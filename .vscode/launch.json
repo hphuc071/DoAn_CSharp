@@ -1,0 +1,39 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Web · 4CHANG LINH NGU LAM",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build solution",
+      "program": "${workspaceFolder}/src/MocCafe.Web/bin/Debug/net8.0/MocCafe.Web.dll",
+      "cwd": "${workspaceFolder}/src/MocCafe.Web",
+      "args": [
+        "--urls",
+        "http://localhost:5180"
+      ],
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
+      }
+    },
+    {
+      "name": "Nhân viên · 4CHANG",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build solution",
+      "program": "${workspaceFolder}/src/MocCafe.Pos/bin/Debug/net8.0-windows/MocCafe.Pos.dll",
+      "cwd": "${workspaceFolder}",
+      "args": []
+    },
+    {
+      "name": "Quản lý · 4CHANG",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "Build solution",
+      "program": "${workspaceFolder}/src/MocCafe.Admin/bin/Debug/net8.0-windows/MocCafe.Admin.dll",
+      "cwd": "${workspaceFolder}",
+      "args": []
+    }
+  ]
+}
