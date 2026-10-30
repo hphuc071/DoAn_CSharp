@@ -1,0 +1,347 @@
+{
+  "database": "FourChangDb",
+  "tableCount": 51,
+  "groups": [
+    {
+      "name": "Tài khoản, phân quyền và ca làm việc",
+      "tables": [
+        {
+          "name": "UserAccounts",
+          "primaryKey": "Id",
+          "columns": "AccountType, LoginNormalized, EmailNormalized?, PhoneNormalized?, DisplayName, PasswordHash, MustChangePassword, IsActive, TokenVersion",
+          "rules": "AccountType chỉ CUSTOMER hoặc ADMIN; không có tài khoản Staff. Định danh chuẩn hóa duy nhất; mật khẩu là hash, không mã hóa thuận nghịch."
+        },
+        {
+          "name": "UserSessions",
+          "primaryKey": "Id",
+          "columns": "UserId → UserAccounts, RefreshTokenHash, Scope, ExpiresAt, RevokedAt?, LastSeenAt",
+          "rules": "Thu hồi từng phiên khi đăng xuất; hash refresh token duy nhất. Scope tạm đổi mật khẩu không được đặt hàng."
+        },
+        {
+          "name": "CustomerAddresses",
+          "primaryKey": "Id",
+          "columns": "CustomerUserId → UserAccounts, ReceiverName, Phone, AddressText, Latitude?, Longitude?, IsDefault, IsActive",
+          "rules": "Chỉ Customer sở hữu; tối đa một địa chỉ mặc định đang hoạt động. Đơn đã gửi dùng bản chụp riêng."
+        },
+        {
+          "name": "Roles",
+          "primaryKey": "Id",
+          "columns": "Code, Name, IsActive",
+          "rules": "Code duy nhất; vai trò quản trị được cấu hình; Customer không được gán quyền nội bộ."
+        },
+        {
+          "name": "UserRoles",
+          "primaryKey": "(UserId, RoleId)",
+          "columns": "UserId → UserAccounts, RoleId → Roles",
+          "rules": "PK ghép; áp dụng cho người có tài khoản; không gắn tên nhân viên tự khai vào bảng này."
+        },
+        {
+          "name": "Permissions",
+          "primaryKey": "Id",
+          "columns": "Code, Name, Module",
+          "rules": "Code duy nhất, ví dụ Refund.Approve, Audit.Read, Audit.Export, Inventory.Post."
+        },
+        {
+          "name": "RolePermissions",
+          "primaryKey": "(RoleId, PermissionId)",
+          "columns": "RoleId → Roles, PermissionId → Permissions",
+          "rules": "PK ghép; quyền báo cáo, audit và xuất độc lập."
+        },
+        {
+          "name": "PosDevices",
+          "primaryKey": "Id",
+          "columns": "TerminalCode, Name, CredentialHash, IsActive, RevokedAt?",
+          "rules": "TerminalCode duy nhất; dùng tập quyền POS cố định của dịch vụ, không tạo tài khoản nhân viên."
+        },
+        {
+          "name": "WorkSessions",
+          "primaryKey": "Id",
+          "columns": "PosDeviceId → PosDevices, DeclaredStaffName, StartedAt, EndedAt?, Status, OpeningCash, CountedCash?, DifferenceReason?, HandoverFromId? → WorkSessions, ApprovedByAdminId? → UserAccounts",
+          "rules": "Tên tự khai + mã ca + thiết bị; tối đa một ca chưa đóng trên máy. Khóa/tiếp tục là trạng thái ca, không cấp quyền Admin."
+        },
+        {
+          "name": "CashMovements",
+          "primaryKey": "Id",
+          "columns": "WorkSessionId → WorkSessions, PaymentId? → Payments, RefundAttemptId? → RefundAttempts, Kind, Amount, Reason, OperationKey",
+          "rules": "Sổ tiền mặt bất biến; tham chiếu nguồn có điều kiện; unique OperationKey. Chi ngoài bán hàng cần Admin duyệt/audit."
+        }
+      ]
+    },
+    {
+      "name": "Thực đơn và nội dung",
+      "tables": [
+        {
+          "name": "Categories",
+          "primaryKey": "Id",
+          "columns": "Code, Name, SortOrder, IsPublished, IsActive",
+          "rules": "Mã duy nhất; ngừng sử dụng khi có món liên quan."
+        },
+        {
+          "name": "Products",
+          "primaryKey": "Id",
+          "columns": "CategoryId → Categories, Code, Name, Description, ImagePath, IsPublished, IsSelling, PublishedAt?",
+          "rules": "Trạng thái bật bán khác trạng thái đủ nguyên liệu; món mới theo PublishedAt, bán chạy tính từ giao dịch."
+        },
+        {
+          "name": "ProductVariants",
+          "primaryKey": "Id",
+          "columns": "ProductId → Products, SizeCode, TemperatureCode, Price, IsEnabled",
+          "rules": "Unique(ProductId, SizeCode, TemperatureCode); size S/M/L, nhiệt HOT/ICED; giá không âm."
+        },
+        {
+          "name": "Toppings",
+          "primaryKey": "Id",
+          "columns": "Code, Name, PricePerPortion, IsEnabled",
+          "rules": "Đơn vị phần; giá không âm; BOM topping được quản lý bằng Recipes."
+        },
+        {
+          "name": "ProductToppings",
+          "primaryKey": "(ProductId, ToppingId)",
+          "columns": "ProductId → Products, ToppingId → Toppings, MaxPortionsPerCup, IsEnabled",
+          "rules": "Giới hạn số phần/ly và quan hệ món–topping hợp lệ."
+        },
+        {
+          "name": "Banners",
+          "primaryKey": "Id",
+          "columns": "Title, ImagePath, TargetUrl?, Placement, StartsAt, EndsAt?, SortOrder, IsPublished",
+          "rules": "EndsAt > StartsAt nếu có; thay banner không thay dữ liệu giao dịch."
+        }
+      ]
+    },
+    {
+      "name": "Nguyên liệu và công thức BOM",
+      "tables": [
+        {
+          "name": "Units",
+          "primaryKey": "Id",
+          "columns": "Code, Name, Dimension",
+          "rules": "Đơn vị cơ sở/nhập như g, kg, ml, l, chai; không tự quy đổi khối lượng sang thể tích."
+        },
+        {
+          "name": "Ingredients",
+          "primaryKey": "Id",
+          "columns": "Code, Name, BaseUnitId → Units, SafetyQuantity, LowStockThreshold, IsActive",
+          "rules": "Các ngưỡng không âm; không chứa một cột tồn kho cho mọi kho."
+        },
+        {
+          "name": "IngredientUnitConversions",
+          "primaryKey": "(IngredientId, FromUnitId)",
+          "columns": "IngredientId → Ingredients, FromUnitId → Units, FactorToBaseUnit",
+          "rules": "Hệ số > 0; 1 chai của từng nguyên liệu có thể khác nhau. Snapshot quy đổi trên dòng chứng từ."
+        },
+        {
+          "name": "Recipes",
+          "primaryKey": "Id",
+          "columns": "ProductVariantId? → ProductVariants, ToppingId? → Toppings, IsActive",
+          "rules": "CHECK XOR: đúng một chủ sở hữu là biến thể món hoặc topping; unique FK không null."
+        },
+        {
+          "name": "RecipeVersions",
+          "primaryKey": "Id",
+          "columns": "RecipeId → Recipes, VersionNo, Status, EffectiveFrom?, EffectiveTo?, CreatedByAdminId → UserAccounts",
+          "rules": "Unique(RecipeId, VersionNo); bản DRAFT sửa được; đã dùng/công bố không ghi đè. API chặn khoảng hiệu lực chồng nhau."
+        },
+        {
+          "name": "RecipeIngredients",
+          "primaryKey": "(RecipeVersionId, IngredientId)",
+          "columns": "RecipeVersionId → RecipeVersions, IngredientId → Ingredients, QuantityPerServing, LossRate",
+          "rules": "Định mức theo đơn vị cơ sở; lượng > 0, 0 ≤ hao hụt < 1. Cần định nghĩa rõ lượng này là NET hay GROSS; đề xuất NET."
+        },
+        {
+          "name": "RecipeOptionAdjustments",
+          "primaryKey": "Id",
+          "columns": "RecipeVersionId → RecipeVersions, OptionType, PercentValue, IngredientId → Ingredients, ReplacementNetQuantity",
+          "rules": "Unique(version, loại tùy chọn, mức, nguyên liệu); đường/đá là cấu trúc. Lượng thay thế có thể 0; chặn hai loại cùng ghi đè một nguyên liệu nếu chưa có quy tắc kết hợp."
+        }
+      ]
+    },
+    {
+      "name": "Bàn, giao hàng và đơn hàng",
+      "tables": [
+        {
+          "name": "DiningTables",
+          "primaryKey": "Id",
+          "columns": "TableCode, Name, IsActive, QrTokenHash, QrVersion, QrExpiresAt?",
+          "rules": "Mã bàn duy nhất; lưu hash token, xoay version vô hiệu QR cũ; đơn giữ TableCode snapshot."
+        },
+        {
+          "name": "DeliveryRules",
+          "primaryKey": "Id",
+          "columns": "VersionNo, OriginLatitude, OriginLongitude, BaseDistanceKm, BaseFee, StepDistanceKm, FeePerStep, MaxDistanceKm, FreeShippingThreshold?, EffectiveFrom, EffectiveTo?",
+          "rules": "Chính sách có phiên bản; ngưỡng và làm tròn xác định rõ. Không ghi cố định 15.000đ cho mọi đơn."
+        },
+        {
+          "name": "DeliveryQuotes",
+          "primaryKey": "Id",
+          "columns": "CustomerUserId → UserAccounts, RuleId → DeliveryRules, AddressSnapshot, Latitude, Longitude, DistanceKm, ItemsAmountSnapshot, ShippingFee, ExpiresAt, Status",
+          "rules": "Báo phí gắn địa chỉ, giá trị giỏ và phiên bản chính sách. Lưu số phí cuối cùng; hết hạn/đổi địa chỉ phải báo lại."
+        },
+        {
+          "name": "Orders",
+          "primaryKey": "Id",
+          "columns": "OrderNo, Channel, FulfillmentType, CustomerUserId? → UserAccounts, WorkSessionId? → WorkSessions, TableId? → DiningTables, DeliveryQuoteId? → DeliveryQuotes, Status, ReceiverNameSnapshot?, PhoneSnapshot?, AddressSnapshot?, TableCodeSnapshot?, ItemSubtotalSnapshot, ShippingFeeSnapshot, OriginalTotalSnapshot, CurrentObligation, AcceptedAt?, CompletedAt?, ExpiresAt?",
+          "rules": "OrderNo duy nhất; WEB cần Customer; POS cần ca. DINE_IN cần bàn; DELIVERY cần địa chỉ/quote. Một trạng thái xử lý đơn riêng, không trộn trạng thái thanh toán/hoàn."
+        },
+        {
+          "name": "OrderItems",
+          "primaryKey": "Id",
+          "columns": "OrderId → Orders, ProductVariantId → ProductVariants, RecipeVersionId → RecipeVersions, ProductNameSnapshot, SizeSnapshot, TemperatureSnapshot, SugarPercent, IcePercent, UnitBasePriceSnapshot, Quantity, Note?, Status",
+          "rules": "Quantity > 0; số lượng hủy/đã pha được đối chiếu từ bảng con. Snapshot không sửa theo menu mới; ghi chú không tự thay BOM."
+        },
+        {
+          "name": "OrderItemToppings",
+          "primaryKey": "Id",
+          "columns": "OrderItemId → OrderItems, ToppingId → Toppings, RecipeVersionId → RecipeVersions, NameSnapshot, PortionsPerCup, UnitPriceSnapshot",
+          "rules": "Unique(OrderItemId, ToppingId); số phần > 0 và nằm trong giới hạn tại thời điểm đặt."
+        },
+        {
+          "name": "OrderItemIngredients",
+          "primaryKey": "(OrderItemId, IngredientId)",
+          "columns": "OrderItemId → OrderItems, IngredientId → Ingredients, BaseUnitId → Units, GrossQuantityPerCup",
+          "rules": "Snapshot BOM đã áp dụng biến thể, đường/đá, số phần topping và hao hụt; gộp nguyên liệu trùng. Không tính lại từ BOM đang công bố khi bắt đầu pha."
+        },
+        {
+          "name": "PreparationBatches",
+          "primaryKey": "Id",
+          "columns": "OrderItemId → OrderItems, WorkSessionId → WorkSessions, Quantity, Status, StartedAt, ReadyAt?, OperationKey",
+          "rules": "Một lần bắt đầu pha một phần số ly. Unique OperationKey; tổng batch + phần hủy không vượt số đặt."
+        },
+        {
+          "name": "OrderStatusHistory",
+          "primaryKey": "Id",
+          "columns": "OrderId → Orders, OrderItemId? → OrderItems, FromStatus, ToStatus, ActorUserId? → UserAccounts, WorkSessionId? → WorkSessions, Reason?, OccurredAt, CorrelationId",
+          "rules": "Lịch sử append-only; giữ cả ca/máy và tên snapshot khi Staff thực hiện."
+        },
+        {
+          "name": "Cancellations",
+          "primaryKey": "Id",
+          "columns": "OrderId → Orders, RequestedByUserId? → UserAccounts, WorkSessionId? → WorkSessions, Status, Reason, RequestedAt, AcceptedAt?, ShippingAdjustment, OperationKey",
+          "rules": "Lý do bắt buộc; Customer chỉ yêu cầu lúc Chờ xác nhận; Staff chỉ hủy phần chưa pha. Duyệt hủy không đồng nghĩa chi hoàn."
+        },
+        {
+          "name": "CancellationItems",
+          "primaryKey": "(CancellationId, OrderItemId)",
+          "columns": "CancellationId → Cancellations, OrderItemId → OrderItems, Quantity, AmountSnapshot",
+          "rules": "Quantity > 0; cùng Order với phiếu hủy; tổng hủy được chấp nhận không vượt phần chưa bắt đầu pha."
+        }
+      ]
+    },
+    {
+      "name": "Kho và chứng từ",
+      "tables": [
+        {
+          "name": "Warehouses",
+          "primaryKey": "Id",
+          "columns": "Code, Name, IsActive",
+          "rules": "Ban đầu một kho quán; bảng này cho phép thêm kho mà không đổi cấu trúc tồn."
+        },
+        {
+          "name": "InventoryBalances",
+          "primaryKey": "(WarehouseId, IngredientId)",
+          "columns": "WarehouseId → Warehouses, IngredientId → Ingredients, OnHandQuantity, ReservedQuantity, RowVersion",
+          "rules": "Số dư nhanh phải khớp sổ kho; lượng không âm và Reserved ≤ OnHand. Khả dụng = OnHand − Reserved − SafetyQuantity."
+        },
+        {
+          "name": "InventoryDocuments",
+          "primaryKey": "Id",
+          "columns": "DocumentNo, WarehouseId → Warehouses, Type, Status, SupplierName?, Reason?, InventoryCutoffAt?, CreatedByAdminId → UserAccounts, PostedAt?, ReversalOfId? → InventoryDocuments, OperationKey",
+          "rules": "IMPORT/EXPORT/COUNT_ADJUST; DRAFT/POSTED/REVERSED. Chỉ nháp được sửa/xóa. Ghi sổ toàn phiếu trong một transaction."
+        },
+        {
+          "name": "InventoryDocumentItems",
+          "primaryKey": "Id",
+          "columns": "DocumentId → InventoryDocuments, IngredientId → Ingredients, InputUnitId → Units, InputQuantity, ConversionFactorSnapshot, BaseQuantity, BookQuantitySnapshot?, CountedQuantity?, UnitCost?",
+          "rules": "Nhập/xuất dùng lượng dương; điều chỉnh tính delta từ thực đếm và số sổ đã đối chiếu. Không lấn phần giữ chỗ."
+        },
+        {
+          "name": "InventoryMovements",
+          "primaryKey": "Id",
+          "columns": "WarehouseId → Warehouses, IngredientId → Ingredients, DocumentItemId? → InventoryDocumentItems, PreparationBatchId? → PreparationBatches, QuantityDelta, Kind, OccurredAt, ReversalOfId? → InventoryMovements",
+          "rules": "Sổ bất biến, delta khác 0. Đúng một nguồn chứng từ hoặc batch pha; bản đảo liên kết nguồn gốc. Unique batch + nguyên liệu + kho + loại tiêu hao để không trừ trùng."
+        },
+        {
+          "name": "IngredientReservations",
+          "primaryKey": "Id",
+          "columns": "OrderItemId → OrderItems, IngredientId → Ingredients, WarehouseId → Warehouses, ReservedQuantity, ConsumedQuantity, ReleasedQuantity, ExpiresAt?, Status",
+          "rules": "Unique(item, nguyên liệu, kho); Consumed + Released ≤ Reserved. Giữ chỗ không phải xuất kho; hết hạn/hủy giải phóng phần chưa pha."
+        }
+      ]
+    },
+    {
+      "name": "Thu tiền, hoàn tiền và hóa đơn",
+      "tables": [
+        {
+          "name": "PaymentRequests",
+          "primaryKey": "Id",
+          "columns": "OrderId → Orders, RequestCode, Method, AmountDueSnapshot, Currency, QrPayload?, ExpiresAt, Status, OperationKey",
+          "rules": "QR/VietQR là yêu cầu thu; không là bằng chứng đã thu. Có thể có yêu cầu cũ hết hạn; không dùng trạng thái này làm sổ tiền."
+        },
+        {
+          "name": "BankTransactions",
+          "primaryKey": "Id",
+          "columns": "Provider, MerchantAccountKey, ProviderTransactionId, Direction, Amount, Currency, BankOccurredAt, ReferenceText, VerificationStatus, MatchedAt?",
+          "rules": "Unique(provider, tài khoản, mã giao dịch); ghi cả khoản chưa ghép đơn. Chỉ nguồn tin cậy được đánh VERIFIED; lưu/che dữ liệu theo phạm vi truy cập."
+        },
+        {
+          "name": "Payments",
+          "primaryKey": "Id",
+          "columns": "OrderId → Orders, PaymentRequestId? → PaymentRequests, BankTransactionId? → BankTransactions, WorkSessionId? → WorkSessions, Method, Amount, ReceivedAt, VerifiedAt?, Status, OperationKey",
+          "rules": "Thu CASH hoặc BANK_TRANSFER. WEB chỉ BANK_TRANSFER đã xác minh. Unique BankTransactionId không null; một khoản thu ngân hàng chỉ ghép một đơn trong thiết kế ban đầu."
+        },
+        {
+          "name": "Refunds",
+          "primaryKey": "Id",
+          "columns": "OrderId → Orders, CancellationId? → Cancellations, PaymentId? → Payments, RequestedAmount, Reason, RecipientNameSnapshot, RecipientAccountEncrypted, RecipientAccountMasked, Status, RequestedByUserId? → UserAccounts, ApprovedByAdminId? → UserAccounts, ApprovedAt?",
+          "rules": "Hoàn do hủy hoặc thu thừa/tiền đến muộn. Kiểm tra nghĩa vụ thực, không dựa riêng RequestedAmount. Tài khoản nhận là dữ liệu nhạy cảm; audit chỉ lưu bản che."
+        },
+        {
+          "name": "RefundAttempts",
+          "primaryKey": "Id",
+          "columns": "RefundId → Refunds, Amount, OperationKey, ProviderRequestKey?, BankTransactionId? → BankTransactions, Status, StartedAt, ResolvedAt?, VerifiedByAdminId? → UserAccounts, EvidenceReference?, FailureReason?",
+          "rules": "Mỗi lần chi là bản ghi riêng; unique OperationKey và mã ngân hàng không null. PROCESSING/RECONCILING giữ hạn mức; chỉ SUCCEEDED cộng số đã hoàn."
+        },
+        {
+          "name": "Invoices",
+          "primaryKey": "Id",
+          "columns": "InvoiceNo, OrderId → Orders, Type, OriginalInvoiceId? → Invoices, SourceCancellationId? → Cancellations, Status, BuyerSnapshot, TotalAmount, IssuedAt, IssuedByUserId? → UserAccounts, WorkSessionId? → WorkSessions",
+          "rules": "Hóa đơn bán hàng nội bộ: SALE/ADJUSTMENT. Unique InvoiceNo; bản phát hành bất biến; điều chỉnh có nguồn, không ghi đè bản gốc. In lại không tạo hóa đơn mới."
+        },
+        {
+          "name": "InvoiceLines",
+          "primaryKey": "Id",
+          "columns": "InvoiceId → Invoices, OrderItemId? → OrderItems, DescriptionSnapshot, Quantity, UnitPriceSnapshot, LineAmount",
+          "rules": "Lưu dòng hàng/topping/phí đã phát hành. Dòng điều chỉnh có thể có giá trị âm theo loại chứng từ; tổng dòng bằng đầu hóa đơn."
+        }
+      ]
+    },
+    {
+      "name": "Tích hợp, chống trùng và nhật ký",
+      "tables": [
+        {
+          "name": "PaymentEvents",
+          "primaryKey": "Id",
+          "columns": "Provider, ProviderEventId, ReceivedAt, VerifiedAt?, PayloadHash, PayloadReference, ProcessingStatus, BankTransactionId? → BankTransactions, ErrorCode?",
+          "rules": "Unique(provider, eventId); inbox webhook. Nhận lặp trả kết quả cũ; xác minh nguồn trước khi ghi nhận tiền."
+        },
+        {
+          "name": "AuditLogs",
+          "primaryKey": "Id",
+          "columns": "ActorUserId? → UserAccounts, WorkSessionId? → WorkSessions, ActorNameSnapshot, TerminalCodeSnapshot?, Action, EntityType, EntityId, BeforeJson?, AfterJson?, Reason?, OccurredAt, CorrelationId",
+          "rules": "Append-only; che token/password/số tài khoản; quyền đọc/xuất độc lập. Tên Staff luôn gắn ca/máy, không coi là tài khoản xác thực."
+        },
+        {
+          "name": "OutboxMessages",
+          "primaryKey": "Id",
+          "columns": "EventType, AggregateType, AggregateId, AggregateVersion, Payload, CreatedAt, PublishedAt?, RetryCount, NextAttemptAt?, ErrorCode?",
+          "rules": "Ghi cùng transaction nghiệp vụ, worker phát SignalR/event sau commit; consumer chống trùng. Không giả định exactly-once delivery."
+        },
+        {
+          "name": "IdempotencyRequests",
+          "primaryKey": "Id",
+          "columns": "PrincipalScope, OperationType, RequestKey, PayloadHash, Status, ResponseReference?, CreatedAt, ExpiresAt",
+          "rules": "Unique(scope, loại lệnh, key); cùng key khác payload bị từ chối. Thời gian giữ key bao phủ thời gian retry/đối soát."
+        }
+      ]
+    }
+  ]
+}

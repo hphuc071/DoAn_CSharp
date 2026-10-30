@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup><ProjectReference Include="../FourChang.Presentation.Shared/FourChang.Presentation.Shared.csproj"/><Content Include="../../assets/images/*" Link="Assets/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /></ItemGroup></Project>

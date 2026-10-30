@@ -1,11 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-set "APP=%~dp0src\MocCafe.Pos\bin\Debug\net8.0-windows\MocCafe.Pos.exe"
+set "APP=%~dp0src\FourChang.Pos\bin\Debug\net8.0-windows\FourChang.Pos.exe"
 if exist "%APP%" goto launch
 where dotnet >nul 2>nul
 if errorlevel 1 goto missing
- dotnet build "%~dp0src\MocCafe.Pos\MocCafe.Pos.csproj" --nologo
+ dotnet build "%~dp0src\FourChang.Pos\FourChang.Pos.csproj" --nologo
 if errorlevel 1 goto failed
 :launch
 start "" "%APP%"

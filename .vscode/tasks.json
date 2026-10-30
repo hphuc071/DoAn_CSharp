@@ -7,7 +7,7 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/MocCafe.sln"
+        "${workspaceFolder}/FourChang.sln"
       ],
       "group": {
         "kind": "build",
@@ -22,7 +22,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/MocCafe.Web",
+        "${workspaceFolder}/src/FourChang.Web",
         "--urls",
         "http://localhost:5180"
       ],
@@ -38,7 +38,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/MocCafe.Pos"
+        "${workspaceFolder}/src/FourChang.Pos"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -52,7 +52,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/MocCafe.Admin"
+        "${workspaceFolder}/src/FourChang.Admin"
       ],
       "problemMatcher": [],
       "presentation": {

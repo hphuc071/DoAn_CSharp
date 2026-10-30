@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <AssemblyTitle>4CHANG LINH NGU LAM — POS Nhân viên</AssemblyTitle>
-  </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../MocCafe.Desktop/MocCafe.Desktop.csproj" /></ItemGroup>
-</Project>

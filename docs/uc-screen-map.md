@@ -17,7 +17,7 @@ Nguồn: `references/Dac_ta_chi_tiet_24_Use_Case_Sau_khi_gop.docx`. Mã UC giữ
 
 ## Nhân viên — 5 UC
 
-Các tệp ở `MocCafe.Desktop/Features/Pos`. Mở từ sidebar POS. Dữ liệu ca mẫu luôn kèm mã ca/máy. Không có tài khoản hoặc mật khẩu Staff.
+Các tệp ở `FourChang.Desktop/Features/Pos`. Mở từ sidebar POS. Dữ liệu ca mẫu luôn kèm mã ca/máy. Không có tài khoản hoặc mật khẩu Staff.
 
 | UC | Màn hình / tệp | Luồng chính thể hiện trên UI | Nhánh thay thế / lỗi để review |
 |---|---|---|---|
@@ -29,7 +29,7 @@ Các tệp ở `MocCafe.Desktop/Features/Pos`. Mở từ sidebar POS. Dữ liệ
 
 ## Quản lý — 11 UC
 
-Các tệp ở `MocCafe.Desktop/Features/Admin`. CRUD dùng bảng + các hộp thoại theo trường của hành động. Không thêm tài khoản Staff vào CRUD. Đăng nhập Admin có biểu mẫu riêng ở EntryForm; sidebar Phân quyền có quản lý Admin/vai trò/máy POS.
+Các tệp ở `FourChang.Desktop/Features/Admin`. CRUD dùng bảng + các hộp thoại theo trường của hành động. Không thêm tài khoản Staff vào CRUD. Đăng nhập Admin có biểu mẫu riêng ở EntryForm; sidebar Phân quyền có quản lý Admin/vai trò/máy POS.
 
 | UC | Màn hình / tệp | Luồng chính thể hiện trên UI | Nhánh thay thế / lỗi để review |
 |---|---|---|---|

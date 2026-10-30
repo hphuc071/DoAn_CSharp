@@ -8,7 +8,7 @@ Web / Razor Pages ───────┐
 POS / Admin → Desktop UI ┘
 ```
 
-Web, POS và Admin là ba executable độc lập. POS/Admin cùng tham chiếu thư viện MocCafe.Desktop để tái sử dụng UI. Shared không biết Razor, Control, HTTP, EF hay SQL. Các lớp `*View` tạo control và trình bày; `Ui` tạo control chuẩn; `PreviewDialog` chỉ mở bản xem trước. Web JS chỉ xử lý DOM, không có fetch hoặc lưu dữ liệu. Không có mật khẩu/API key/connection string trong mã nguồn.
+Web, POS và Admin là ba executable độc lập. POS/Admin cùng tham chiếu thư viện FourChang.Desktop để tái sử dụng UI. Shared không biết Razor, Control, HTTP, EF hay SQL. Các lớp `*View` tạo control và trình bày; `Ui` tạo control chuẩn; `PreviewDialog` chỉ mở bản xem trước. Web JS chỉ xử lý DOM, không có fetch hoặc lưu dữ liệu. Không có mật khẩu/API key/connection string trong mã nguồn.
 
 ## Vì sao tổ chức như vậy
 
@@ -22,7 +22,7 @@ Web, POS và Admin là ba executable độc lập. POS/Admin cùng tham chiếu 
 
 ## Khi bắt đầu triển khai nghiệp vụ (chưa tạo ở bản này)
 
-Thêm `MocCafe.Domain` cho entity/value object/rule và state machine; `MocCafe.Application` cho use case, interface repository/payment/refund/inventory; `MocCafe.Infrastructure` cho EF Core SQL Server và adapter VietQR; `MocCafe.Api` làm điểm vào duy nhất cho hai UI. Có thể thêm `MocCafe.Contracts` cho request/response/version DTO. Những project này chỉ nên tạo khi bắt đầu chức năng thật, tránh đưa nghiệp vụ giả vào bản UI.
+Thêm `FourChang.Domain` cho entity/value object/rule và state machine; `FourChang.Application` cho use case, interface repository/payment/refund/inventory; `FourChang.Infrastructure` cho EF Core SQL Server và adapter VietQR; `FourChang.Api` làm điểm vào duy nhất cho hai UI. Có thể thêm `FourChang.Contracts` cho request/response/version DTO. Những project này chỉ nên tạo khi bắt đầu chức năng thật, tránh đưa nghiệp vụ giả vào bản UI.
 
 ```text
 Web / Desktop → API (HTTP + SignalR)

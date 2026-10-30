@@ -6,8 +6,8 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "Build solution",
-      "program": "${workspaceFolder}/src/MocCafe.Web/bin/Debug/net8.0/MocCafe.Web.dll",
-      "cwd": "${workspaceFolder}/src/MocCafe.Web",
+      "program": "${workspaceFolder}/src/FourChang.Web/bin/Debug/net8.0/FourChang.Web.dll",
+      "cwd": "${workspaceFolder}/src/FourChang.Web",
       "args": [
         "--urls",
         "http://localhost:5180"
@@ -22,7 +22,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "Build solution",
-      "program": "${workspaceFolder}/src/MocCafe.Pos/bin/Debug/net8.0-windows/MocCafe.Pos.dll",
+      "program": "${workspaceFolder}/src/FourChang.Pos/bin/Debug/net8.0-windows/FourChang.Pos.dll",
       "cwd": "${workspaceFolder}",
       "args": []
     },
@@ -31,7 +31,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "Build solution",
-      "program": "${workspaceFolder}/src/MocCafe.Admin/bin/Debug/net8.0-windows/MocCafe.Admin.dll",
+      "program": "${workspaceFolder}/src/FourChang.Admin/bin/Debug/net8.0-windows/FourChang.Admin.dll",
       "cwd": "${workspaceFolder}",
       "args": []
     }

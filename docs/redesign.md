@@ -13,16 +13,16 @@ Giữ nguyên 24 UC, màu nâu–kem và bố cục: Web có lưới món + side
 
 | Ứng dụng | Project | Cách mở | Màn hình đầu |
 |---|---|---|---|
-| Nhân viên | `src/MocCafe.Pos` | `Chay-NhanVien.cmd` hoặc `dotnet run --project src/MocCafe.Pos` | Nhập tên mở ca; không tài khoản nhân viên. |
-| Quản lý | `src/MocCafe.Admin` | `Chay-QuanLy.cmd` hoặc `dotnet run --project src/MocCafe.Admin` | Biểu mẫu đăng nhập quản lý; chưa xác thực thật. |
-| Khách hàng | `src/MocCafe.Web` | `Chay-Web.cmd` hoặc `dotnet run --project src/MocCafe.Web --urls http://localhost:5180` | Website thực đơn. |
+| Nhân viên | `src/FourChang.Pos` | `Chay-NhanVien.cmd` hoặc `dotnet run --project src/FourChang.Pos` | Nhập tên mở ca; không tài khoản nhân viên. |
+| Quản lý | `src/FourChang.Admin` | `Chay-QuanLy.cmd` hoặc `dotnet run --project src/FourChang.Admin` | Biểu mẫu đăng nhập quản lý; chưa xác thực thật. |
+| Khách hàng | `src/FourChang.Web` | `Chay-Web.cmd` hoặc `dotnet run --project src/FourChang.Web --urls http://localhost:5180` | Website thực đơn. |
 
-`MocCafe.Desktop` trở thành thư viện giao diện dùng chung cho hai executable. Các feature POS/Admin vẫn tách riêng; mỗi executable chỉ mở menu đúng vai trò, không có bộ chọn/chuyển vai trò trong ứng dụng. Đây là phân tách trình bày; quyền bảo mật thực thuộc giai đoạn API/xác thực sau.
+`FourChang.Desktop` trở thành thư viện giao diện dùng chung cho hai executable. Các feature POS/Admin vẫn tách riêng; mỗi executable chỉ mở menu đúng vai trò, không có bộ chọn/chuyển vai trò trong ứng dụng. Đây là phân tách trình bày; quyền bảo mật thực thuộc giai đoạn API/xác thực sau.
 
-Các namespace và tên solution `MocCafe` được giữ để tránh đổi tên kỹ thuật lan rộng; tên thương hiệu hiển thị là **4CHANG LINH NGU LAM**. Mở hai Desktop đồng thời được; dữ liệu mẫu không đồng bộ giữa hai cửa sổ.
+Các namespace và tên solution `FourChang` được giữ để tránh đổi tên kỹ thuật lan rộng; tên thương hiệu hiển thị là **4CHANG LINH NGU LAM**. Mở hai Desktop đồng thời được; dữ liệu mẫu không đồng bộ giữa hai cửa sổ.
 
 ## Review
 
 Hai màn hình đầu lưu ở `previews/staff-entry.png` và `previews/admin-entry.png`; ba giao diện chính ở `web.png`, `pos.png`, `admin.png`.
 
-Để mở thẳng giao diện nội bộ khi review: `dotnet run --project src/MocCafe.Pos -- --preview` hoặc tương tự `MocCafe.Admin`. Cờ chỉ phục vụ prototype, không phải cơ chế đăng nhập sản xuất.
+Để mở thẳng giao diện nội bộ khi review: `dotnet run --project src/FourChang.Pos -- --preview` hoặc tương tự `FourChang.Admin`. Cờ chỉ phục vụ prototype, không phải cơ chế đăng nhập sản xuất.
