@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="../FourChang.Infrastructure/FourChang.Infrastructure.csproj" />
+    <ProjectReference Include="../FourChang.Presentation.Shared/FourChang.Presentation.Shared.csproj" />
+  </ItemGroup>
+</Project>

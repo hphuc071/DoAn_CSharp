@@ -1,0 +1,11 @@
+namespace FourChang.Presentation.Shared.Integration;
+public sealed record MenuProduct(long Id, long MaMon, string Name, string Category, decimal Price, int ImageIndex, bool Available, string Badge);
+public sealed record Employee(long MaNhanVien, string HoTen, string? SoDienThoai, DateTime NgayVaoLam, string TrangThai, byte[]? PhienBanDuLieu = null);
+public sealed record SignIn(string TenDangNhap, string MatKhau);
+public sealed record RegisterCustomer(string TenDangNhap, string HoTen, string? Email, string? SoDienThoai, string MatKhau);
+public sealed record SessionResult(string Token, string Role, string Name, long Id, long? ShiftId = null);
+public sealed record OpenShift(long MaNhanVien, string TenCa, string MaMay, decimal TienMatDauCa);
+public sealed record CloseShift(decimal TienMatThucDem, string? LyDoChenhLech);
+public sealed record EmployeeInput(string HoTen, string? SoDienThoai, DateTime NgayVaoLam, string TrangThai, byte[]? PhienBanDuLieu = null);
+public sealed record TableData(string[] Columns, string[][] Rows);
+public sealed record DashboardData(decimal Revenue, int CompletedOrders, int PendingRefunds, int LowIngredients);

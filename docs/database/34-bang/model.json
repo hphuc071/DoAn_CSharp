@@ -1,0 +1,3811 @@
+{
+  "tables": [
+    {
+      "name": "TaiKhoanKhachHang",
+      "group": "Accounts",
+      "pk": [
+        "MaKhachHang"
+      ],
+      "fields": [
+        {
+          "name": "MaKhachHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenDangNhapChuanHoa",
+          "sql": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MatKhauBam",
+          "sql": "nvarchar(512)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "BatBuocDoiMatKhau",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "SoLanDangNhapSai",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "KhoaDenLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "DangNhapLanCuoiLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "HoTen",
+          "sql": "nvarchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "EmailChuanHoa",
+          "sql": "nvarchar(254)",
+          "nullable": true
+        },
+        {
+          "name": "SoDienThoaiChuanHoa",
+          "sql": "varchar(20)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "TrangThai IN ('ACTIVE','LOCKED','INACTIVE')",
+        "SoLanDangNhapSai >= 0",
+        "EmailChuanHoa IS NOT NULL OR SoDienThoaiChuanHoa IS NOT NULL",
+        "LEN(LTRIM(RTRIM(HoTen))) > 0"
+      ],
+      "unique": [
+        [
+          "TenDangNhapChuanHoa"
+        ]
+      ],
+      "indexes": [
+        [
+          "UX_KhachHang_Email",
+          [
+            "EmailChuanHoa"
+          ],
+          "EmailChuanHoa IS NOT NULL"
+        ],
+        [
+          "UX_KhachHang_DienThoai",
+          [
+            "SoDienThoaiChuanHoa"
+          ],
+          "SoDienThoaiChuanHoa IS NOT NULL"
+        ]
+      ],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "TaiKhoanQuanLy",
+      "group": "Accounts",
+      "pk": [
+        "MaQuanLy"
+      ],
+      "fields": [
+        {
+          "name": "MaQuanLy",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenDangNhapChuanHoa",
+          "sql": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MatKhauBam",
+          "sql": "nvarchar(512)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "BatBuocDoiMatKhau",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "SoLanDangNhapSai",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "KhoaDenLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "DangNhapLanCuoiLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "HoTen",
+          "sql": "nvarchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "MaQuanLy = 1",
+        "TrangThai IN ('ACTIVE','LOCKED','INACTIVE')",
+        "SoLanDangNhapSai >= 0"
+      ],
+      "unique": [
+        [
+          "TenDangNhapChuanHoa"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "PhienDangNhap",
+      "group": "Accounts",
+      "pk": [
+        "MaPhienDangNhap"
+      ],
+      "fields": [
+        {
+          "name": "MaPhienDangNhap",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaKhachHang",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLy",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaLamMoiDaBam",
+          "sql": "binary(32)",
+          "nullable": false
+        },
+        {
+          "name": "PhamViPhien",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "LoaiUngDung",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "ThongTinThietBi",
+          "sql": "nvarchar(300)",
+          "nullable": true
+        },
+        {
+          "name": "HetHanLuc",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "HoatDongLanCuoiLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "ThuHoiLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "LyDoThuHoi",
+          "sql": "nvarchar(250)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "(MaKhachHang IS NOT NULL AND MaQuanLy IS NULL) OR (MaKhachHang IS NULL AND MaQuanLy IS NOT NULL)",
+        "HetHanLuc > ThoiDiemTao",
+        "PhamViPhien IN ('FULL','PASSWORD_CHANGE')"
+      ],
+      "unique": [
+        [
+          "MaLamMoiDaBam"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "DiaChiKhachHang",
+      "group": "Accounts",
+      "pk": [
+        "MaDiaChi"
+      ],
+      "fields": [
+        {
+          "name": "MaDiaChi",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaKhachHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "NhanDiaChi",
+          "sql": "nvarchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "TenNguoiNhan",
+          "sql": "nvarchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "DienThoaiNguoiNhan",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "DiaChiChiTiet",
+          "sql": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "ViDo",
+          "sql": "decimal(9,6)",
+          "nullable": true
+        },
+        {
+          "name": "KinhDo",
+          "sql": "decimal(9,6)",
+          "nullable": true
+        },
+        {
+          "name": "GhiChuGiaoHang",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "LaDiaChiMacDinh",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "ViDo IS NULL OR ViDo BETWEEN -90 AND 90",
+        "KinhDo IS NULL OR KinhDo BETWEEN -180 AND 180",
+        "(ViDo IS NULL AND KinhDo IS NULL) OR (ViDo IS NOT NULL AND KinhDo IS NOT NULL)"
+      ],
+      "unique": [],
+      "indexes": [
+        [
+          "UX_DiaChi_MacDinh",
+          [
+            "MaKhachHang"
+          ],
+          "LaDiaChiMacDinh = 1 AND DangSuDung = 1"
+        ]
+      ],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "NhanVien",
+      "group": "Accounts",
+      "pk": [
+        "MaNhanVien"
+      ],
+      "fields": [
+        {
+          "name": "MaNhanVien",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "HoTen",
+          "sql": "nvarchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "SoDienThoai",
+          "sql": "varchar(20)",
+          "nullable": true
+        },
+        {
+          "name": "NgayVaoLam",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "TrangThai IN ('ACTIVE','INACTIVE')",
+        "LEN(LTRIM(RTRIM(HoTen))) > 0"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "CaLamViec",
+      "group": "Accounts",
+      "pk": [
+        "MaCaLamViec"
+      ],
+      "fields": [
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaCaHienThi",
+          "sql": "varchar(30)",
+          "nullable": false
+        },
+        {
+          "name": "MaNhanVien",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenCa",
+          "sql": "nvarchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "MaMay",
+          "sql": "varchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "BatDauLuc",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "KetThucLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "TienMatDauCa",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "TienMatDuKienCuoiCa",
+          "sql": "decimal(18,0)",
+          "nullable": true
+        },
+        {
+          "name": "TienMatThucDem",
+          "sql": "decimal(18,0)",
+          "nullable": true
+        },
+        {
+          "name": "LyDoChenhLech",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "MaCaBanGiaoTruoc",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyDuyet",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "GhiChu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "TenCa IN (N'Sáng',N'Chiều',N'Tối')",
+        "TrangThai IN ('OPEN','LOCKED','HANDED_OVER','CLOSED')",
+        "KetThucLuc IS NULL OR KetThucLuc >= BatDauLuc",
+        "TienMatDauCa >= 0 AND (TienMatDuKienCuoiCa IS NULL OR TienMatDuKienCuoiCa >= 0) AND (TienMatThucDem IS NULL OR TienMatThucDem >= 0)",
+        "(TrangThai IN ('OPEN','LOCKED') AND KetThucLuc IS NULL) OR (TrangThai IN ('CLOSED','HANDED_OVER') AND KetThucLuc IS NOT NULL)",
+        "TrangThai <> 'CLOSED' OR (TienMatDuKienCuoiCa IS NOT NULL AND TienMatThucDem IS NOT NULL)"
+      ],
+      "unique": [
+        [
+          "MaCaHienThi"
+        ]
+      ],
+      "indexes": [
+        [
+          "UX_Ca_MayDangMo",
+          [
+            "MaMay"
+          ],
+          "KetThucLuc IS NULL"
+        ],
+        [
+          "UX_Ca_NhanVienDangMo",
+          [
+            "MaNhanVien"
+          ],
+          "KetThucLuc IS NULL"
+        ]
+      ],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "DanhMucMon",
+      "group": "Menu",
+      "pk": [
+        "MaDanhMuc"
+      ],
+      "fields": [
+        {
+          "name": "MaDanhMuc",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenDanhMuc",
+          "sql": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MoTa",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThuTuHienThi",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "DaCongBo",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [],
+      "unique": [
+        [
+          "TenDanhMuc"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "Mon",
+      "group": "Menu",
+      "pk": [
+        "MaMon"
+      ],
+      "fields": [
+        {
+          "name": "MaMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaDanhMuc",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenMon",
+          "sql": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "MoTa",
+          "sql": "nvarchar(1000)",
+          "nullable": true
+        },
+        {
+          "name": "DuongDanAnh",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThuTuHienThi",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "DaCongBo",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "DangBan",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [],
+      "unique": [
+        [
+          "MaDanhMuc",
+          "TenMon"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "CauHinhMon",
+      "group": "Menu",
+      "pk": [
+        "MaCauHinhMon"
+      ],
+      "fields": [
+        {
+          "name": "MaCauHinhMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "KichCo",
+          "sql": "varchar(5)",
+          "nullable": false
+        },
+        {
+          "name": "NhietDo",
+          "sql": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "GiaBan",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "DangBan",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "KichCo IN ('S','M','L')",
+        "NhietDo IN ('HOT','ICED')",
+        "GiaBan >= 0"
+      ],
+      "unique": [
+        [
+          "MaMon",
+          "KichCo",
+          "NhietDo"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "MonThem",
+      "group": "Menu",
+      "pk": [
+        "MaMonThem"
+      ],
+      "fields": [
+        {
+          "name": "MaMonThem",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenMonThem",
+          "sql": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MoTa",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "GiaMoiPhan",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "GioiHanMacDinhMoiLy",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "DuongDanAnh",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "GiaMoiPhan >= 0",
+        "GioiHanMacDinhMoiLy > 0"
+      ],
+      "unique": [
+        [
+          "TenMonThem"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "CauHinhMonThem",
+      "group": "Menu",
+      "pk": [
+        "MaCauHinhMon",
+        "MaMonThem"
+      ],
+      "fields": [
+        {
+          "name": "MaCauHinhMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaMonThem",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "GioiHanMoiLy",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "GioiHanMoiLy > 0"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "TuyChonPhaCheHopLe",
+      "group": "Menu",
+      "pk": [
+        "MaCauHinhMon",
+        "PhanTramDuong",
+        "PhanTramDa"
+      ],
+      "fields": [
+        {
+          "name": "MaCauHinhMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "PhanTramDuong",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "PhanTramDa",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "PhanTramDuong IN (0,25,50,75,100)",
+        "PhanTramDa IN (0,25,50,75,100)"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "NguyenLieu",
+      "group": "Inventory",
+      "pk": [
+        "MaNguyenLieu"
+      ],
+      "fields": [
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenNguyenLieu",
+          "sql": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "MaDonViCoSo",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TonAnToan",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "NguongCanhBao",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "MoTa",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "TonAnToan >= 0 AND NguongCanhBao >= TonAnToan"
+      ],
+      "unique": [
+        [
+          "TenNguyenLieu"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "DonViTinh",
+      "group": "Inventory",
+      "pk": [
+        "MaDonVi"
+      ],
+      "fields": [
+        {
+          "name": "MaDonVi",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "KyHieu",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "TenDonVi",
+          "sql": "nvarchar(60)",
+          "nullable": false
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [],
+      "unique": [
+        [
+          "KyHieu"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "QuyDoiDonViNguyenLieu",
+      "group": "Inventory",
+      "pk": [
+        "MaNguyenLieu",
+        "MaDonVi"
+      ],
+      "fields": [
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaDonVi",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "HeSoVeDonViCoSo",
+          "sql": "decimal(18,6)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "HeSoVeDonViCoSo > 0"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "CongThuc",
+      "group": "Recipes",
+      "pk": [
+        "MaCongThuc"
+      ],
+      "fields": [
+        {
+          "name": "MaCongThuc",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaCauHinhMon",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaMonThem",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "SoPhienBan",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "TenCongThuc",
+          "sql": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "HieuLucTu",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "HieuLucDen",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyTao",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaQuanLyDuyet",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "GhiChu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "(MaCauHinhMon IS NOT NULL AND MaMonThem IS NULL) OR (MaCauHinhMon IS NULL AND MaMonThem IS NOT NULL)",
+        "SoPhienBan > 0",
+        "HieuLucDen IS NULL OR (HieuLucTu IS NOT NULL AND HieuLucDen > HieuLucTu)",
+        "TrangThai IN ('DRAFT','SCHEDULED','ACTIVE','RETIRED')",
+        "TrangThai <> 'ACTIVE' OR (HieuLucTu IS NOT NULL AND MaQuanLyDuyet IS NOT NULL)"
+      ],
+      "unique": [],
+      "indexes": [
+        [
+          "UX_CongThuc_CauHinhPhienBan",
+          [
+            "MaCauHinhMon",
+            "SoPhienBan"
+          ],
+          "MaCauHinhMon IS NOT NULL"
+        ],
+        [
+          "UX_CongThuc_MonThemPhienBan",
+          [
+            "MaMonThem",
+            "SoPhienBan"
+          ],
+          "MaMonThem IS NOT NULL"
+        ],
+        [
+          "UX_CongThuc_CauHinhHieuLuc",
+          [
+            "MaCauHinhMon"
+          ],
+          "MaCauHinhMon IS NOT NULL AND TrangThai = 'ACTIVE'"
+        ],
+        [
+          "UX_CongThuc_MonThemHieuLuc",
+          [
+            "MaMonThem"
+          ],
+          "MaMonThem IS NOT NULL AND TrangThai = 'ACTIVE'"
+        ]
+      ],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "ChiTietCongThuc",
+      "group": "Recipes",
+      "pk": [
+        "MaCongThuc",
+        "MaNguyenLieu",
+        "LoaiDinhMuc"
+      ],
+      "fields": [
+        {
+          "name": "MaCongThuc",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "LoaiDinhMuc",
+          "sql": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "DinhMucCoSo",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "TyLeHaoHut",
+          "sql": "decimal(9,6)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "LoaiDinhMuc IN ('FIXED','SUGAR','ICE')",
+        "DinhMucCoSo > 0",
+        "TyLeHaoHut >= 0 AND TyLeHaoHut < 1"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "Ban",
+      "group": "Orders",
+      "pk": [
+        "MaBan"
+      ],
+      "fields": [
+        {
+          "name": "MaBan",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaBanHienThi",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "TenBan",
+          "sql": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "TenKhuVuc",
+          "sql": "nvarchar(100)",
+          "nullable": true
+        },
+        {
+          "name": "SoChoNgoi",
+          "sql": "int",
+          "nullable": true
+        },
+        {
+          "name": "MaBamQR",
+          "sql": "binary(32)",
+          "nullable": false
+        },
+        {
+          "name": "PhienBanQR",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "QRHetHanLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "DangSuDung",
+          "sql": "bit",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoChoNgoi IS NULL OR SoChoNgoi > 0",
+        "PhienBanQR > 0"
+      ],
+      "unique": [
+        [
+          "MaBanHienThi"
+        ],
+        [
+          "MaBamQR"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "DonHang",
+      "group": "Orders",
+      "pk": [
+        "MaDonHang"
+      ],
+      "fields": [
+        {
+          "name": "MaDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaDonHienThi",
+          "sql": "varchar(30)",
+          "nullable": false
+        },
+        {
+          "name": "MaKhachHang",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaDonLienQuan",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "KenhDatHang",
+          "sql": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "HinhThucNhanMon",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "MaBan",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaBanDaChot",
+          "sql": "varchar(20)",
+          "nullable": true
+        },
+        {
+          "name": "TenNguoiNhan",
+          "sql": "nvarchar(120)",
+          "nullable": true
+        },
+        {
+          "name": "DienThoaiNguoiNhan",
+          "sql": "varchar(20)",
+          "nullable": true
+        },
+        {
+          "name": "DiaChiGiaoDaChot",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ViDo",
+          "sql": "decimal(9,6)",
+          "nullable": true
+        },
+        {
+          "name": "KinhDo",
+          "sql": "decimal(9,6)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemHenNhan",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "KhoangCachGiaoKm",
+          "sql": "decimal(10,3)",
+          "nullable": true
+        },
+        {
+          "name": "ChinhSachGiaoHangDaChotJson",
+          "sql": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "HanBaoPhi",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "PhiGiaoHangBanDau",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "PhiGiaoHangHienTai",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(25)",
+          "nullable": false
+        },
+        {
+          "name": "GhiChu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "HetHanLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "TiepNhanLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "HoanTatLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "KenhDatHang IN ('WEB','POS')",
+        "HinhThucNhanMon IN ('DINE_IN','TAKEAWAY','DELIVERY')",
+        "(KenhDatHang = 'WEB' AND MaKhachHang IS NOT NULL) OR (KenhDatHang = 'POS' AND MaCaLamViec IS NOT NULL)",
+        "(HinhThucNhanMon = 'DINE_IN' AND MaBan IS NOT NULL) OR (HinhThucNhanMon <> 'DINE_IN' AND MaBan IS NULL)",
+        "HinhThucNhanMon <> 'DELIVERY' OR (TenNguoiNhan IS NOT NULL AND DienThoaiNguoiNhan IS NOT NULL AND DiaChiGiaoDaChot IS NOT NULL)",
+        "PhiGiaoHangBanDau >= 0 AND PhiGiaoHangHienTai >= 0 AND PhiGiaoHangHienTai <= PhiGiaoHangBanDau",
+        "TrangThai IN ('DRAFT','PENDING_PAYMENT','PENDING_CONFIRMATION','ACCEPTED','PREPARING','READY','DELIVERING','COMPLETED','REJECTED','CANCELLED','DELIVERY_FAILED')",
+        "ChinhSachGiaoHangDaChotJson IS NULL OR ISJSON(ChinhSachGiaoHangDaChotJson) = 1",
+        "ViDo IS NULL OR ViDo BETWEEN -90 AND 90",
+        "KinhDo IS NULL OR KinhDo BETWEEN -180 AND 180",
+        "KhoangCachGiaoKm IS NULL OR KhoangCachGiaoKm >= 0"
+      ],
+      "unique": [
+        [
+          "MaDonHienThi"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "ChiTietDonHang",
+      "group": "Orders",
+      "pk": [
+        "MaChiTietDonHang"
+      ],
+      "fields": [
+        {
+          "name": "MaChiTietDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaCauHinhMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaCongThuc",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenMonDaChot",
+          "sql": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "KichCoDaChot",
+          "sql": "varchar(5)",
+          "nullable": false
+        },
+        {
+          "name": "NhietDoDaChot",
+          "sql": "varchar(10)",
+          "nullable": false
+        },
+        {
+          "name": "PhanTramDuong",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "PhanTramDa",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "GiaMonDaChot",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongDat",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongBatDauPha",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongPhaXong",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongDaHuy",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "GhiChu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "GiaMonDaChot >= 0",
+        "SoLuongDat > 0 AND SoLuongBatDauPha >= 0 AND SoLuongPhaXong >= 0 AND SoLuongDaHuy >= 0",
+        "SoLuongBatDauPha + SoLuongDaHuy <= SoLuongDat",
+        "SoLuongPhaXong <= SoLuongBatDauPha",
+        "PhanTramDuong IN (0,25,50,75,100) AND PhanTramDa IN (0,25,50,75,100)"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "MonThemChiTietDonHang",
+      "group": "Orders",
+      "pk": [
+        "MaChiTietDonHang",
+        "MaMonThem"
+      ],
+      "fields": [
+        {
+          "name": "MaChiTietDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaMonThem",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaCongThuc",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenMonThemDaChot",
+          "sql": "nvarchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "SoPhanMoiLy",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "GiaMoiPhanDaChot",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoPhanMoiLy > 0",
+        "GiaMoiPhanDaChot >= 0"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "NguyenLieuChiTietDonHang",
+      "group": "Orders",
+      "pk": [
+        "MaChiTietDonHang",
+        "MaNguyenLieu"
+      ],
+      "fields": [
+        {
+          "name": "MaChiTietDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenNguyenLieuDaChot",
+          "sql": "nvarchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "DonViCoSoDaChot",
+          "sql": "nvarchar(60)",
+          "nullable": false
+        },
+        {
+          "name": "DinhMucMoiLy",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        }
+      ],
+      "checks": [
+        "DinhMucMoiLy > 0"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": true,
+      "identity": false
+    },
+    {
+      "name": "HuyMon",
+      "group": "Orders",
+      "pk": [
+        "MaHuyMon"
+      ],
+      "fields": [
+        {
+          "name": "MaHuyMon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaNhomHuy",
+          "sql": "uniqueidentifier",
+          "nullable": false
+        },
+        {
+          "name": "MaChiTietDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongHuy",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "LyDoHuy",
+          "sql": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "MaKhachHangYeuCau",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyYeuCau",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyDuyet",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "TienHangGiam",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "PhiGiaoHangGiam",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "XuLyLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoLuongHuy > 0",
+        "LEN(LTRIM(RTRIM(LyDoHuy))) > 0",
+        "(CASE WHEN MaKhachHangYeuCau IS NULL THEN 0 ELSE 1 END + CASE WHEN MaCaLamViec IS NULL THEN 0 ELSE 1 END + CASE WHEN MaQuanLyYeuCau IS NULL THEN 0 ELSE 1 END) = 1",
+        "TrangThai IN ('REQUESTED','ACCEPTED','REJECTED')",
+        "TienHangGiam >= 0 AND PhiGiaoHangGiam >= 0"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "ThanhToan",
+      "group": "Finance",
+      "pk": [
+        "MaThanhToan"
+      ],
+      "fields": [
+        {
+          "name": "MaThanhToan",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaThanhToanHienThi",
+          "sql": "varchar(40)",
+          "nullable": false
+        },
+        {
+          "name": "MaDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "PhuongThuc",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "SoTienYeuCau",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "SoTienDaXacMinh",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "TienKhachDua",
+          "sql": "decimal(18,0)",
+          "nullable": true
+        },
+        {
+          "name": "MaThamChieuChuyenKhoan",
+          "sql": "varchar(100)",
+          "nullable": true
+        },
+        {
+          "name": "NoiDungQR",
+          "sql": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "HetHanLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "XacMinhLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyXacMinh",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "ThamChieuChungCu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "MaThaoTac",
+          "sql": "uniqueidentifier",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "PhuongThuc IN ('CASH','BANK_TRANSFER')",
+        "SoTienYeuCau >= 0 AND SoTienDaXacMinh >= 0",
+        "PhuongThuc <> 'CASH' OR MaCaLamViec IS NOT NULL",
+        "TienKhachDua IS NULL OR TienKhachDua >= SoTienDaXacMinh",
+        "TrangThai IN ('PENDING','PARTIAL','VERIFIED','EXPIRED','FAILED','RECONCILING')"
+      ],
+      "unique": [
+        [
+          "MaThanhToanHienThi"
+        ],
+        [
+          "MaThaoTac"
+        ]
+      ],
+      "indexes": [
+        [
+          "UX_ThanhToan_ThamChieu",
+          [
+            "MaThamChieuChuyenKhoan"
+          ],
+          "MaThamChieuChuyenKhoan IS NOT NULL"
+        ]
+      ],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "GiaoDichNganHang",
+      "group": "Finance",
+      "pk": [
+        "MaGiaoDichNganHang"
+      ],
+      "fields": [
+        {
+          "name": "MaGiaoDichNganHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TenNhaCungCap",
+          "sql": "varchar(50)",
+          "nullable": false
+        },
+        {
+          "name": "MaTaiKhoanNganHangQuan",
+          "sql": "varchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MaGiaoDichBenNgoai",
+          "sql": "varchar(150)",
+          "nullable": false
+        },
+        {
+          "name": "ChieuGiaoDich",
+          "sql": "varchar(5)",
+          "nullable": false
+        },
+        {
+          "name": "SoTien",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "NoiDungChuyenKhoan",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemNganHang",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThaiXacMinh",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "XacMinhLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaThanhToan",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaLanChiHoan",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaBamNoiDung",
+          "sql": "binary(32)",
+          "nullable": true
+        },
+        {
+          "name": "ThamChieuChungCu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoTien > 0",
+        "ChieuGiaoDich IN ('IN','OUT')",
+        "MaThanhToan IS NULL OR MaLanChiHoan IS NULL",
+        "MaThanhToan IS NULL OR ChieuGiaoDich = 'IN'",
+        "MaLanChiHoan IS NULL OR ChieuGiaoDich = 'OUT'"
+      ],
+      "unique": [
+        [
+          "TenNhaCungCap",
+          "MaTaiKhoanNganHangQuan",
+          "MaGiaoDichBenNgoai"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "HoSoHoanTien",
+      "group": "Finance",
+      "pk": [
+        "MaHoanTien"
+      ],
+      "fields": [
+        {
+          "name": "MaHoanTien",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaHoanTienHienThi",
+          "sql": "varchar(40)",
+          "nullable": false
+        },
+        {
+          "name": "MaDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaThanhToan",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaHuyMon",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "LyDoHoan",
+          "sql": "nvarchar(500)",
+          "nullable": false
+        },
+        {
+          "name": "SoTienYeuCau",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "SoTienDuocDuyet",
+          "sql": "decimal(18,0)",
+          "nullable": true
+        },
+        {
+          "name": "PhuongThucHoan",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "TenNguoiNhan",
+          "sql": "nvarchar(120)",
+          "nullable": true
+        },
+        {
+          "name": "NganHangNguoiNhan",
+          "sql": "nvarchar(100)",
+          "nullable": true
+        },
+        {
+          "name": "TaiKhoanNhanMaHoa",
+          "sql": "varbinary(max)",
+          "nullable": true
+        },
+        {
+          "name": "TaiKhoanNhanDaChe",
+          "sql": "nvarchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(25)",
+          "nullable": false
+        },
+        {
+          "name": "MaKhachHangYeuCau",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaCaYeuCau",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyYeuCau",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyDuyet",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "DuyetLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoTienYeuCau > 0",
+        "SoTienDuocDuyet IS NULL OR (SoTienDuocDuyet > 0 AND SoTienDuocDuyet <= SoTienYeuCau)",
+        "TrangThai IN ('REQUESTED','APPROVED','REJECTED','PROCESSING','PARTIALLY_REFUNDED','REFUNDED','RECONCILING')",
+        "(CASE WHEN MaKhachHangYeuCau IS NULL THEN 0 ELSE 1 END + CASE WHEN MaCaYeuCau IS NULL THEN 0 ELSE 1 END + CASE WHEN MaQuanLyYeuCau IS NULL THEN 0 ELSE 1 END) = 1",
+        "PhuongThucHoan IN ('CASH','BANK_TRANSFER')"
+      ],
+      "unique": [
+        [
+          "MaHoanTienHienThi"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "LanChiHoanTien",
+      "group": "Finance",
+      "pk": [
+        "MaLanChiHoan"
+      ],
+      "fields": [
+        {
+          "name": "MaLanChiHoan",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaHoanTien",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "SoThuTuLanChi",
+          "sql": "int",
+          "nullable": false
+        },
+        {
+          "name": "MaChongChiLap",
+          "sql": "uniqueidentifier",
+          "nullable": false
+        },
+        {
+          "name": "SoTien",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "PhuongThuc",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "NhaCungCap",
+          "sql": "varchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "MaThamChieuBenNgoai",
+          "sql": "varchar(150)",
+          "nullable": true
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "BatDauLuc",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "CoKetQuaLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyXacMinh",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "ThamChieuChungCu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "LyDoThatBai",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoThuTuLanChi > 0 AND SoTien > 0",
+        "TrangThai IN ('PENDING','SUCCEEDED','FAILED','RECONCILING')",
+        "PhuongThuc IN ('CASH','BANK_TRANSFER')",
+        "CoKetQuaLuc IS NULL OR CoKetQuaLuc >= BatDauLuc"
+      ],
+      "unique": [
+        [
+          "MaHoanTien",
+          "SoThuTuLanChi"
+        ],
+        [
+          "MaChongChiLap"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "HoaDon",
+      "group": "Finance",
+      "pk": [
+        "MaHoaDon"
+      ],
+      "fields": [
+        {
+          "name": "MaHoaDon",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "SoHoaDon",
+          "sql": "varchar(40)",
+          "nullable": false
+        },
+        {
+          "name": "MaDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "LoaiHoaDon",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "MaHoaDonGoc",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaHuyMon",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "TenNguoiMua",
+          "sql": "nvarchar(150)",
+          "nullable": true
+        },
+        {
+          "name": "MaSoThueNguoiMua",
+          "sql": "varchar(30)",
+          "nullable": true
+        },
+        {
+          "name": "SoTien",
+          "sql": "decimal(18,0)",
+          "nullable": false
+        },
+        {
+          "name": "NoiDungHoaDonDaChotJson",
+          "sql": "nvarchar(max)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "LyDo",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "PhatHanhLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyPhatHanh",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "LoaiHoaDon IN ('ORIGINAL','ADJUSTMENT')",
+        "(LoaiHoaDon = 'ORIGINAL' AND MaHoaDonGoc IS NULL AND SoTien >= 0) OR (LoaiHoaDon = 'ADJUSTMENT' AND MaHoaDonGoc IS NOT NULL AND MaHoaDonGoc <> MaHoaDon)",
+        "TrangThai IN ('DRAFT','ISSUED')",
+        "TrangThai <> 'ISSUED' OR PhatHanhLuc IS NOT NULL",
+        "ISJSON(NoiDungHoaDonDaChotJson) = 1"
+      ],
+      "unique": [
+        [
+          "SoHoaDon"
+        ]
+      ],
+      "indexes": [
+        [
+          "UX_HoaDon_Goc",
+          [
+            "MaDonHang"
+          ],
+          "LoaiHoaDon = 'ORIGINAL'"
+        ]
+      ],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "PhieuKho",
+      "group": "Inventory",
+      "pk": [
+        "MaPhieuKho"
+      ],
+      "fields": [
+        {
+          "name": "MaPhieuKho",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "SoPhieuKho",
+          "sql": "varchar(40)",
+          "nullable": false
+        },
+        {
+          "name": "LoaiPhieu",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "TenNhaCungCapDaChot",
+          "sql": "nvarchar(200)",
+          "nullable": true
+        },
+        {
+          "name": "MaMucDich",
+          "sql": "varchar(30)",
+          "nullable": true
+        },
+        {
+          "name": "LyDo",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "MocKiemKe",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaPhieuBiDao",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLyLap",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaQuanLyDuyet",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "GhiSoLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "MaThaoTac",
+          "sql": "uniqueidentifier",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "LoaiPhieu IN ('RECEIPT','ISSUE','COUNT','ADJUSTMENT','REVERSAL')",
+        "TrangThai IN ('DRAFT','POSTED')",
+        "TrangThai <> 'POSTED' OR (GhiSoLuc IS NOT NULL AND MaQuanLyDuyet IS NOT NULL)",
+        "MaPhieuBiDao IS NULL OR MaPhieuBiDao <> MaPhieuKho"
+      ],
+      "unique": [
+        [
+          "SoPhieuKho"
+        ],
+        [
+          "MaThaoTac"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "ChiTietPhieuKho",
+      "group": "Inventory",
+      "pk": [
+        "MaDongPhieuKho"
+      ],
+      "fields": [
+        {
+          "name": "MaDongPhieuKho",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaPhieuKho",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaDonViNhap",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "DonViNhapDaChot",
+          "sql": "nvarchar(60)",
+          "nullable": false
+        },
+        {
+          "name": "HeSoQuyDoiDaChot",
+          "sql": "decimal(18,6)",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongTheoDonViNhap",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "ChenhLechDonViCoSo",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "DonGiaNhap",
+          "sql": "decimal(18,2)",
+          "nullable": true
+        },
+        {
+          "name": "TonSoDaChot",
+          "sql": "decimal(18,4)",
+          "nullable": true
+        },
+        {
+          "name": "SoLuongThucDem",
+          "sql": "decimal(18,4)",
+          "nullable": true
+        },
+        {
+          "name": "PhienBanTonKhoDaChot",
+          "sql": "binary(8)",
+          "nullable": true
+        },
+        {
+          "name": "GhiChu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "HeSoQuyDoiDaChot > 0",
+        "SoLuongTheoDonViNhap >= 0",
+        "DonGiaNhap IS NULL OR DonGiaNhap >= 0",
+        "TonSoDaChot IS NULL OR TonSoDaChot >= 0",
+        "SoLuongThucDem IS NULL OR SoLuongThucDem >= 0"
+      ],
+      "unique": [
+        [
+          "MaPhieuKho",
+          "MaNguyenLieu"
+        ]
+      ],
+      "indexes": [],
+      "immutable": false,
+      "identity": true
+    },
+    {
+      "name": "TonKho",
+      "group": "Inventory",
+      "pk": [
+        "MaNguyenLieu"
+      ],
+      "fields": [
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "TonThucTe",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "TongGiuCho",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "TonThucTe >= 0 AND TongGiuCho >= 0 AND TongGiuCho <= TonThucTe"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "GiuChoNguyenLieu",
+      "group": "Inventory",
+      "pk": [
+        "MaChiTietDonHang",
+        "MaNguyenLieu"
+      ],
+      "fields": [
+        {
+          "name": "MaChiTietDonHang",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongGiuCho",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongDaTieuHao",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongDaGiaiPhong",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "HetHanLuc",
+          "sql": "datetime2(3)",
+          "nullable": true
+        },
+        {
+          "name": "TrangThai",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "ThoiDiemCapNhat",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        },
+        {
+          "name": "PhienBanDuLieu",
+          "sql": "rowversion",
+          "nullable": false
+        }
+      ],
+      "checks": [
+        "SoLuongGiuCho >= 0 AND SoLuongDaTieuHao >= 0 AND SoLuongDaGiaiPhong >= 0",
+        "SoLuongDaTieuHao + SoLuongDaGiaiPhong <= SoLuongGiuCho",
+        "TrangThai IN ('RESERVED','PARTIAL','CONSUMED','RELEASED','EXPIRED')"
+      ],
+      "unique": [],
+      "indexes": [],
+      "immutable": false,
+      "identity": false
+    },
+    {
+      "name": "BienDongKho",
+      "group": "Inventory",
+      "pk": [
+        "MaBienDongKho"
+      ],
+      "fields": [
+        {
+          "name": "MaBienDongKho",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaNguyenLieu",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaDongPhieuKho",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaChiTietDonHang",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "LoaiBienDong",
+          "sql": "varchar(25)",
+          "nullable": false
+        },
+        {
+          "name": "SoLuongThayDoi",
+          "sql": "decimal(18,4)",
+          "nullable": false
+        },
+        {
+          "name": "MaThaoTac",
+          "sql": "uniqueidentifier",
+          "nullable": false
+        },
+        {
+          "name": "MaBienDongBiDao",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "PhatSinhLuc",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "GhiChu",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        }
+      ],
+      "checks": [
+        "SoLuongThayDoi <> 0",
+        "(MaDongPhieuKho IS NOT NULL AND MaChiTietDonHang IS NULL) OR (MaDongPhieuKho IS NULL AND MaChiTietDonHang IS NOT NULL)",
+        "MaBienDongBiDao IS NULL OR MaBienDongBiDao <> MaBienDongKho"
+      ],
+      "unique": [
+        [
+          "MaThaoTac",
+          "MaNguyenLieu"
+        ]
+      ],
+      "indexes": [],
+      "immutable": true,
+      "identity": true
+    },
+    {
+      "name": "NhatKyHeThong",
+      "group": "Audit",
+      "pk": [
+        "MaNhatKy"
+      ],
+      "fields": [
+        {
+          "name": "MaNhatKy",
+          "sql": "bigint",
+          "nullable": false
+        },
+        {
+          "name": "MaLienKetXuLy",
+          "sql": "uniqueidentifier",
+          "nullable": false
+        },
+        {
+          "name": "MaThaoTac",
+          "sql": "uniqueidentifier",
+          "nullable": true
+        },
+        {
+          "name": "LoaiTacNhan",
+          "sql": "varchar(15)",
+          "nullable": false
+        },
+        {
+          "name": "MaKhachHang",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaQuanLy",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "MaCaLamViec",
+          "sql": "bigint",
+          "nullable": true
+        },
+        {
+          "name": "TenNguoiThucHienDaChot",
+          "sql": "nvarchar(120)",
+          "nullable": false
+        },
+        {
+          "name": "MaMayDaChot",
+          "sql": "varchar(50)",
+          "nullable": true
+        },
+        {
+          "name": "HanhDong",
+          "sql": "varchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "LoaiDoiTuong",
+          "sql": "varchar(100)",
+          "nullable": false
+        },
+        {
+          "name": "MaDoiTuong",
+          "sql": "varchar(100)",
+          "nullable": true
+        },
+        {
+          "name": "DuLieuTruocJson",
+          "sql": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "DuLieuSauJson",
+          "sql": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "LyDo",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
+          "name": "KetQua",
+          "sql": "varchar(20)",
+          "nullable": false
+        },
+        {
+          "name": "MaBamYeuCau",
+          "sql": "binary(32)",
+          "nullable": true
+        },
+        {
+          "name": "KetQuaDaChotJson",
+          "sql": "nvarchar(max)",
+          "nullable": true
+        },
+        {
+          "name": "PhatSinhLuc",
+          "sql": "datetime2(3)",
+          "nullable": false
+        },
+        {
+          "name": "ThoiDiemTao",
+          "sql": "datetime2(3)",
+          "nullable": false,
+          "default": "SYSUTCDATETIME()"
+        }
+      ],
+      "checks": [
+        "(LoaiTacNhan = 'CUSTOMER' AND MaKhachHang IS NOT NULL AND MaQuanLy IS NULL AND MaCaLamViec IS NULL) OR (LoaiTacNhan = 'ADMIN' AND MaQuanLy IS NOT NULL AND MaKhachHang IS NULL AND MaCaLamViec IS NULL) OR (LoaiTacNhan = 'STAFF' AND MaCaLamViec IS NOT NULL AND MaKhachHang IS NULL AND MaQuanLy IS NULL) OR (LoaiTacNhan = 'SYSTEM' AND MaKhachHang IS NULL AND MaQuanLy IS NULL AND MaCaLamViec IS NULL)",
+        "DuLieuTruocJson IS NULL OR ISJSON(DuLieuTruocJson) = 1",
+        "DuLieuSauJson IS NULL OR ISJSON(DuLieuSauJson) = 1",
+        "KetQuaDaChotJson IS NULL OR ISJSON(KetQuaDaChotJson) = 1"
+      ],
+      "unique": [],
+      "indexes": [
+        [
+          "UX_NhatKy_ThaoTac",
+          [
+            "MaThaoTac"
+          ],
+          "MaThaoTac IS NOT NULL"
+        ]
+      ],
+      "immutable": true,
+      "identity": true
+    }
+  ],
+  "relations": [
+    {
+      "child": "PhienDangNhap",
+      "fields": [
+        "MaKhachHang"
+      ],
+      "parent": "TaiKhoanKhachHang",
+      "target": [
+        "MaKhachHang"
+      ]
+    },
+    {
+      "child": "PhienDangNhap",
+      "fields": [
+        "MaQuanLy"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "DiaChiKhachHang",
+      "fields": [
+        "MaKhachHang"
+      ],
+      "parent": "TaiKhoanKhachHang",
+      "target": [
+        "MaKhachHang"
+      ]
+    },
+    {
+      "child": "CaLamViec",
+      "fields": [
+        "MaNhanVien"
+      ],
+      "parent": "NhanVien",
+      "target": [
+        "MaNhanVien"
+      ]
+    },
+    {
+      "child": "CaLamViec",
+      "fields": [
+        "MaCaBanGiaoTruoc"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "CaLamViec",
+      "fields": [
+        "MaQuanLyDuyet"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "Mon",
+      "fields": [
+        "MaDanhMuc"
+      ],
+      "parent": "DanhMucMon",
+      "target": [
+        "MaDanhMuc"
+      ]
+    },
+    {
+      "child": "CauHinhMon",
+      "fields": [
+        "MaMon"
+      ],
+      "parent": "Mon",
+      "target": [
+        "MaMon"
+      ]
+    },
+    {
+      "child": "CauHinhMonThem",
+      "fields": [
+        "MaCauHinhMon"
+      ],
+      "parent": "CauHinhMon",
+      "target": [
+        "MaCauHinhMon"
+      ]
+    },
+    {
+      "child": "CauHinhMonThem",
+      "fields": [
+        "MaMonThem"
+      ],
+      "parent": "MonThem",
+      "target": [
+        "MaMonThem"
+      ]
+    },
+    {
+      "child": "TuyChonPhaCheHopLe",
+      "fields": [
+        "MaCauHinhMon"
+      ],
+      "parent": "CauHinhMon",
+      "target": [
+        "MaCauHinhMon"
+      ]
+    },
+    {
+      "child": "NguyenLieu",
+      "fields": [
+        "MaDonViCoSo"
+      ],
+      "parent": "DonViTinh",
+      "target": [
+        "MaDonVi"
+      ]
+    },
+    {
+      "child": "QuyDoiDonViNguyenLieu",
+      "fields": [
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieu",
+      "target": [
+        "MaNguyenLieu"
+      ]
+    },
+    {
+      "child": "QuyDoiDonViNguyenLieu",
+      "fields": [
+        "MaDonVi"
+      ],
+      "parent": "DonViTinh",
+      "target": [
+        "MaDonVi"
+      ]
+    },
+    {
+      "child": "CongThuc",
+      "fields": [
+        "MaCauHinhMon"
+      ],
+      "parent": "CauHinhMon",
+      "target": [
+        "MaCauHinhMon"
+      ]
+    },
+    {
+      "child": "CongThuc",
+      "fields": [
+        "MaMonThem"
+      ],
+      "parent": "MonThem",
+      "target": [
+        "MaMonThem"
+      ]
+    },
+    {
+      "child": "CongThuc",
+      "fields": [
+        "MaQuanLyTao"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "CongThuc",
+      "fields": [
+        "MaQuanLyDuyet"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "ChiTietCongThuc",
+      "fields": [
+        "MaCongThuc"
+      ],
+      "parent": "CongThuc",
+      "target": [
+        "MaCongThuc"
+      ]
+    },
+    {
+      "child": "ChiTietCongThuc",
+      "fields": [
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieu",
+      "target": [
+        "MaNguyenLieu"
+      ]
+    },
+    {
+      "child": "DonHang",
+      "fields": [
+        "MaKhachHang"
+      ],
+      "parent": "TaiKhoanKhachHang",
+      "target": [
+        "MaKhachHang"
+      ]
+    },
+    {
+      "child": "DonHang",
+      "fields": [
+        "MaCaLamViec"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "DonHang",
+      "fields": [
+        "MaDonLienQuan"
+      ],
+      "parent": "DonHang",
+      "target": [
+        "MaDonHang"
+      ]
+    },
+    {
+      "child": "DonHang",
+      "fields": [
+        "MaBan"
+      ],
+      "parent": "Ban",
+      "target": [
+        "MaBan"
+      ]
+    },
+    {
+      "child": "ChiTietDonHang",
+      "fields": [
+        "MaDonHang"
+      ],
+      "parent": "DonHang",
+      "target": [
+        "MaDonHang"
+      ]
+    },
+    {
+      "child": "ChiTietDonHang",
+      "fields": [
+        "MaCauHinhMon"
+      ],
+      "parent": "CauHinhMon",
+      "target": [
+        "MaCauHinhMon"
+      ]
+    },
+    {
+      "child": "ChiTietDonHang",
+      "fields": [
+        "MaCongThuc"
+      ],
+      "parent": "CongThuc",
+      "target": [
+        "MaCongThuc"
+      ]
+    },
+    {
+      "child": "MonThemChiTietDonHang",
+      "fields": [
+        "MaChiTietDonHang"
+      ],
+      "parent": "ChiTietDonHang",
+      "target": [
+        "MaChiTietDonHang"
+      ]
+    },
+    {
+      "child": "MonThemChiTietDonHang",
+      "fields": [
+        "MaMonThem"
+      ],
+      "parent": "MonThem",
+      "target": [
+        "MaMonThem"
+      ]
+    },
+    {
+      "child": "MonThemChiTietDonHang",
+      "fields": [
+        "MaCongThuc"
+      ],
+      "parent": "CongThuc",
+      "target": [
+        "MaCongThuc"
+      ]
+    },
+    {
+      "child": "NguyenLieuChiTietDonHang",
+      "fields": [
+        "MaChiTietDonHang"
+      ],
+      "parent": "ChiTietDonHang",
+      "target": [
+        "MaChiTietDonHang"
+      ]
+    },
+    {
+      "child": "NguyenLieuChiTietDonHang",
+      "fields": [
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieu",
+      "target": [
+        "MaNguyenLieu"
+      ]
+    },
+    {
+      "child": "HuyMon",
+      "fields": [
+        "MaChiTietDonHang"
+      ],
+      "parent": "ChiTietDonHang",
+      "target": [
+        "MaChiTietDonHang"
+      ]
+    },
+    {
+      "child": "HuyMon",
+      "fields": [
+        "MaKhachHangYeuCau"
+      ],
+      "parent": "TaiKhoanKhachHang",
+      "target": [
+        "MaKhachHang"
+      ]
+    },
+    {
+      "child": "HuyMon",
+      "fields": [
+        "MaCaLamViec"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "HuyMon",
+      "fields": [
+        "MaQuanLyYeuCau"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "HuyMon",
+      "fields": [
+        "MaQuanLyDuyet"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "ThanhToan",
+      "fields": [
+        "MaDonHang"
+      ],
+      "parent": "DonHang",
+      "target": [
+        "MaDonHang"
+      ]
+    },
+    {
+      "child": "ThanhToan",
+      "fields": [
+        "MaCaLamViec"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "ThanhToan",
+      "fields": [
+        "MaQuanLyXacMinh"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaDonHang"
+      ],
+      "parent": "DonHang",
+      "target": [
+        "MaDonHang"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaThanhToan"
+      ],
+      "parent": "ThanhToan",
+      "target": [
+        "MaThanhToan"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaHuyMon"
+      ],
+      "parent": "HuyMon",
+      "target": [
+        "MaHuyMon"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaKhachHangYeuCau"
+      ],
+      "parent": "TaiKhoanKhachHang",
+      "target": [
+        "MaKhachHang"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaCaYeuCau"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaQuanLyYeuCau"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "HoSoHoanTien",
+      "fields": [
+        "MaQuanLyDuyet"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "LanChiHoanTien",
+      "fields": [
+        "MaHoanTien"
+      ],
+      "parent": "HoSoHoanTien",
+      "target": [
+        "MaHoanTien"
+      ]
+    },
+    {
+      "child": "LanChiHoanTien",
+      "fields": [
+        "MaCaLamViec"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "LanChiHoanTien",
+      "fields": [
+        "MaQuanLyXacMinh"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "GiaoDichNganHang",
+      "fields": [
+        "MaThanhToan"
+      ],
+      "parent": "ThanhToan",
+      "target": [
+        "MaThanhToan"
+      ]
+    },
+    {
+      "child": "GiaoDichNganHang",
+      "fields": [
+        "MaLanChiHoan"
+      ],
+      "parent": "LanChiHoanTien",
+      "target": [
+        "MaLanChiHoan"
+      ]
+    },
+    {
+      "child": "HoaDon",
+      "fields": [
+        "MaDonHang"
+      ],
+      "parent": "DonHang",
+      "target": [
+        "MaDonHang"
+      ]
+    },
+    {
+      "child": "HoaDon",
+      "fields": [
+        "MaHoaDonGoc"
+      ],
+      "parent": "HoaDon",
+      "target": [
+        "MaHoaDon"
+      ]
+    },
+    {
+      "child": "HoaDon",
+      "fields": [
+        "MaHuyMon"
+      ],
+      "parent": "HuyMon",
+      "target": [
+        "MaHuyMon"
+      ]
+    },
+    {
+      "child": "HoaDon",
+      "fields": [
+        "MaQuanLyPhatHanh"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "HoaDon",
+      "fields": [
+        "MaCaLamViec"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "PhieuKho",
+      "fields": [
+        "MaPhieuBiDao"
+      ],
+      "parent": "PhieuKho",
+      "target": [
+        "MaPhieuKho"
+      ]
+    },
+    {
+      "child": "PhieuKho",
+      "fields": [
+        "MaQuanLyLap"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "PhieuKho",
+      "fields": [
+        "MaQuanLyDuyet"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "ChiTietPhieuKho",
+      "fields": [
+        "MaPhieuKho"
+      ],
+      "parent": "PhieuKho",
+      "target": [
+        "MaPhieuKho"
+      ]
+    },
+    {
+      "child": "ChiTietPhieuKho",
+      "fields": [
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieu",
+      "target": [
+        "MaNguyenLieu"
+      ]
+    },
+    {
+      "child": "ChiTietPhieuKho",
+      "fields": [
+        "MaDonViNhap"
+      ],
+      "parent": "DonViTinh",
+      "target": [
+        "MaDonVi"
+      ]
+    },
+    {
+      "child": "TonKho",
+      "fields": [
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieu",
+      "target": [
+        "MaNguyenLieu"
+      ]
+    },
+    {
+      "child": "BienDongKho",
+      "fields": [
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieu",
+      "target": [
+        "MaNguyenLieu"
+      ]
+    },
+    {
+      "child": "BienDongKho",
+      "fields": [
+        "MaDongPhieuKho"
+      ],
+      "parent": "ChiTietPhieuKho",
+      "target": [
+        "MaDongPhieuKho"
+      ]
+    },
+    {
+      "child": "BienDongKho",
+      "fields": [
+        "MaChiTietDonHang"
+      ],
+      "parent": "ChiTietDonHang",
+      "target": [
+        "MaChiTietDonHang"
+      ]
+    },
+    {
+      "child": "BienDongKho",
+      "fields": [
+        "MaBienDongBiDao"
+      ],
+      "parent": "BienDongKho",
+      "target": [
+        "MaBienDongKho"
+      ]
+    },
+    {
+      "child": "NhatKyHeThong",
+      "fields": [
+        "MaKhachHang"
+      ],
+      "parent": "TaiKhoanKhachHang",
+      "target": [
+        "MaKhachHang"
+      ]
+    },
+    {
+      "child": "NhatKyHeThong",
+      "fields": [
+        "MaQuanLy"
+      ],
+      "parent": "TaiKhoanQuanLy",
+      "target": [
+        "MaQuanLy"
+      ]
+    },
+    {
+      "child": "NhatKyHeThong",
+      "fields": [
+        "MaCaLamViec"
+      ],
+      "parent": "CaLamViec",
+      "target": [
+        "MaCaLamViec"
+      ]
+    },
+    {
+      "child": "GiuChoNguyenLieu",
+      "fields": [
+        "MaChiTietDonHang",
+        "MaNguyenLieu"
+      ],
+      "parent": "NguyenLieuChiTietDonHang",
+      "target": [
+        "MaChiTietDonHang",
+        "MaNguyenLieu"
+      ]
+    }
+  ]
+}

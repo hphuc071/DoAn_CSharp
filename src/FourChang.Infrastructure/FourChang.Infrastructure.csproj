@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../FourChang.Domain/FourChang.Domain.csproj" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.33" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <EmbeddedResource Include="../../docs/database/34-bang/schema.sql" LogicalName="FourChang.Schema34.sql" />
+    <EmbeddedResource Include="../../docs/database/34-bang/model.json" LogicalName="FourChang.Model34.json" />
+  </ItemGroup>
+</Project>

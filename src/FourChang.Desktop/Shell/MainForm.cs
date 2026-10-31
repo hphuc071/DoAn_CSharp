@@ -37,18 +37,24 @@ public sealed class MainForm:Form
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         pageTitle.AutoSize=false;pageTitle.AutoEllipsis=true;pageTitle.Dock=DockStyle.Fill;pageTitle.TextAlign=ContentAlignment.MiddleLeft;pageTitle.Margin=Padding.Empty;
         var account=Ui.Label(role=="Admin"?"Quản lý":name,10,true);account.AutoSize=false;account.AutoEllipsis=true;account.Width=160;account.Height=44;account.TextAlign=ContentAlignment.MiddleRight;account.Margin=new Padding(0,0,16,0);
-        var action=Ui.Button(role=="Admin"?"Tài khoản":"Kết thúc ca",()=>{if(role=="Staff")Navigate("shift");else AccessView.ShowLogin(this);});action.Margin=Padding.Empty;
+        var action=Ui.Button(role=="Admin"?"Tài khoản":"Kết thúc ca",()=>{if(role=="Staff")Navigate("shift");else { if(FourChang.Desktop.Data.LiveSession.Preview)AccessView.ShowLogin(this);else ShowAccount(); }});action.Margin=Padding.Empty;
         var topRight=Ui.Row(account,action);topRight.Dock=DockStyle.Fill;topRight.WrapContents=false;topRight.Anchor=AnchorStyles.Right;
         header.Controls.Add(pageTitle,0,0);header.Controls.Add(topRight,1,0);top.Controls.Add(header);
         main.Controls.Add(content);main.Controls.Add(top);Controls.Add(main);Controls.Add(side);
         Navigate(role=="Admin"?"dashboard":"sale");
+    }
+    private async void ShowAccount()
+    {
+        if(MessageBox.Show(this,"Đăng xuất tài khoản quản lý?","Tài khoản",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
+        try { await FourChang.Desktop.Data.LiveSession.Api.LogoutAsync(); FourChang.Desktop.Data.LiveSession.Api.Token=null; Close(); }
+        catch(FourChang.Presentation.Shared.Integration.CafeApiException ex) { MessageBox.Show(this,ex.Message); }
     }
     public void Navigate(string route)
     {
         foreach(var pair in navigation)pair.Value.BackColor=pair.Key==route?CafeTheme.Coffee:CafeTheme.Dark;
         var definition=ScreenCatalog.All.FirstOrDefault(s=>s.Role==role&&s.Route==route);
         pageTitle.Text=definition?.Name??"Tổng quan hôm nay";
-        Control body=route switch
+        Control body=!FourChang.Desktop.Data.LiveSession.Preview ? FourChang.Desktop.Features.Database.DatabaseViews.Create(role,route) : route switch
         {
             "shift"=>ShiftView.Create(sessionName),"sale"=>SaleView.Create(),"orders"=>OrdersView.Create(),"cancel"=>CancelView.Create(),"payment"=>PaymentView.Create(),
             "customers"=>CustomersView.Create(),"access"=>AccessView.Create(),"menu"=>MenuManagementView.Create(),"ingredients"=>IngredientsView.Create(),"recipes"=>RecipesView.Create(),"inventory"=>InventoryView.Create(),"stock"=>StockDocumentsView.Create(),"manage-orders"=>OrdersManagementView.Create(),"invoices"=>InvoicesView.Create(),"refunds"=>RefundsView.Create(),"reports"=>ReportsView.Create(),"dashboard"=>DashboardView.Create(),_=>Ui.Label("Chưa có màn hình này")

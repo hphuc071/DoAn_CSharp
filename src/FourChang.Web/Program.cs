@@ -1,12 +1,11 @@
-using Microsoft.AspNetCore.DataProtection;
+using FourChang.Presentation.Shared.Integration;
 using Microsoft.Extensions.FileProviders;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
-builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider(); // UI preview only: no persistent identity keys.
+builder.Services.AddHttpClient<CafeApiClient>(client=>{client.BaseAddress=CafeApiClient.BaseAddress;client.Timeout=TimeSpan.FromSeconds(20);});
 var app = builder.Build();
 app.UseStaticFiles();
-var assets = Path.Combine(AppContext.BaseDirectory, "Assets");
-if (Directory.Exists(assets)) app.UseStaticFiles(new StaticFileOptions { FileProvider = new PhysicalFileProvider(assets), RequestPath = "/assets" });
+var assets = Path.Combine(AppContext.BaseDirectory,"Assets");
+if(Directory.Exists(assets))app.UseStaticFiles(new StaticFileOptions{FileProvider=new PhysicalFileProvider(assets),RequestPath="/assets"});
 app.MapRazorPages();
 app.Run();
-

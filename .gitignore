@@ -5,3 +5,9 @@
 artifacts/
 .dotnet-home/
 
+
+# Local Docker database password
+.env
+
+.env.*
+!.env.example
