@@ -13,12 +13,14 @@ public static class WorkEndpoints
     {
         app.MapGet("/api/pos/employees",async(HttpContext context,CafeDbContext db)=>
         {
-            if(!PosAccess.IsDevice(context.Request))return Results.Unauthorized();
+            if(await PosAccess.Device(context.Request,db) is null)return Results.Unauthorized();
             return Results.Ok(await db.NhanVien.AsNoTracking().Where(x=>x.TrangThai=="ACTIVE").OrderBy(x=>x.HoTen).Select(x=>new Employee(x.MaNhanVien,x.HoTen,null,x.NgayVaoLam,x.TrangThai,null)).ToListAsync());
         });
         app.MapPost("/api/pos/shifts",async(OpenShift input,HttpContext context,CafeDbContext db)=>
         {
-            if(!PosAccess.IsDevice(context.Request))return Results.Unauthorized();
+            var device=await PosAccess.Device(context.Request,db);if(device is null)return Results.Unauthorized();
+            if(FourChang.Api.Features.Access.PosDeviceService.Machine(input.MaMay)!=device.MaMay)return Results.Problem(detail:"Mã máy không khớp cấu hình thiết bị.",statusCode:403);
+            input=input with{MaMay=device.MaMay};
             if(input.TenCa is not ("Sáng" or "Chiều" or "Tối")||string.IsNullOrWhiteSpace(input.MaMay)||input.MaMay.Length>50||input.TienMatDauCa<0||input.TienMatDauCa!=decimal.Truncate(input.TienMatDauCa))return Results.Problem(detail:"Ca làm, mã máy hoặc tiền đầu ca không hợp lệ.",statusCode:400);
             await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             var employee=await db.NhanVien.SingleOrDefaultAsync(x=>x.MaNhanVien==input.MaNhanVien&&x.TrangThai=="ACTIVE");
@@ -26,14 +28,14 @@ public static class WorkEndpoints
             var existing=await db.CaLamViec.FirstOrDefaultAsync(x=>x.KetThucLuc==null&&(x.MaMay==input.MaMay||x.MaNhanVien==input.MaNhanVien));
             if(existing is not null)
             {
-                if(existing.MaNhanVien==input.MaNhanVien&&existing.MaMay==input.MaMay&&existing.TrangThai=="OPEN")return Results.Ok(new SessionResult(PosAccess.Token(existing.MaCaLamViec),"STAFF",employee.HoTen,employee.MaNhanVien,existing.MaCaLamViec));
+                if(existing.MaNhanVien==input.MaNhanVien&&existing.MaMay==input.MaMay&&existing.TrangThai=="OPEN")return Results.Ok(new SessionResult(PosAccess.Token(existing.MaCaLamViec,device),"STAFF",employee.HoTen,employee.MaNhanVien,existing.MaCaLamViec));
                 return Results.Problem(detail:"Nhân viên hoặc máy đang có ca chưa kết thúc.",statusCode:409);
             }
             var shift=new CaLamViec{MaCaHienThi="CA-"+Guid.NewGuid().ToString("N")[..20],MaNhanVien=employee.MaNhanVien,TenCa=input.TenCa,MaMay=input.MaMay.Trim(),BatDauLuc=DateTime.UtcNow,TrangThai="OPEN",TienMatDauCa=input.TienMatDauCa};
             db.CaLamViec.Add(shift);await db.SaveChangesAsync();
             var audit=AuthEndpoints.Audit("STAFF",shift.MaCaLamViec,"OPEN_SHIFT","CaLamViec",shift.MaCaLamViec);audit.TenNguoiThucHienDaChot=employee.HoTen;audit.MaMayDaChot=shift.MaMay;db.NhatKyHeThong.Add(audit);
             await db.SaveChangesAsync();await tx.CommitAsync();
-            return Results.Ok(new SessionResult(PosAccess.Token(shift.MaCaLamViec),"STAFF",employee.HoTen,employee.MaNhanVien,shift.MaCaLamViec));
+            return Results.Ok(new SessionResult(PosAccess.Token(shift.MaCaLamViec,device),"STAFF",employee.HoTen,employee.MaNhanVien,shift.MaCaLamViec));
         });
         app.MapPost("/api/pos/shifts/current/close",async(CloseShift input,HttpContext context,CafeDbContext db)=>
         {
@@ -43,9 +45,7 @@ public static class WorkEndpoints
             var shift=await db.CaLamViec.SingleAsync(x=>x.MaCaLamViec==id);
             if(shift.TrangThai!="OPEN")return Results.Conflict();
             if(await db.DonHang.AnyAsync(x=>x.MaCaLamViec==id&&x.TrangThai!="COMPLETED"&&x.TrangThai!="CANCELLED"&&x.TrangThai!="REJECTED"))return Results.Problem(detail:"Cần xử lý hoặc bàn giao các đơn còn mở trước khi chốt ca.",statusCode:409);
-            var collected=await db.ThanhToan.Where(x=>x.MaCaLamViec==id&&x.PhuongThuc=="CASH"&&x.TrangThai=="VERIFIED").SumAsync(x=>(decimal?)x.SoTienDaXacMinh)??0;
-            var refunded=await db.LanChiHoanTien.Where(x=>x.MaCaLamViec==id&&x.PhuongThuc=="CASH"&&x.TrangThai=="SUCCEEDED").SumAsync(x=>(decimal?)x.SoTien)??0;
-            shift.TienMatDuKienCuoiCa=shift.TienMatDauCa+collected-refunded;
+            shift.TienMatDuKienCuoiCa=await FourChang.Api.Features.Access.ShiftCash.Expected(db,shift);
             if(input.TienMatThucDem!=shift.TienMatDuKienCuoiCa&&string.IsNullOrWhiteSpace(input.LyDoChenhLech))return Results.Problem(detail:"Bắt buộc ghi lý do chênh lệch tiền.",statusCode:400);
             shift.TienMatThucDem=input.TienMatThucDem;shift.LyDoChenhLech=input.LyDoChenhLech;shift.KetThucLuc=DateTime.UtcNow;shift.TrangThai="CLOSED";
             var audit=AuthEndpoints.Audit("STAFF",id,"CLOSE_SHIFT","CaLamViec",id);audit.TenNguoiThucHienDaChot=context.User.Identity?.Name??"Nhân viên";audit.MaMayDaChot=shift.MaMay;db.NhatKyHeThong.Add(audit);

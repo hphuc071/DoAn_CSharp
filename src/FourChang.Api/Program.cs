@@ -1,4 +1,6 @@
 using FourChang.Api.Features;
+using FourChang.Api.Features.Access;
+using FourChang.Api.Features.Customers;
 using FourChang.Api.Security;
 using FourChang.Infrastructure.Configuration;
 using FourChang.Infrastructure.Persistence;
@@ -10,13 +12,16 @@ using Microsoft.EntityFrameworkCore;
 LocalEnvironment.Load();
 try
 {
-    if(args.Contains("--init-db")){await DatabaseBootstrap.InitializeAsync();Console.WriteLine("DATABASE OK: đúng 34 bảng, dữ liệu khởi tạo và tài khoản ứng dụng đã sẵn sàng.");return;}
-    if(args.Contains("--check-db")){await using var connection=new SqlConnection(DatabaseSettings.ConnectionString());await connection.OpenAsync();await DatabaseBootstrap.ValidateAsync(connection);Console.WriteLine("CHECK OK: đúng 34 bảng và 72 FK, kết nối bằng fourchang_app.");return;}
+    if(args.Contains("--init-db")){await DatabaseBootstrap.InitializeAsync();Console.WriteLine("DATABASE OK: đúng 35 bảng, dữ liệu khởi tạo và tài khoản ứng dụng đã sẵn sàng.");return;}
+    if(args.Contains("--check-db")){await using var connection=new SqlConnection(DatabaseSettings.ConnectionString());await connection.OpenAsync();await DatabaseBootstrap.ValidateAsync(connection);Console.WriteLine("CHECK OK: đúng 35 bảng và 73 FK, kết nối bằng fourchang_app.");return;}
     if(args.Contains("--test-db")){await DatabaseChecks.RunAsync();return;}
     var builder=WebApplication.CreateBuilder(args);
     builder.Services.AddDbContext<CafeDbContext>(o=>o.UseSqlServer(DatabaseSettings.ConnectionString(),s=>s.CommandTimeout(30)));
+    builder.Services.AddScoped<CustomerAccountService>();
+    builder.Services.AddScoped<AdminAccountService>();
+    builder.Services.AddScoped<PosDeviceService>();
     builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions,SessionAuthentication>("Session",_=>{});
-    builder.Services.AddAuthorization(options=>{options.AddPolicy("Admin",p=>p.RequireRole("ADMIN"));options.AddPolicy("Staff",p=>p.RequireRole("STAFF"));options.AddPolicy("Customer",p=>p.RequireRole("CUSTOMER"));});
+    builder.Services.AddAuthorization(options=>{options.AddPolicy("Admin",p=>p.RequireRole("ADMIN"));options.AddPolicy("AdminPassword",p=>p.RequireRole("ADMIN","ADMIN_PASSWORD_CHANGE"));options.AddPolicy("Staff",p=>p.RequireRole("STAFF"));options.AddPolicy("Customer",p=>p.RequireRole("CUSTOMER"));options.AddPolicy("CustomerPasswordChange",p=>p.RequireRole("CUSTOMER_PASSWORD_CHANGE"));});
     builder.Services.AddRateLimiter(o=>o.AddFixedWindowLimiter("auth",x=>{x.PermitLimit=20;x.Window=TimeSpan.FromMinutes(1);x.QueueLimit=0;}));
     var app=builder.Build();
     app.Use(async(context,next)=>
@@ -33,7 +38,7 @@ try
     {
         await using var connection=new SqlConnection(DatabaseSettings.ConnectionString());await connection.OpenAsync();await DatabaseBootstrap.ValidateAsync(connection);return Results.Ok(new{status="ready",tables=db.Model.GetEntityTypes().Count()});
     });
-    app.MapAuth();app.MapCatalog();app.MapWork();app.MapData();
+    app.MapAdminAccount();app.MapPosDevices();app.MapAuth();app.MapCatalog();app.MapWork();app.MapData();app.MapAdminCustomers();app.MapCustomerTemporaryPassword();
     app.Run();
 }
 catch(Exception exception)

@@ -35,7 +35,7 @@ Các dữ liệu trong --test-db đều rollback, không tạo thêm bảng. Ide
 
 ## Kiểm thử API
 
-Chạy `pwsh -File scripts/Test-Api.ps1` (PowerShell 7), sau khi backend sẵn sàng:
+Chạy `pwsh -File tests/TichHop/Test-Api.ps1` (PowerShell 7), sau khi backend sẵn sàng:
 
 - Người chưa đăng nhập không truy cập API quản lý.
 - Thiết bị không có khóa không lấy danh sách nhân viên POS.

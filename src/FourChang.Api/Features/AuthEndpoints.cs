@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Data;
+using FourChang.Api.Features.Access;
 using FourChang.Domain.Entities;
 using FourChang.Infrastructure.Persistence;
 using FourChang.Infrastructure.Security;
@@ -24,8 +25,9 @@ public static class AuthEndpoints
             await db.SaveChangesAsync();await tx.CommitAsync();return Results.Ok(result);
         }).RequireRateLimiting("auth");
         app.MapPost("/api/auth/{role}/login",Login).RequireRateLimiting("auth");
-        app.MapPost("/api/auth/logout",async(HttpContext context,CafeDbContext db)=>
+        app.MapPost("/api/auth/logout",async(HttpContext context,CafeDbContext db,AdminAccountService adminService)=>
         {
+            if(context.User.IsInRole("ADMIN") || context.User.IsInRole("ADMIN_PASSWORD_CHANGE"))return await adminService.Logout(context);
             if(!long.TryParse(context.User.FindFirst("session")?.Value,out var id))return Results.BadRequest();
             var session=await db.PhienDangNhap.FindAsync(id);if(session is not null){session.ThuHoiLuc=DateTime.UtcNow;session.LyDoThuHoi="LOGOUT";await db.SaveChangesAsync();}
             return Results.Ok(new{message="Đã đăng xuất"});
@@ -41,34 +43,27 @@ public static class AuthEndpoints
             return await db.TaiKhoanKhachHang.Where(x=>x.MaKhachHang==id).Select(x=>new{x.MaKhachHang,x.HoTen,x.EmailChuanHoa,x.SoDienThoaiChuanHoa}).SingleAsync();
         }).RequireAuthorization("Customer");
     }
-    private static async Task<IResult> Login(string role,SignIn input,CafeDbContext db)
+    private static async Task<IResult> Login(string role,SignIn input,CafeDbContext db,AdminAccountService adminService)
     {
         if(role is not ("customer" or "admin")||input.TenDangNhap is null||input.MatKhau is null||input.TenDangNhap.Length>254||input.MatKhau.Length>128)return Results.Problem(detail:"Thông tin đăng nhập không hợp lệ.",statusCode:400);
+        if(role=="admin")return await adminService.Login(input);
         var name=input.TenDangNhap.Trim().ToLowerInvariant();
         await using var tx=await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        if(role=="admin")
-        {
-            var user=await db.TaiKhoanQuanLy.SingleOrDefaultAsync(x=>x.TenDangNhapChuanHoa==name);
-            if(user is null||user.TrangThai!="ACTIVE"||user.KhoaDenLuc>DateTime.UtcNow)return Denied();
-            if(!Passwords.Verify(input.MatKhau,user.MatKhauBam)){user.SoLanDangNhapSai++;if(user.SoLanDangNhapSai>=5)user.KhoaDenLuc=DateTime.UtcNow.AddMinutes(15);await db.SaveChangesAsync();await tx.CommitAsync();return Denied();}
-            user.SoLanDangNhapSai=0;user.KhoaDenLuc=null;user.DangNhapLanCuoiLuc=DateTime.UtcNow;
-            var session=await NewSession(db,null,user.MaQuanLy,user.HoTen,"DESKTOP");await tx.CommitAsync();return Results.Ok(session);
-        }
-        else
         {
             var user=await db.TaiKhoanKhachHang.SingleOrDefaultAsync(x=>x.TenDangNhapChuanHoa==name||x.EmailChuanHoa==name||x.SoDienThoaiChuanHoa==name);
             if(user is null||user.TrangThai!="ACTIVE"||user.KhoaDenLuc>DateTime.UtcNow)return Denied();
             if(!Passwords.Verify(input.MatKhau,user.MatKhauBam)){user.SoLanDangNhapSai++;if(user.SoLanDangNhapSai>=5)user.KhoaDenLuc=DateTime.UtcNow.AddMinutes(15);await db.SaveChangesAsync();await tx.CommitAsync();return Denied();}
             user.SoLanDangNhapSai=0;user.KhoaDenLuc=null;user.DangNhapLanCuoiLuc=DateTime.UtcNow;
-            var session=await NewSession(db,user.MaKhachHang,null,user.HoTen,"WEB");await tx.CommitAsync();return Results.Ok(session);
+            // UC-ADM-01 / BR-07: mật khẩu tạm chỉ cấp phiên đổi mật khẩu, chưa được truy cập đơn/hồ sơ.
+            var session=await NewSession(db,user.MaKhachHang,null,user.HoTen,"WEB",user.BatBuocDoiMatKhau);await tx.CommitAsync();return Results.Ok(session);
         }
     }
     private static IResult Denied()=>Results.Problem(detail:"Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản tạm khóa.",statusCode:401);
-    private static async Task<SessionResult> NewSession(CafeDbContext db,long? customer,long? admin,string name,string app)
+    private static async Task<SessionResult> NewSession(CafeDbContext db,long? customer,long? admin,string name,string app,bool mustChangePassword=false)
     {
         var token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        db.PhienDangNhap.Add(new(){MaKhachHang=customer,MaQuanLy=admin,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien="FULL",LoaiUngDung=app,HetHanLuc=DateTime.UtcNow.AddHours(8)});
-        await db.SaveChangesAsync();return new(token,admin is null?"CUSTOMER":"ADMIN",name,(admin??customer)!.Value);
+        db.PhienDangNhap.Add(new(){MaKhachHang=customer,MaQuanLy=admin,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien=mustChangePassword?"PASSWORD_CHANGE":"FULL",LoaiUngDung=app,HetHanLuc=mustChangePassword?DateTime.UtcNow.AddMinutes(15):DateTime.UtcNow.AddHours(8)});
+        await db.SaveChangesAsync();return new(token,admin is null?"CUSTOMER":"ADMIN",name,(admin??customer)!.Value,MustChangePassword:mustChangePassword);
     }
     public static NhatKyHeThong Audit(string role,long actor,string action,string entity,long id)=>new(){MaLienKetXuLy=Guid.NewGuid(),LoaiTacNhan=role,MaKhachHang=role=="CUSTOMER"?actor:null,MaQuanLy=role=="ADMIN"?actor:null,MaCaLamViec=role=="STAFF"?actor:null,TenNguoiThucHienDaChot=role,HanhDong=action,LoaiDoiTuong=entity,MaDoiTuong=id.ToString(System.Globalization.CultureInfo.InvariantCulture),KetQua="SUCCEEDED",PhatSinhLuc=DateTime.UtcNow};
 }

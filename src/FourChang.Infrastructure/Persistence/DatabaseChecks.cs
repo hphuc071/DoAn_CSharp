@@ -9,11 +9,11 @@ public static class DatabaseChecks
     public static async Task RunAsync()
     {
         await using var connection=new SqlConnection(DatabaseSettings.ConnectionString());await connection.OpenAsync();
-        await DatabaseBootstrap.ValidateAsync(connection);Console.WriteLine("PASS: 34 bảng, đúng cột và 72 FK hoạt động.");
+        await DatabaseBootstrap.ValidateAsync(connection);Console.WriteLine("PASS: 35 bảng, đúng cột và 73 FK hoạt động.");
         await using var db=new CafeDbContext(new DbContextOptionsBuilder<CafeDbContext>().UseSqlServer(DatabaseSettings.ConnectionString()).Options);
-        if(db.Model.GetEntityTypes().Count()!=34)throw new InvalidOperationException("EF Core ánh xạ sai số bảng.");
+        if(db.Model.GetEntityTypes().Count()!=35)throw new InvalidOperationException("EF Core ánh xạ sai số bảng.");
         if(!Passwords.Verify("Test-password-123!",Passwords.Hash("Test-password-123!"))||Passwords.Verify("Wrong",Passwords.Hash("Test-password-123!")))throw new InvalidOperationException("Password hashing failed.");
-        Console.WriteLine("PASS: EF Core 34 entity; băm mật khẩu xác minh đúng/sai.");
+        Console.WriteLine("PASS: EF Core 35 entity; băm mật khẩu xác minh đúng/sai.");
         await Reject(connection,"FK khách hàng không tồn tại", "INSERT dbo.DiaChiKhachHang(MaKhachHang,TenNguoiNhan,DienThoaiNguoiNhan,DiaChiChiTiet,LaDiaChiMacDinh,DangSuDung) VALUES(9223372036854775800,N'Test','0900000000',N'Test',0,1)");
         await Reject(connection,"Không trùng danh mục", "INSERT dbo.DanhMucMon(TenDanhMuc,ThuTuHienThi,DaCongBo,DangSuDung) SELECT TOP(1) TenDanhMuc,0,1,1 FROM dbo.DanhMucMon");
         await Reject(connection,"Giá cấu hình không âm", "UPDATE dbo.CauHinhMon SET GiaBan=-1 WHERE MaCauHinhMon=(SELECT MIN(MaCauHinhMon) FROM dbo.CauHinhMon)");

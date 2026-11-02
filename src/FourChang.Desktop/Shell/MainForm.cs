@@ -43,12 +43,13 @@ public sealed class MainForm:Form
         main.Controls.Add(content);main.Controls.Add(top);Controls.Add(main);Controls.Add(side);
         Navigate(role=="Admin"?"dashboard":"sale");
     }
-    private async void ShowAccount()
+    // Tài khoản mở đúng UC-ADM-02; đăng xuất/đổi mật khẩu thành công quay lại màn hình xác thực.
+    public event EventHandler? ReauthenticationRequested;
+    public void RequestReauthentication()
     {
-        if(MessageBox.Show(this,"Đăng xuất tài khoản quản lý?","Tài khoản",MessageBoxButtons.YesNo,MessageBoxIcon.Question)!=DialogResult.Yes)return;
-        try { await FourChang.Desktop.Data.LiveSession.Api.LogoutAsync(); FourChang.Desktop.Data.LiveSession.Api.Token=null; Close(); }
-        catch(FourChang.Presentation.Shared.Integration.CafeApiException ex) { MessageBox.Show(this,ex.Message); }
+        if(ReauthenticationRequested is not null)ReauthenticationRequested(this,EventArgs.Empty);else Close();
     }
+    private void ShowAccount()=>Navigate("access");
     public void Navigate(string route)
     {
         foreach(var pair in navigation)pair.Value.BackColor=pair.Key==route?CafeTheme.Coffee:CafeTheme.Dark;
@@ -64,5 +65,3 @@ public sealed class MainForm:Form
         body.Dock=DockStyle.Top;layout.RowCount=1;layout.Controls.Add(body,0,0);content.Controls.Add(layout);content.ResumeLayout(true);content.AutoScrollPosition=Point.Empty;
     }
 }
-
-

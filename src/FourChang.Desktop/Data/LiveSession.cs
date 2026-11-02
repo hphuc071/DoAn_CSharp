@@ -8,7 +8,7 @@ public static class LiveSession
     public static CafeApiClient Api { get; } = Create();
     private static CafeApiClient Create()
     {
-        // Client chỉ đọc URL và khóa thiết bị; không nạp mật khẩu SQL vào WinForms.
+        // Client chỉ đọc URL từ .env; khóa từng máy được đọc riêng từ kho DPAPI.
         var settings=new Dictionary<string,string>(StringComparer.Ordinal);
         var dir=new DirectoryInfo(AppContext.BaseDirectory);
         while(dir is not null&&!File.Exists(Path.Combine(dir.FullName,"FourChang.sln")))dir=dir.Parent;
@@ -16,9 +16,10 @@ public static class LiveSession
         if(file is not null&&File.Exists(file))foreach(var line in File.ReadLines(file))
         {
             var split=line.IndexOf('=');if(split<=0)continue;var key=line[..split].Trim();
-            if(key is "FOURCHANG_API_URL" or "FOURCHANG_POS_KEY")settings[key]=line[(split+1)..].Trim().Trim('"','\'');
+            if(key is "FOURCHANG_API_URL")settings[key]=line[(split+1)..].Trim().Trim('"','\'');
         }
         var url=Environment.GetEnvironmentVariable("FOURCHANG_API_URL")??settings.GetValueOrDefault("FOURCHANG_API_URL")??"http://127.0.0.1:5181";
-        return new CafeApiClient(new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(20)}){PosKey=Environment.GetEnvironmentVariable("FOURCHANG_POS_KEY")??settings.GetValueOrDefault("FOURCHANG_POS_KEY")};
+        var credential=FourChang.Desktop.Security.PosDeviceCredentials.Load();
+        return new CafeApiClient(new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(20)}){PosKey=credential?.KhoaThietBi,PosMachine=credential?.MaMay??Environment.MachineName.ToUpperInvariant()};
     }
 }

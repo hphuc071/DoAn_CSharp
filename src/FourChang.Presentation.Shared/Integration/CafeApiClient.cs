@@ -3,11 +3,15 @@ using System.Net.Http.Json;
 using System.Text.Json;
 namespace FourChang.Presentation.Shared.Integration;
 
-public sealed class CafeApiException(string message) : Exception(message);
-public sealed class CafeApiClient(HttpClient http)
+public sealed class CafeApiException(string message, System.Net.HttpStatusCode? statusCode = null) : Exception(message)
+{
+    public System.Net.HttpStatusCode? StatusCode { get; } = statusCode;
+}
+public sealed partial class CafeApiClient(HttpClient http)
 {
     public string? Token { get; set; }
     public string? PosKey { get; set; }
+    public string? PosMachine { get; set; }
     public static Uri BaseAddress => new(Environment.GetEnvironmentVariable("FOURCHANG_API_URL") ?? "http://localhost:5181");
     public Task<List<MenuProduct>> GetMenuAsync(CancellationToken ct = default) => SendAsync<List<MenuProduct>>(HttpMethod.Get,"/api/menu",ct:ct);
     public Task<List<Employee>> GetEmployeesAsync(bool admin = false) => SendAsync<List<Employee>>(HttpMethod.Get,admin?"/api/admin/employees":"/api/pos/employees");
@@ -28,13 +32,17 @@ public sealed class CafeApiClient(HttpClient http)
             using var request = new HttpRequestMessage(method,url);
             if (body is not null) request.Content = JsonContent.Create(body);
             if (Token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer",Token);
-            if (url.StartsWith("/api/pos/",StringComparison.Ordinal) && PosKey is not null) request.Headers.Add("X-POS-Key",PosKey);
+            if (url.StartsWith("/api/pos/",StringComparison.Ordinal))
+            {
+                if(PosKey is not null)request.Headers.Add("X-POS-Key",PosKey);
+                if(PosMachine is not null)request.Headers.Add("X-POS-Machine",PosMachine);
+            }
             using var response = await http.SendAsync(request,ct);
             if (!response.IsSuccessStatusCode)
             {
                 var detail="Không thể thực hiện thao tác. Kiểm tra kết nối hoặc đăng nhập lại.";
                 try { var problem = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken:ct); if(problem.TryGetProperty("detail",out var message))detail=message.GetString()??detail; } catch(JsonException) { }
-                throw new CafeApiException(detail);
+                throw new CafeApiException(detail,response.StatusCode);
             }
             return await response.Content.ReadFromJsonAsync<T>(cancellationToken:ct) ?? throw new CafeApiException("Backend trả dữ liệu rỗng.");
         }

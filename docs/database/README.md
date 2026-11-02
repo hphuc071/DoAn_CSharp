@@ -1,11 +1,12 @@
-# Database hiện tại: 34 bảng
+# Database hiện tại: 35 bảng
 
-Nguồn đang sử dụng:
+Giữ nguyên 34 bảng đã chốt, bổ sung duy nhất **ThietBiPOS** cho UC-ADM-02 theo xác nhận của người dùng. `dbo.sysdiagrams` của SSMS được giữ nguyên và không tính vào 35 bảng nghiệp vụ.
 
-- [Schema 34 bảng](34-bang/schema.sql)
-- [Manifest mô hình](34-bang/model.json)
-- [Từ điển dữ liệu](34-bang/TU-DIEN-DU-LIEU.md)
-- [ERD hiện tại](34-bang/ERD.md)
-- [Khởi tạo, chạy và kiểm tra](../../HUONG-DAN-DATABASE.md)
+- [Thiết kế và nâng cấp hiện hành](35-bang/README.md)
+- [Schema khởi tạo 35 bảng](35-bang/schema.sql)
+- [Manifest mô hình 35 bảng](35-bang/model.json)
+- [Migration chỉ thêm thiết bị POS](35-bang/001-add-ThietBiPOS.sql)
+- [Từ điển 34 bảng gốc, không thay đổi](34-bang/TU-DIEN-DU-LIEU.md)
+- [Hướng dẫn khởi tạo, chạy và kiểm tra](../../HUONG-DAN-DATABASE.md)
 
-Các file schema.sql (42 bảng), ERD.md, tables.json và THIET-KE-DATABASE-GOI-Y.md ở thư mục này là bản cũ, được giữ lại để không mất tài liệu. Không dùng chúng để khởi tạo database hiện tại.
+Các phiên bản 34 bảng, schema 42 bảng và thiết kế cũ được giữ để đối chiếu. Không dùng schema cũ để khởi tạo database hiện hành. Runner `tests/TichHop/Test-Upgrade35.ps1` dựng schema 34 thật và kiểm tra nâng cấp, bảo toàn sơ đồ SSMS trên database tạm.

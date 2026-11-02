@@ -53,7 +53,7 @@ public static class DataEndpoints
     }
     private static async Task<TableData> Read<T>(IQueryable<T> source) where T:class
     {
-        var forbidden=new HashSet<string>(StringComparer.Ordinal){"MatKhauBam","MaLamMoiDaBam","MaBamQR","TaiKhoanNhanMaHoa","NoiDungQR","MaBamYeuCau","DuLieuTruocJson","DuLieuSauJson","KetQuaDaChotJson"};
+        var forbidden=new HashSet<string>(StringComparer.Ordinal){"MaBamKhoa","MatKhauBam","MaLamMoiDaBam","MaBamQR","TaiKhoanNhanMaHoa","NoiDungQR","MaBamYeuCau","DuLieuTruocJson","DuLieuSauJson","KetQuaDaChotJson"};
         var columns=typeof(T).GetProperties().Where(p=>!forbidden.Contains(p.Name)&&p.PropertyType!=typeof(byte[])).ToArray();
         var records=await source.AsNoTracking().Take(100).ToListAsync();
         var rows=records.Select(row=>columns.Select(p=>p.GetValue(row) switch{null=>"",DateTime time=>time.ToLocalTime().ToString("dd/MM/yyyy HH:mm",CultureInfo.GetCultureInfo("vi-VN")),decimal number=>number.ToString("0.####",CultureInfo.InvariantCulture),bool boolean=>boolean?"Có":"Không",var value=>Convert.ToString(value,CultureInfo.InvariantCulture)??""}).ToArray()).ToArray();

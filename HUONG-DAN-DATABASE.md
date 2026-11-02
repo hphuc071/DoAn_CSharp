@@ -1,4 +1,4 @@
-# Database 34 bảng — 4CHANG LINH NGU LAM
+# Database 35 bảng — 4CHANG LINH NGU LAM
 
 ## Khởi tạo trên máy mới / máy chấm
 
@@ -12,7 +12,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\ChuanBi-Database.ps1
 
 Script tự tạo mật khẩu riêng trong .env nếu chưa có; không hiển thị mật khẩu, không thay mật khẩu đang có. Nếu dùng volume SQL cũ, SQL_SA_PASSWORD phải khớp mật khẩu thực tế. Không sửa .env để đổi mật khẩu SQL của volume đã tồn tại.
 
-Script tạo database FourChangDb nếu chưa có. Nếu gặp schema khác 34 bảng thì dừng, không tự xóa/sửa dữ liệu. Bộ khởi tạo không dùng EF migrations và không tạo __EFMigrationsHistory. Database có đúng 34 bảng nghiệp vụ; view, index và trigger không phải bảng mới.
+Script tạo database FourChangDb nếu chưa có. Nếu gặp đúng schema 34 bảng đã xác minh, bổ sung duy nhất ThietBiPOS theo migration được chấp thuận. Schema lạ sẽ dừng, không tự xóa/sửa dữ liệu. Bộ khởi tạo không dùng EF migrations và không tạo __EFMigrationsHistory. Database có đúng 35 bảng nghiệp vụ; view, index và trigger không phải bảng mới.
 
 ## Chạy ứng dụng
 
@@ -21,7 +21,7 @@ Script tạo database FourChangDb nếu chưa có. Nếu gặp schema khác 34 b
 - Chay-QuanLy.cmd → tài khoản quanly; mật khẩu khởi tạo là ADMIN_INITIAL_PASSWORD trong .env. Không phải mật khẩu sa.
 - Các launcher kiểm tra và khởi động backend ở http://localhost:5181. Có thể chạy Chay-Backend.cmd riêng để xem log trực tiếp.
 
-SQL Server trên máy: 127.0.0.1,14330. Chỉ dùng sa khi quản trị/khởi tạo. Backend kết nối bằng fourchang_app với quyền SELECT/INSERT/UPDATE, không được DELETE hay ALTER database. Mật khẩu ứng dụng và khóa thiết bị không nằm trong Git. Chia sẻ .env.example cho giảng viên, không chia sẻ .env thật.
+SQL Server trên máy: 127.0.0.1,14330. Chỉ dùng sa khi quản trị/khởi tạo. Backend kết nối bằng fourchang_app với quyền SELECT/INSERT/UPDATE, chỉ DELETE tài khoản khách chưa có tham chiếu trong UC-ADM-01; các bảng khác bị DENY DELETE và không có quyền ALTER database. Mật khẩu ứng dụng và bí mật ký phiên máy chủ không nằm trong Git. Khóa riêng từng thiết bị POS được lưu bằng Windows DPAPI, không dùng khóa chung từ .env để mở POS. Chia sẻ .env.example cho giảng viên, không chia sẻ .env thật.
 
 ## Những phần đã kết nối dữ liệu thật
 
@@ -47,7 +47,7 @@ dotnet run --project src/FourChang.Api -- --test-db
 
 ```text
 src/
-  FourChang.Domain/Entities/                # 34 entity, chia theo nghiệp vụ
+  FourChang.Domain/Entities/                # 35 entity, chia theo nghiệp vụ
   FourChang.Infrastructure/
     Configuration/                         # Chỉ backend đọc cấu hình SQL
     Persistence/CafeDbContext.cs
@@ -83,3 +83,14 @@ docs/database/34-bang/
 - Không ghi mật khẩu, token hay dữ liệu tài khoản nhận hoàn chưa che vào Audit Log. API tra cứu không trả các trường bí mật.
 
 README.md của nhóm và schema.sql 42 bảng cũ được giữ nguyên. Chỉ dùng docs/database/34-bang/schema.sql cho thiết kế hiện tại. ERD 25 bảng và tài liệu cũ chỉ là lịch sử, không dùng để tạo database mới.
+
+
+## UC-ADM-01 quản lý tài khoản khách hàng
+
+Màn hình Quản lý → Khách hàng dùng API nghiệp vụ riêng cho tìm kiếm/phân trang, tạo/sửa, khóa/mở/ngừng, reset mật khẩu tạm và xóa có điều kiện. Không đổi 34 bảng/cột/FK. `fourchang_app` chỉ được DELETE `TaiKhoanKhachHang` khi không có tham chiếu; 33 bảng khác vẫn bị DENY DELETE. Chạy `ChuanBi-Database.ps1` sau cập nhật để áp dụng quyền có giới hạn. Chi tiết đối chiếu đặc tả ở `docs/use-cases/UC-ADM-01.md`.
+
+## UC-ADM-02 — Quyền truy cập
+
+Mở Admin → **Quyền truy cập**: tài khoản duy nhất, đổi mật khẩu, đăng xuất, cấp/thu hồi thiết bị và xử lý ca liên quan. Trên máy POS cần chạy Admin đăng ký đúng mã máy và chọn lưu cấu hình trên máy này trước khi mở ứng dụng Nhân viên. POS dùng cùng người dùng Windows để đọc được cấu hình DPAPI. Không có tài khoản cá nhân cho nhân viên.
+
+Đổi mật khẩu Quản lý thu hồi phiên Quản lý và yêu cầu đăng nhập lại; ca POS vẫn giữ nguyên. Thu hồi thiết bị chặn lệnh mới ngay, không xóa ca hoặc giao dịch cũ. Xem [hướng dẫn UC-ADM-02](tests/QuanLy/UC-ADM-02/README.md).

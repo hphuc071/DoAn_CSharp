@@ -25,6 +25,9 @@ public static class DatabaseViews
     public static Control Create(string role,string route)
     {
         if(role=="Staff")return route switch{"shift"=>Shift(),"sale"=>Sale(),"orders"=>Table("DonHang",false),"cancel"=>Ui.Panel("Hủy món",Ui.Label("Chọn đơn để tra cứu. Thao tác hủy sẽ được triển khai cùng luồng xử lý đơn."),Table("DonHang",false)),"payment"=>Table("HoaDon",false),_=>Ui.Label("Chưa có màn hình")};
+        // UC-ADM-01 dùng màn hình nghiệp vụ riêng, thay bảng đọc thô ở chế độ chạy thật.
+        if(route=="customers")return new FourChang.Desktop.Features.Admin.Customers.CustomersPage();
+        if(route=="access")return new FourChang.Desktop.Features.Admin.Access.AccessPage();
         if(route=="employees")return Employees();
         if(route=="dashboard")return Dashboard();
         if(!AdminTables.TryGetValue(route,out var tables))return Ui.Label("Chưa có màn hình");

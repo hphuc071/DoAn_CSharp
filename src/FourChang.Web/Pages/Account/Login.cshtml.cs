@@ -11,7 +11,7 @@ public sealed class LoginModel(CafeApiClient api):PageModel
     public async Task<IActionResult> OnPostAsync()
     {
         if(!ModelState.IsValid)return Page();
-        try{var session=await api.LoginCustomerAsync(new(TenDangNhap,MatKhau));CustomerCookie.Set(Response,Request,session);return RedirectToPage("/Index");}
+        try{var session=await api.LoginCustomerAsync(new(TenDangNhap,MatKhau));CustomerCookie.Set(Response,Request,session);return session.MustChangePassword?RedirectToPage("ChangeTemporaryPassword"):RedirectToPage("/Index");}
         catch(CafeApiException ex){ModelState.AddModelError("",ex.Message);MatKhau="";return Page();}
     }
 }

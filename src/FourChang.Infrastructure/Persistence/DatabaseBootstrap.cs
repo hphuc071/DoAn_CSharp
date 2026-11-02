@@ -28,8 +28,16 @@ public static class DatabaseBootstrap
             {
                 await using var schema = connection.CreateCommand();
                 schema.CommandTimeout = 120;
-                schema.CommandText = await ReadResourceAsync("FourChang.Schema34.sql");
+                schema.CommandText = await ReadResourceAsync("FourChang.Schema35.sql");
                 await schema.ExecuteNonQueryAsync();
+            }
+            else if (!existing.Contains("ThietBiPOS"))
+            {
+                // Chỉ nâng cấp từ schema 34 bảng đã xác minh; không tự sửa database lạ hoặc xóa sysdiagrams.
+                await ValidateAsync(connection, "FourChang.Model34.json");
+                await using var upgrade = connection.CreateCommand();
+                upgrade.CommandText = await ReadResourceAsync("FourChang.Upgrade35.sql");
+                await upgrade.ExecuteNonQueryAsync();
             }
             else await ValidateAsync(connection);
         }
@@ -40,12 +48,12 @@ public static class DatabaseBootstrap
         await check.OpenAsync();
         await ValidateAsync(check);
     }
-    public static async Task ValidateAsync(SqlConnection connection)
+    public static async Task ValidateAsync(SqlConnection connection, string manifestName = "FourChang.Model35.json")
     {
-        using var manifest = JsonDocument.Parse(await ReadResourceAsync("FourChang.Model34.json"));
+        using var manifest = JsonDocument.Parse(await ReadResourceAsync(manifestName));
         var expected = manifest.RootElement.GetProperty("tables").EnumerateArray().Select(t => t.GetProperty("name").GetString()!).Order().ToArray();
         var actual = (await ReadTableNamesAsync(connection)).Order().ToArray();
-        if (!expected.SequenceEqual(actual)) throw new InvalidOperationException("Database không đúng 34 bảng đã chốt. Dừng để bảo vệ dữ liệu; không tự xóa hoặc sửa schema cũ.");
+        if (!expected.SequenceEqual(actual)) throw new InvalidOperationException("Database không đúng bộ bảng nghiệp vụ đã chốt. Dừng để bảo vệ dữ liệu; không tự xóa hoặc sửa schema cũ.");
         foreach (var table in manifest.RootElement.GetProperty("tables").EnumerateArray())
         {
             await using var query = connection.CreateCommand();
@@ -68,18 +76,20 @@ public static class DatabaseBootstrap
         var expectedKeys = manifest.RootElement.GetProperty("relations").EnumerateArray().Select(r=>string.Join('|',r.GetProperty("child").GetString(),string.Join(',',r.GetProperty("fields").EnumerateArray().Select(x=>x.GetString())),r.GetProperty("parent").GetString(),string.Join(',',r.GetProperty("target").EnumerateArray().Select(x=>x.GetString())))).ToHashSet(StringComparer.Ordinal);
         if(!actualKeys.SetEquals(expectedKeys))throw new InvalidOperationException("FK không nối đúng thuộc tính đã chốt.");
         await using var integrity = connection.CreateCommand();
-        integrity.CommandText = "SELECT (SELECT COUNT(*) FROM sys.key_constraints WHERE type='PK'), (SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=0 AND is_not_trusted=0), (SELECT COUNT(*) FROM sys.triggers WHERE parent_class=1 AND is_disabled=0)";
+        integrity.CommandText = "SELECT (SELECT COUNT(*) FROM sys.key_constraints WHERE type='PK' AND parent_object_id<>ISNULL(OBJECT_ID(N'dbo.sysdiagrams'),-1)), (SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=0 AND is_not_trusted=0), (SELECT COUNT(*) FROM sys.triggers WHERE parent_class=1 AND is_disabled=0)";
         await using(var reader = await integrity.ExecuteReaderAsync())
         {
             await reader.ReadAsync();
             var checkCount = manifest.RootElement.GetProperty("tables").EnumerateArray().Sum(t=>t.GetProperty("checks").GetArrayLength());
-            if(reader.GetInt32(0)!=34||reader.GetInt32(1)!=checkCount||reader.GetInt32(2)!=11)throw new InvalidOperationException("PK, CHECK hoặc trigger chưa đúng bộ thiết kế.");
+            if(reader.GetInt32(0)!=manifest.RootElement.GetProperty("tables").GetArrayLength()||reader.GetInt32(1)!=checkCount||reader.GetInt32(2)!=11)throw new InvalidOperationException("PK, CHECK hoặc trigger chưa đúng bộ thiết kế.");
         }
     }
     private static async Task<List<string>> ReadTableNamesAsync(SqlConnection connection)
     {
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.is_ms_shipped=0 ORDER BY t.name";
+        // Giữ nguyên bảng sơ đồ của SSMS theo xác nhận của người dùng. Chỉ bỏ qua khi đúng tên/schema và dấu hỗ trợ Microsoft.
+        // Các bảng lạ khác vẫn bị chặn; PK của sysdiagrams không thuộc các bảng nghiệp vụ trong manifest.
+        command.CommandText = "SELECT t.name FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id WHERE t.is_ms_shipped=0 AND NOT(s.name=N'dbo' AND t.name=N'sysdiagrams' AND EXISTS(SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=t.object_id AND ep.minor_id=0 AND ep.name=N'microsoft_database_tools_support' AND CONVERT(nvarchar(10),ep.value)=N'1')) ORDER BY t.name";
         var result = new List<string>();
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync()) result.Add(reader.GetString(0));
@@ -97,8 +107,18 @@ public static class DatabaseBootstrap
         await using var db = new SqlConnection(DatabaseSettings.ConnectionString(true));
         await db.OpenAsync();
         await using var grant = db.CreateCommand();
-        grant.CommandText = "IF USER_ID(N'fourchang_app') IS NULL CREATE USER [fourchang_app] FOR LOGIN [fourchang_app]; GRANT SELECT, INSERT, UPDATE ON SCHEMA::dbo TO [fourchang_app]; DENY DELETE ON SCHEMA::dbo TO [fourchang_app];";
+        grant.CommandText = "IF USER_ID(N'fourchang_app') IS NULL CREATE USER [fourchang_app] FOR LOGIN [fourchang_app]; GRANT SELECT, INSERT, UPDATE ON SCHEMA::dbo TO [fourchang_app]; REVOKE DELETE ON SCHEMA::dbo FROM [fourchang_app]; GRANT DELETE ON OBJECT::dbo.TaiKhoanKhachHang TO [fourchang_app];";
         await grant.ExecuteNonQueryAsync();
+        // UC-ADM-01 cần xóa khách chưa tham chiếu. Không cấp DELETE cho đơn, tiền, kho hoặc nhật ký.
+        using var manifest = JsonDocument.Parse(await ReadResourceAsync("FourChang.Model35.json"));
+        foreach (var table in manifest.RootElement.GetProperty("tables").EnumerateArray())
+        {
+            var name = table.GetProperty("name").GetString()!;
+            if (name == "TaiKhoanKhachHang") continue;
+            await using var deny = db.CreateCommand();
+            deny.CommandText = $"DENY DELETE ON OBJECT::dbo.[{name}] TO [fourchang_app]";
+            await deny.ExecuteNonQueryAsync();
+        }
     }
     private static async Task<string> ReadResourceAsync(string name)
     {

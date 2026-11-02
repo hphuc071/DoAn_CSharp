@@ -6,10 +6,17 @@ namespace FourChang.Desktop.Shell;
 
 public sealed class RoleApplicationContext : ApplicationContext
 {
-    public RoleApplicationContext(string role)
+    public RoleApplicationContext(string role)=>ShowEntry(role);
+    private void ShowEntry(string role)
     {
-        var entry=new EntryForm(role,name=>{var previous=MainForm;MainForm=new MainForm(role,name);MainForm.Show();previous?.Close();});
-        MainForm=entry;entry.Show();
+        var previous=MainForm;
+        var entry=new EntryForm(role,name=>
+        {
+            var old=MainForm;var shell=new MainForm(role,name);MainForm=shell;
+            shell.ReauthenticationRequested+=(_,_)=>ShowEntry(role);
+            shell.Show();old?.Close();
+        });
+        MainForm=entry;entry.Show();previous?.Close();
     }
 }
 public sealed class EntryForm:Form
@@ -42,7 +49,7 @@ public sealed class EntryForm:Form
         if(staff){fields.Add(Ui.Field("Nhân viên",employees));fields.Add(Ui.Field("Ca làm việc",shift));fields.Add(Ui.Field("Tiền đầu ca",opening));}
         else{fields.Add(Ui.Field("Tài khoản quản lý",name));fields.Add(Ui.Field("Mật khẩu",password));}
         fields.Add(error);
-        var button=Ui.Button(staff?"Mở ca":"Đăng nhập",()=>{},true);button.MinimumSize=new Size(430,48);
+        Button button=staff?Ui.Button("Mở ca",()=>{},true):new FourChang.Desktop.Controls.Admin.AdminActionButton("Đăng nhập",FourChang.Desktop.Controls.Admin.AdminIcon.Lock,true);button.MinimumSize=new Size(430,48);
         button.Click+=async(_,_)=>
         {
             error.Visible=false;button.Enabled=false;
@@ -57,7 +64,17 @@ public sealed class EntryForm:Form
                 }
                 else session=await LiveSession.Api.LoginAdminAsync(new(name.Text,password.Text));
                 LiveSession.Current=session;LiveSession.Api.Token=session.Token;
-                onContinue(session.Name);
+                if(!staff&&session.MustChangePassword)
+                {
+                    // A1: phiên đổi mật khẩu không bao giờ được mở Dashboard trước khi đổi thành công.
+                    var context=await LiveSession.Api.GetAdminPasswordContextAsync();
+                    using var change=new FourChang.Desktop.Features.Admin.Access.AdminPasswordForm(context,password.Text);
+                    var changed=change.ShowDialog(this)==DialogResult.OK;
+                    if(!changed){try{await LiveSession.Api.LogoutAsync();}catch(CafeApiException){}}
+                    LiveSession.Api.Token=null;LiveSession.Current=null;password.Clear();
+                    error.Text=changed?"Đã đổi mật khẩu. Đăng nhập lại bằng mật khẩu mới.":"Cần đổi mật khẩu tạm trước khi sử dụng Quản lý.";error.Visible=true;return;
+                }
+                password.Clear();onContinue(session.Name);
             }
             catch(CafeApiException exception){error.Text=exception.Message;error.Visible=true;}
             finally{if(!button.IsDisposed)button.Enabled=true;}

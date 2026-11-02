@@ -4,6 +4,7 @@ namespace FourChang.Infrastructure.Persistence;
 
 public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(options)
 {
+    public DbSet<ThietBiPOS> ThietBiPOS => Set<ThietBiPOS>();
     public DbSet<TaiKhoanKhachHang> TaiKhoanKhachHang => Set<TaiKhoanKhachHang>();
     public DbSet<TaiKhoanQuanLy> TaiKhoanQuanLy => Set<TaiKhoanQuanLy>();
     public DbSet<PhienDangNhap> PhienDangNhap => Set<PhienDangNhap>();
