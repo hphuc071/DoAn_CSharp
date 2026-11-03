@@ -4,157 +4,251 @@
       "code": "UC-WEB-01",
       "actor": "KhachHang",
       "name": "Đăng ký tài khoản",
-      "script": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-01/RegistrationTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-01"
     },
     {
       "code": "UC-WEB-02",
       "actor": "KhachHang",
       "name": "Đăng nhập và đăng xuất",
-      "script": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-02/SessionTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-02"
     },
     {
       "code": "UC-WEB-03",
       "actor": "KhachHang",
       "name": "Quản lý thông tin cá nhân",
-      "script": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-03/ProfileTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-03"
     },
     {
       "code": "UC-WEB-04",
       "actor": "KhachHang",
       "name": "Duyệt và tra cứu thực đơn",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-WEB-05",
       "actor": "KhachHang",
       "name": "Tùy chỉnh món và quản lý giỏ hàng",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-WEB-06",
       "actor": "KhachHang",
       "name": "Đặt món đa hình thức",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-WEB-07",
       "actor": "KhachHang",
       "name": "Thanh toán chuyển khoản VietQR",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-WEB-08",
       "actor": "KhachHang",
       "name": "Quản lý đơn hàng cá nhân",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-POS-01",
       "actor": "NhanVien",
       "name": "Bắt đầu và kết thúc ca làm việc",
-      "script": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/NhanVien/UC-POS-01/EmployeeIdentityTests.cs",
+        "FourChang.Tests/NhanVien/UC-POS-01/WinForms/EntryUiTests.cs"
+      ],
+      "filter": "UseCase=UC-POS-01"
     },
     {
       "code": "UC-POS-02",
       "actor": "NhanVien",
       "name": "Tạo đơn tại quầy",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-POS-03",
       "actor": "NhanVien",
       "name": "Tiếp nhận và xử lý đơn hàng",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-POS-04",
       "actor": "NhanVien",
       "name": "Hủy món trước pha chế",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-POS-05",
       "actor": "NhanVien",
       "name": "Thanh toán và phát hành hóa đơn",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-01",
       "actor": "QuanLy",
       "name": "Quản lý tài khoản khách hàng",
-      "script": "QuanLy/UC-ADM-01/Test-Api.ps1"
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-01/CustomerAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/Web/TemporaryPasswordBrowserTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/WinForms/CustomersUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-01"
     },
     {
       "code": "UC-ADM-02",
       "actor": "QuanLy",
       "name": "Quản lý quyền truy cập hệ thống",
-      "script": "QuanLy/UC-ADM-02/Test-Api.ps1"
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-02/AccessAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-02/WinForms/AccessUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-02"
     },
     {
       "code": "UC-ADM-03",
       "actor": "QuanLy",
       "name": "Quản lý thực đơn",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-04",
       "actor": "QuanLy",
       "name": "Quản lý nguyên liệu",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-05",
       "actor": "QuanLy",
       "name": "Quản lý công thức pha chế BOM",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-06",
       "actor": "QuanLy",
       "name": "Theo dõi tồn kho và cảnh báo",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-07",
       "actor": "QuanLy",
       "name": "Quản lý chứng từ kho",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-08",
       "actor": "QuanLy",
       "name": "Giám sát và xử lý đơn hàng",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-09",
       "actor": "QuanLy",
       "name": "Tra cứu và quản lý hóa đơn",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-10",
       "actor": "QuanLy",
       "name": "Xử lý và xác nhận hoàn tiền",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-11",
       "actor": "QuanLy",
       "name": "Thống kê, báo cáo và tra cứu nhật ký hệ thống",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-12",
       "actor": "QuanLy",
       "name": "Quản lý danh sách nhân viên",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     },
     {
       "code": "UC-ADM-13",
       "actor": "QuanLy",
       "name": "Quản lý ca làm việc",
-      "script": null
+      "status": "ChuaTrienKhai",
+      "project": null,
+      "sources": [],
+      "filter": null
     }
   ]
 }

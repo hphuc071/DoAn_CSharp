@@ -1,3 +1,5 @@
+> Báo cáo lịch sử của schema 34 bảng và bộ runner trước đây. Bộ kiểm thử hiện hành đã chuyển sang C# xUnit: xem [tests/README.md](../../../tests/README.md).
+
 # Kết quả kiểm tra tích hợp database 34 bảng
 
 ## Phạm vi
@@ -20,7 +22,7 @@ Database FourChangDb trên SQL Server Docker, EF Core 8.0.33, .NET 8. Không t�
 
 ## Kiểm thử database
 
-Chạy `dotnet run --project src/FourChang.Api -- --test-db`:
+Chạy `dotnet run --project src/Backend/FourChang.Api -- --test-db`:
 
 - FK không tồn tại và FK ghép giữ chỗ bị từ chối.
 - Chống trùng danh mục, giá âm, tồn âm, giữ chỗ vượt tồn.

@@ -27,6 +27,6 @@ Giữ nguyên 34 bảng nghiệp vụ đã chốt. Bổ sung duy nhất `ThietBi
 
 ## Vận hành
 
-Chạy `dotnet src/FourChang.Api/bin/Debug/net8.0/FourChang.Api.dll --init-db` từ thư mục gốc sau khi build và Docker sẵn sàng. Bootstrap xác minh schema 34 trước khi nâng cấp; gặp schema lạ sẽ dừng. Sau đó chạy `--check-db`: 35 bảng, 73 FK. Không dùng EnsureDeleted/EnsureCreated trên database đang có dữ liệu.
+Chạy `dotnet src/Backend/FourChang.Api/bin/Debug/net8.0/FourChang.Api.dll --init-db` từ thư mục gốc sau khi build và Docker sẵn sàng. Bootstrap xác minh schema 34 trước khi nâng cấp; gặp schema lạ sẽ dừng. Sau đó chạy `--check-db`: 35 bảng, 73 FK. Không dùng EnsureDeleted/EnsureCreated trên database đang có dữ liệu.
 
 Khóa thiết bị không thể đọc lại từ server, không ghi trong audit. Máy POS lưu khóa bằng Windows DPAPI theo người dùng hiện tại; `FOURCHANG_POS_KEY` chỉ còn là bí mật ký/xác thực yêu cầu ở máy chủ, không phải khóa đăng nhập chung cho tất cả POS.

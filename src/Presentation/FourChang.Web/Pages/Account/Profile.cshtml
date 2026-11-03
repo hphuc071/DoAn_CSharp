@@ -1,0 +1,40 @@
+@page
+@model FourChang.Web.Pages.Account.ProfileModel
+@{ViewData["Title"]="Thông tin cá nhân";}
+<div class="page-heading"><h1>Thông tin cá nhân</h1><a class="button secondary" href="/Account/Profile">Tải lại và đối chiếu</a></div>
+@if(Model.Error is not null){<p class="account-error" role="alert">@Model.Error</p>}
+<div class="account-grid">
+<section class="panel"><h2>Hồ sơ của tôi</h2>
+@if(Model.Profile is not null){<p>Tên đăng nhập: <strong>@Model.Profile.TenDangNhap</strong></p>}
+<form method="post" asp-page-handler="Save" data-account-draft>
+<input asp-for="MaThaoTac" type="hidden"/><input asp-for="PhienBan" type="hidden"/>
+<label class="field">Họ tên<input asp-for="HoTen" maxlength="120" required/></label>
+<label class="field">Email<input asp-for="Email" type="email" maxlength="254"/></label>
+<label class="field">Số điện thoại<input asp-for="SoDienThoai" type="tel" maxlength="20"/></label>
+<p>Cần ít nhất email hoặc số điện thoại.</p><button class="button primary">Lưu hồ sơ</button></form>
+</section>
+<section class="panel"><h2>Đổi mật khẩu</h2><p>Đổi thành công sẽ yêu cầu đăng nhập lại trên các phiên hiện tại.</p>
+<form method="post" asp-page-handler="Password" data-account-draft><input asp-for="MaThaoTac" type="hidden"/><input asp-for="PhienBan" type="hidden"/>
+<label class="field">Mật khẩu hiện tại<input asp-for="MatKhauHienTai" type="password" autocomplete="current-password" maxlength="128" required/></label>
+<label class="field">Mật khẩu mới<input asp-for="MatKhauMoi" type="password" autocomplete="new-password" minlength="10" maxlength="128" required/></label>
+<label class="field">Xác nhận mật khẩu mới<input asp-for="XacNhanMatKhau" type="password" autocomplete="new-password" maxlength="128" required/></label>
+<button class="button primary">Đổi mật khẩu</button></form></section>
+</div>
+<section class="panel account-section"><h2>Địa chỉ đã lưu</h2>
+@if(Model.Profile is not null){foreach(var address in Model.Profile.DiaChi){
+<article class="account-address"><div><h3>@(address.NhanDiaChi??"Địa chỉ nhận hàng") @(address.LaDiaChiMacDinh?"· Mặc định":"")</h3><p>@address.TenNguoiNhan · @address.DienThoaiNguoiNhan</p><p>@address.DiaChiChiTiet</p><p>@address.GhiChuGiaoHang</p></div>
+<div class="account-actions"><a class="button secondary" asp-page="Profile" asp-route-address="@address.MaDiaChi">Sửa địa chỉ</a>
+<form method="post" asp-page-handler="Remove" data-confirm-remove><input name="MaThaoTac" type="hidden" value="@Guid.NewGuid()"/><input name="PhienBan" type="hidden" value="@Convert.ToBase64String(Model.Profile.PhienBanDuLieu)"/><input name="MaDiaChi" type="hidden" value="@address.MaDiaChi"/><input name="PhienBanDiaChi" type="hidden" value="@Convert.ToBase64String(address.PhienBanDuLieu)"/><button class="button secondary">Bỏ địa chỉ</button></form></div></article>
+}if(Model.Profile.DiaChi.Count==0){<p>Bạn chưa có địa chỉ đã lưu.</p>}}
+<h3>@(Model.MaDiaChi is null?"Thêm địa chỉ":"Sửa địa chỉ")</h3>
+<form method="post" asp-page-handler="Address" data-account-draft><input asp-for="MaThaoTac" type="hidden"/><input asp-for="PhienBan" type="hidden"/><input asp-for="MaDiaChi" type="hidden"/><input asp-for="PhienBanDiaChi" type="hidden"/>
+<div class="field-grid"><label class="field">Nhãn địa chỉ<input asp-for="NhanDiaChi" maxlength="50"/></label>
+<label class="field">Người nhận<input asp-for="TenNguoiNhan" maxlength="120" required/></label>
+<label class="field">Điện thoại nhận hàng<input asp-for="DienThoaiNguoiNhan" maxlength="20" required/></label>
+<label class="field">Địa chỉ nhận hàng<input asp-for="DiaChiChiTiet" maxlength="500" required/></label>
+<label class="field">Vĩ độ<input asp-for="ViDo" type="number" step="0.000001" min="-90" max="90"/></label>
+<label class="field">Kinh độ<input asp-for="KinhDo" type="number" step="0.000001" min="-180" max="180"/></label>
+<label class="field wide">Ghi chú giao hàng<input asp-for="GhiChuGiaoHang" maxlength="500"/></label></div>
+<label><input asp-for="LaDiaChiMacDinh"/> Đặt làm địa chỉ mặc định</label><div class="account-actions"><button class="button primary">Lưu địa chỉ</button><a class="button secondary" href="/Account/Profile">Hủy chỉnh sửa</a></div></form>
+</section><a class="button secondary" href="/Account/Logout">Đăng xuất</a>
+@section Scripts{<script src="~/js/account.js" asp-append-version="true"></script>}

@@ -2,9 +2,9 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $root
 try { $ready = Invoke-RestMethod 'http://localhost:5181/health/ready' -TimeoutSec 4; if($ready.status -eq 'ready' -and $ready.tables -eq 35) { exit 0 } } catch { }
-$dll = Join-Path $root 'src\FourChang.Api\bin\Debug\net8.0\FourChang.Api.dll'
+$dll = Join-Path $root 'src\Backend\FourChang.Api\bin\Debug\net8.0\FourChang.Api.dll'
 if(-not (Test-Path -LiteralPath $dll)) {
-    dotnet build (Join-Path $root 'src\FourChang.Api\FourChang.Api.csproj') -m:1 --nologo
+    dotnet build (Join-Path $root 'src\Backend\FourChang.Api\FourChang.Api.csproj') -m:1 --nologo
     if($LASTEXITCODE -ne 0) { throw 'Build backend that bai.' }
 }
 $logs = Join-Path $root 'artifacts\run'

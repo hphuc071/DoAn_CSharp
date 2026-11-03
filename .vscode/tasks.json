@@ -22,7 +22,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/FourChang.Web",
+        "${workspaceFolder}/src/Presentation/FourChang.Web",
         "--urls",
         "http://localhost:5180"
       ],
@@ -38,7 +38,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/FourChang.Pos"
+        "${workspaceFolder}/src/Presentation/FourChang.Pos"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -52,7 +52,7 @@
       "args": [
         "run",
         "--project",
-        "${workspaceFolder}/src/FourChang.Admin"
+        "${workspaceFolder}/src/Presentation/FourChang.Admin"
       ],
       "problemMatcher": [],
       "presentation": {

@@ -1,4 +1,0 @@
-@page
-@model FourChang.Web.Pages.Account.LoginModel
-@{ViewData["Title"]="Đăng nhập";}
-<div class="auth-layout"><section class="auth-visual"><span class="eyebrow">RẤT VUI ĐƯỢC GẶP LẠI BẠN</span><div class="drink-photo sprite-2"></div><h1>Một khoảng nghỉ,<br/>một chút bình yên.</h1><p>Món quen luôn đợi bạn.</p></section><section class="auth-form"><h1>Đăng nhập</h1><p>Tiếp tục đặt món và xem những đơn của bạn.</p><form method="post"><div asp-validation-summary="All" role="alert"></div><label class="field">Tên đăng nhập, email hoặc số điện thoại<input asp-for="TenDangNhap" autocomplete="username" required/></label><label class="field">Mật khẩu<input asp-for="MatKhau" type="password" autocomplete="current-password" required/></label><button class="button primary full">Đăng nhập</button></form><p>Chưa có tài khoản? <a href="/Account/Register"><strong>Đăng ký ngay</strong></a></p></section></div>

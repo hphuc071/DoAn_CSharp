@@ -1,4 +1,0 @@
-@page
-@model FourChang.Web.Pages.Account.ProfileModel
-@{ViewData["Title"]="Thông tin cá nhân";}
-<div class="page-heading"><h1>Thông tin cá nhân</h1></div><section class="panel">@if(Model.Error is not null){<p role="alert">@Model.Error</p>}else{<dl><dt>Họ tên</dt><dd>@Model.HoTen</dd><dt>Email</dt><dd>@Model.Email</dd><dt>Điện thoại</dt><dd>@Model.DienThoai</dd></dl>}<a href="/Account/Logout" class="button secondary">Đăng xuất</a></section>

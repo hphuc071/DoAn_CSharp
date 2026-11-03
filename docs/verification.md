@@ -23,8 +23,8 @@ Chưa kiểm tra gọi API, SQL/EF, bảo mật, quyền sở hữu dữ liệu,
 
 ```powershell
 dotnet build FourChang.sln
-dotnet src/FourChang.Pos/bin/Debug/net8.0-windows/FourChang.Pos.dll --render-previews artifacts/desktop
-dotnet src/FourChang.Admin/bin/Debug/net8.0-windows/FourChang.Admin.dll --render-previews artifacts/desktop
+dotnet src/Presentation/FourChang.Pos/bin/Debug/net8.0-windows/FourChang.Pos.dll --render-previews artifacts/desktop
+dotnet src/Presentation/FourChang.Admin/bin/Debug/net8.0-windows/FourChang.Admin.dll --render-previews artifacts/desktop
 ```
 
 Chế độ này mở cửa sổ ngoài vùng màn hình, dựng từng view/tab và lưu ảnh, rồi thoát. Thư mục `artifacts`, `bin`, `obj` bị loại khỏi Git. Không chạy nghiệp vụ hoặc tự động thao tác ứng dụng khác.

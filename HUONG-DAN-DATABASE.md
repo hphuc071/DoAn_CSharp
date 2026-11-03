@@ -37,8 +37,8 @@ Các thao tác tạo/pha/hủy đơn, thanh toán VietQR, giữ/trừ kho, ghi s
 
 ```powershell
 dotnet build FourChang.sln -m:1
-dotnet run --project src/FourChang.Api -- --check-db
-dotnet run --project src/FourChang.Api -- --test-db
+dotnet run --project src/Backend/FourChang.Api -- --check-db
+dotnet run --project src/Backend/FourChang.Api -- --test-db
 ```
 
 --test-db kiểm tra trên SQL thật bằng các transaction rollback: FK, UNIQUE, CHECK, giá/tồn, chủ sở hữu phiên/công thức, khóa ghép giữ chỗ, lịch sử bất biến và quy tắc Web không tiền mặt. Không tạo bảng thử nghiệm và không xóa dữ liệu. Identity có thể có khoảng trống sau rollback; đó là hành vi bình thường của SQL Server.

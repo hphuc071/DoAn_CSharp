@@ -31,9 +31,9 @@ dotnet build FourChang.sln
 Chọn ứng dụng cần chạy, mỗi ứng dụng dùng một terminal:
 
 ```powershell
-dotnet run --project src/FourChang.Web --urls http://localhost:5180
-dotnet run --project src/FourChang.Pos
-dotnet run --project src/FourChang.Admin
+dotnet run --project src/Presentation/FourChang.Web --urls http://localhost:5180
+dotnet run --project src/Presentation/FourChang.Pos
+dotnet run --project src/Presentation/FourChang.Admin
 ```
 
 Hoặc mở `Chay-Web.cmd`, `Chay-NhanVien.cmd`, `Chay-QuanLy.cmd` bằng File Explorer. Shortcut `NhanVien` / `QuanLy` trỏ tới executable tên mới sau khi build. Trong VS Code vẫn dùng Run Task → Web preview / POS preview / Admin preview, hoặc F5 chọn ứng dụng.

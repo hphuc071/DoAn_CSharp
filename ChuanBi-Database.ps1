@@ -42,7 +42,7 @@ for($i=0;$i -lt 90;$i++) {
 if(-not $ready) { throw 'SQL Server chua san sang. Xem docker compose logs sqlserver.' }
 dotnet build FourChang.sln -m:1 --nologo
 if($LASTEXITCODE -ne 0) { throw 'Build that bai.' }
-dotnet run --no-build --project src/FourChang.Api -- --init-db
+dotnet run --no-build --project src/Backend/FourChang.Api -- --init-db
 if($LASTEXITCODE -ne 0) { throw 'Khoi tao that bai; khong tu xoa database hoac volume. Xem thong bao o tren.' }
 Write-Host 'SAN SANG. Chay Chay-Backend.cmd, roi Web / NhanVien / QuanLy.'
 Write-Host 'Quan ly: quanly. Mat khau ban dau nam trong ADMIN_INITIAL_PASSWORD cua file .env.'

@@ -13,4 +13,4 @@ Nguồn nghiệp vụ là đặc tả 26 UC đã chốt; bổ sung duy nhất b�
 | E5: phiên hết hạn/thiết bị thu hồi | SessionAuthentication/PosAccess | Đối chiếu trạng thái máy và phiên bản cấp trong mỗi yêu cầu POS |
 | E6: audit/giao dịch, mất phản hồi | Mã thao tác + HMAC + transaction + endpoint biên nhận | Gửi lặp không ghi lần hai; audit lỗi rollback; token đổi mật khẩu cũ chỉ đọc receipt nguồn có thời hạn |
 
-BR liên quan: BR-05, BR-06, BR-07, BR-08, BR-09, BR-14, BR-29. Xem `tests/QuanLy/UC-ADM-02/TestCases.md` để đối chiếu các nhóm kiểm thử.
+BR liên quan: BR-05, BR-06, BR-07, BR-08, BR-09, BR-14, BR-29. Xem `tests/FourChang.Tests/QuanLy/UC-ADM-02/TestCases.md` để đối chiếu các nhóm kiểm thử.

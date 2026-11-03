@@ -3,11 +3,11 @@ setlocal
 cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\Start-LocalBackend.ps1"
 if errorlevel 1 goto backendfailed
-set "APP=%~dp0src\FourChang.Pos\bin\Debug\net8.0-windows\FourChang.Pos.exe"
+set "APP=%~dp0src\Presentation\FourChang.Pos\bin\Debug\net8.0-windows\FourChang.Pos.exe"
 if exist "%APP%" goto launch
 where dotnet >nul 2>nul
 if errorlevel 1 goto missing
- dotnet build "%~dp0src\FourChang.Pos\FourChang.Pos.csproj" --nologo
+ dotnet build "%~dp0src\Presentation\FourChang.Pos\FourChang.Pos.csproj" --nologo
 if errorlevel 1 goto failed
 :launch
 start "" "%APP%"
