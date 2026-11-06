@@ -108,20 +108,25 @@ public static class CustomerOrdersEndpoints
                 return lockedReplay;
 
             var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
-            var totalRequiredByIngredient = new Dictionary<long, decimal>();
+            // Keep full decimal precision until aggregating each ingredient over the WHOLE order.
             var perItemIngredientRequirements = new List<Dictionary<long, decimal>>();
             foreach (var item in req.Items)
             {
-                var qty = item.SoLuong;
                 var variantRecipe = recipes.FirstOrDefault(r => r.MaCauHinhMon == item.MaCauHinhMon);
                 if (variantRecipe is null)
                     return Results.Conflict(new { message = $"Món {variants[item.MaCauHinhMon].TenMon} chưa có công thức pha chế." });
                 var itemReq = new Dictionary<long, decimal>();
-                foreach (var line in recipeLines.Where(l => l.MaCongThuc == variantRecipe.MaCongThuc))
+                var variantLines = recipeLines.Where(l => l.MaCongThuc == variantRecipe.MaCongThuc).ToList();
+                if (variantLines.Count == 0)
+                    return Results.Conflict(new { message = "Công thức món chưa có định mức nguyên liệu." });
+                foreach (var line in variantLines)
                 {
+                    if (line.TyLeHaoHut is < 0m or >= 1m || line.DinhMucCoSo <= 0m)
+                        return Results.Conflict(new { message = "Định mức hoặc tỷ lệ hao hụt món không hợp lệ." });
                     var factor = line.LoaiDinhMuc == "SUGAR" ? item.PhanTramDuong / 100m
                                : line.LoaiDinhMuc == "ICE" ? item.PhanTramDa / 100m : 1m;
-                    var perCup = decimal.Ceiling(line.DinhMucCoSo * factor / (1m - line.TyLeHaoHut) * 10000m) / 10000m;
+                    // No rounding here. Same ingredient may appear in multiple recipe lines.
+                    var perCup = line.DinhMucCoSo * factor / (1m - line.TyLeHaoHut);
                     if (perCup > 0m)
                         itemReq[line.MaNguyenLieu] = itemReq.GetValueOrDefault(line.MaNguyenLieu) + perCup;
                 }
@@ -138,20 +143,34 @@ public static class CustomerOrdersEndpoints
 
                     foreach (var line in toppingLines)
                     {
-                        if (line.TyLeHaoHut is < 0m or >= 1m || line.DinhMucCoSo < 0m)
+                        if (line.TyLeHaoHut is < 0m or >= 1m || line.DinhMucCoSo <= 0m)
                             return Results.Conflict(new { message = "Định mức nguyên liệu topping không hợp lệ." });
-                        // Topping recipes describe each topping portion, independent of drink sugar/ice choices.
-                        var perPortion = decimal.Ceiling(line.DinhMucCoSo / (1m - line.TyLeHaoHut) * 10000m) / 10000m;
+                        // Until configured otherwise, a topping recipe must be FIXED per topping serving.
+                        // Do not silently treat SUGAR/ICE topping components as FIXED.
+                        if (line.LoaiDinhMuc != "FIXED")
+                            return Results.Conflict(new { message = "Công thức topping có tùy chọn đường/đá chưa được định nghĩa." });
+                        var perPortion = line.DinhMucCoSo / (1m - line.TyLeHaoHut);
                         if (perPortion > 0m)
                             itemReq[line.MaNguyenLieu] = itemReq.GetValueOrDefault(line.MaNguyenLieu)
                                 + perPortion * top.SoPhanMoiLy;
                     }
                 }
 
-                foreach (var kv in itemReq)
-                    totalRequiredByIngredient[kv.Key] = totalRequiredByIngredient.GetValueOrDefault(kv.Key) + kv.Value * qty;
                 perItemIngredientRequirements.Add(itemReq);
             }
+            // BR-23/24: first sum every line's exact quantity, then round up ONCE
+            // per ingredient and allocate the 0.0001 units back to order lines.
+            OrderBomAllocation.Result bomAllocation;
+            try
+            {
+                bomAllocation = OrderBomAllocation.Calculate(
+                    perItemIngredientRequirements, req.Items.Select(x => x.SoLuong).ToArray());
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.Conflict(new { message = ex.Message });
+            }
+            var totalRequiredByIngredient = bomAllocation.TotalByIngredient;
             foreach (var (ingId, needed) in totalRequiredByIngredient)
             {
                 if (!ingredientsMap.TryGetValue(ingId, out var ing) || !ing.DangSuDung || !stocks.TryGetValue(ingId, out var stock))
@@ -235,17 +254,20 @@ public static class CustomerOrdersEndpoints
                     });
                 }
                 var itemReq = perItemIngredientRequirements[idx];
+                var lineReservation = bomAllocation.ReservedByLine[idx];
                 foreach (var (ingId, perCup) in itemReq)
                 {
                     var ing = ingredientsMap[ingId];
-                    var reservedQty = perCup * qty;
+                    var reservedQty = lineReservation[ingId];
                     db.NguyenLieuChiTietDonHang.Add(new NguyenLieuChiTietDonHang
                     {
                         MaChiTietDonHang = detail.MaChiTietDonHang,
                         MaNguyenLieu = ingId,
                         TenNguyenLieuDaChot = ing.TenNguyenLieu,
                         DonViCoSoDaChot = ing.KyHieu,
-                        DinhMucMoiLy = perCup,
+                        // Snapshot column is decimal(18,4); the authoritative allocated
+                        // total for stock is GiuChoNguyenLieu.SoLuongGiuCho below.
+                        DinhMucMoiLy = OrderBomAllocation.RoundUp4(perCup),
                         ThoiDiemTao = now
                     });
                     db.GiuChoNguyenLieu.Add(new GiuChoNguyenLieu
