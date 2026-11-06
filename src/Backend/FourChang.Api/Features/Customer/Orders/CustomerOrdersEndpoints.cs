@@ -39,6 +39,17 @@ public static class CustomerOrdersEndpoints
 
         app.MapPost("/api/customer/orders", async (CreateCustomerOrderRequest req, HttpContext context, CafeDbContext db, CancellationToken ct) =>
         {
+            var claim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!long.TryParse(claim, out var customerId) || customerId <= 0)
+                return Results.Unauthorized();
+            if (!OrderIdempotency.TryReadKey(context, out var idempotencyKey))
+                return Results.BadRequest(new { message = "Cần Idempotency-Key là một GUID khác rỗng cho mỗi lần xác nhận đặt hàng." });
+            var requestFingerprint = OrderIdempotency.Hash(req);
+            var earlyReplay = await OrderIdempotency.ReplayAsync(
+                db, customerId, idempotencyKey, requestFingerprint, ct);
+            if (earlyReplay is not null)
+                return earlyReplay;
+
             if (req.Items is null || req.Items.Count == 0)
                 return Results.BadRequest(new { message = "Giỏ hàng đang trống." });
             // Validate before stock checks or any database writes.
@@ -52,10 +63,6 @@ public static class CustomerOrdersEndpoints
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
-            var claim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (!long.TryParse(claim, out var customerId) || customerId <= 0)
-                return Results.Unauthorized();
-
             var now = DateTime.UtcNow;
             var expiresAt = now.AddMinutes(10);
             var variantIds = req.Items.Select(x => x.MaCauHinhMon).Distinct().ToList();
@@ -84,6 +91,11 @@ public static class CustomerOrdersEndpoints
             ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
 
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+            var lockedReplay = await OrderIdempotency.LockAndReplayAsync(
+                db, tx, customerId, idempotencyKey, requestFingerprint, ct);
+            if (lockedReplay is not null)
+                return lockedReplay;
+
             var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
             var totalRequiredByIngredient = new Dictionary<long, decimal>();
             var perItemIngredientRequirements = new List<Dictionary<long, decimal>>();
@@ -251,23 +263,26 @@ public static class CustomerOrdersEndpoints
                 SoTienYeuCau = priceSummary.TongCong,
                 SoTienDaXacMinh = 0m,
                 TrangThai = "PENDING",
-                MaThaoTac = Guid.NewGuid(),
+                MaThaoTac = idempotencyKey,
                 HetHanLuc = expiresAt,
                 ThoiDiemTao = now,
                 ThoiDiemCapNhat = now
             });
 
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
-
-            return Results.Created($"/api/customer/orders/{order.MaDonHang}", new CustomerOrderReceipt(
+            var receipt = new CustomerOrderReceipt(
                 order.MaDonHang,
                 order.MaDonHienThi,
                 order.TrangThai,
                 priceSummary.TienHang,
                 priceSummary.PhiGiaoHang,
                 priceSummary.TongCong,
-                order.HetHanLuc));
+                order.HetHanLuc);
+            db.NhatKyHeThong.Add(OrderIdempotency.CreateAudit(
+                customerId, idempotencyKey, requestFingerprint, order.MaDonHang, receipt, now));
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+
+            return Results.Created($"/api/customer/orders/{order.MaDonHang}", receipt);
         }).RequireAuthorization("Customer");
 
         // Giữ API hủy đơn UC-WEB-08 của Thái.
