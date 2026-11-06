@@ -81,40 +81,13 @@ public static class CustomerOrderCancellation
             .Where(x => detailIds.Contains(x.MaChiTietDonHang))
             .ToListAsync(ct);
 
-        // Chỉ hỗ trợ hủy toàn đơn trước khi bắt đầu pha và tiêu hao nguyên liệu.
-        if (holds.Any(x => x.SoLuongDaTieuHao != 0 ||
-            x.SoLuongGiuCho < x.SoLuongDaGiaiPhong))
-            return Results.Conflict(new
-            {
-                message = "Đơn đã sử dụng nguyên liệu hoặc dữ liệu giữ kho bất thường."
-            });
-
-        var ingredientIds = holds.Select(x => x.MaNguyenLieu)
-            .Distinct().ToArray();
-        var stock = await db.TonKho
-            .Where(x => ingredientIds.Contains(x.MaNguyenLieu))
-            .ToDictionaryAsync(x => x.MaNguyenLieu, ct);
-
-        var releases = holds
-            .Select(x => new
-            {
-                Hold = x,
-                Remaining = x.SoLuongGiuCho - x.SoLuongDaGiaiPhong
-            })
-            .ToList();
-
-        // Kiểm tra tổng lượng còn giữ trước khi cập nhật một bản ghi kho nào.
-        foreach (var ingredient in releases.GroupBy(x => x.Hold.MaNguyenLieu))
-        {
-            var amount = ingredient.Sum(x => x.Remaining);
-            if (amount < 0 || (amount > 0 &&
-                (!stock.TryGetValue(ingredient.Key, out var item) ||
-                 item.TongGiuCho < amount)))
-                return Results.Conflict(new
-                {
-                    message = "Số lượng giữ kho không khớp; cần kiểm tra lại."
-                });
-        }
+        // All release checks and updates are shared with future expiration handling.
+        // This method requires the caller's active SERIALIZABLE transaction.
+        var now = DateTime.UtcNow;
+        var releaseError = await OrderInventoryRelease.ReleaseAllUnconsumedAsync(
+            db, holds, "RELEASED", now, ct);
+        if (releaseError is not null)
+            return Results.Conflict(new { message = releaseError });
 
         var payments = await db.ThanhToan
             .Where(x => x.MaDonHang == orderId)
@@ -131,7 +104,6 @@ public static class CustomerOrderCancellation
                 message = "Đơn đã có hồ sơ hoàn tiền; cần đối soát trước khi hủy."
             });
 
-        var now = DateTime.UtcNow;
         var groupId = Guid.NewGuid();
         var originalStatus = order.TrangThai;
         var originalShippingFee = order.PhiGiaoHangHienTai;
@@ -160,14 +132,6 @@ public static class CustomerOrderCancellation
             });
 
             detail.SoLuongDaHuy = detail.SoLuongDat;
-        }
-
-        foreach (var item in releases)
-        {
-            if (item.Remaining <= 0) continue;
-            item.Hold.SoLuongDaGiaiPhong += item.Remaining;
-            item.Hold.TrangThai = "RELEASED";
-            stock[item.Hold.MaNguyenLieu].TongGiuCho -= item.Remaining;
         }
 
         decimal refundRequested = 0m;
