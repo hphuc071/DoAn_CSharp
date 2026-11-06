@@ -14,7 +14,7 @@ public sealed class CustomerAdministrationTests
     public async Task TaoSua_TimKiem_PhanTrang_GuiLapDongThoi_VaQuyen()
     {
         await using var api = await TestApi.Start("UC-ADM-01-CRUD");
-        Assert.Equal("35", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0"));
+        Assert.Equal("37", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0"));
         Assert.Equal("1", await api.Sql("EXECUTE AS USER='fourchang_app'; SELECT CASE WHEN HAS_PERMS_BY_NAME('dbo.TaiKhoanKhachHang','OBJECT','DELETE')=1 AND HAS_PERMS_BY_NAME('dbo.DonHang','OBJECT','DELETE')=0 AND HAS_PERMS_BY_NAME('dbo.NhatKyHeThong','OBJECT','DELETE')=0 THEN 1 ELSE 0 END; REVERT;"));
         (await api.Send("GET", "/api/admin/customers")).Expect(401, "Ẩn danh bị chặn");
         var admin = await api.AdminLogin();

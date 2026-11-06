@@ -8,5 +8,6 @@ public sealed class TuyChonPhaCheHopLe
     public bool DangSuDung { get; set; }
     public DateTime ThoiDiemTao { get; set; }
     public DateTime ThoiDiemCapNhat { get; set; }
+    public bool LaMacDinh { get; set; }
     public byte[] PhienBanDuLieu { get; set; } = [];
 }

@@ -19,7 +19,7 @@ public static class LiveSession
             var split=line.IndexOf('=');if(split<=0)continue;var key=line[..split].Trim();
             if(key is "FOURCHANG_API_URL")settings[key]=line[(split+1)..].Trim().Trim('"','\'');
         }
-        var url=Environment.GetEnvironmentVariable("FOURCHANG_API_URL")??settings.GetValueOrDefault("FOURCHANG_API_URL")??"http://127.0.0.1:5181";
+        var url=Environment.GetEnvironmentVariable("FOURCHANG_API_URL")??settings.GetValueOrDefault("FOURCHANG_API_URL")??"http://127.0.0.1:15181";
         var credential=FourChang.Desktop.Shared.Security.PosDeviceCredentials.Load();
         return new CafeApiClient(new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(20)}){PosKey=credential?.KhoaThietBi,PosMachine=credential?.MaMay??Environment.MachineName.ToUpperInvariant()};
     }

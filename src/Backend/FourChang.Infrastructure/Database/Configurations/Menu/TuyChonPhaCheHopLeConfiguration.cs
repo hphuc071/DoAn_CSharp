@@ -14,6 +14,8 @@ public sealed class TuyChonPhaCheHopLeConfiguration : IEntityTypeConfiguration<T
             table.HasCheckConstraint("CK_TuyChonPhaCheHopLe_1", "PhanTramDuong IN (0,25,50,75,100)");
             table.HasCheckConstraint("CK_TuyChonPhaCheHopLe_2", "PhanTramDa IN (0,25,50,75,100)");
         });
+        b.Property(x => x.LaMacDinh).HasColumnType("bit").HasDefaultValue(false);
+        b.HasIndex(x => x.MaCauHinhMon).IsUnique().HasFilter("LaMacDinh=1").HasDatabaseName("UX_TuyChon_MacDinh");
         b.HasKey("MaCauHinhMon", "PhanTramDuong", "PhanTramDa");
         b.Property(x => x.MaCauHinhMon).ValueGeneratedNever();
         b.Property(x => x.PhanTramDuong).ValueGeneratedNever();

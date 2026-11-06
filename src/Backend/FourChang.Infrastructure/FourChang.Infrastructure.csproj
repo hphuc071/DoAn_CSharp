@@ -6,8 +6,12 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <EmbeddedResource Include="../../../docs/database/34-bang/schema.sql" LogicalName="FourChang.Schema34.sql" />
     <EmbeddedResource Include="../../../docs/database/34-bang/model.json" LogicalName="FourChang.Model34.json" />
+    <EmbeddedResource Include="../../../docs/database/35-bang/model-before-employee-address.json" LogicalName="FourChang.Model35Legacy.json" />
+    <EmbeddedResource Include="../../../docs/database/35-bang/002-employee-contact-address.sql" LogicalName="FourChang.EmployeeAddress.sql" />
     <EmbeddedResource Include="../../../docs/database/35-bang/schema.sql" LogicalName="FourChang.Schema35.sql" />
     <EmbeddedResource Include="../../../docs/database/35-bang/model.json" LogicalName="FourChang.Model35.json" />
     <EmbeddedResource Include="../../../docs/database/35-bang/001-add-ThietBiPOS.sql" LogicalName="FourChang.Upgrade35.sql" />
+    <EmbeddedResource Include="../../../docs/database/37-bang/model.json" LogicalName="FourChang.Model37.json" />
+    <EmbeddedResource Include="../../../docs/database/37-bang/003-menu-and-outbox.sql" LogicalName="FourChang.Upgrade37.sql" />
   </ItemGroup>
 </Project>

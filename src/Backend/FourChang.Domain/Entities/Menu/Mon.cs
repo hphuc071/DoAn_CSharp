@@ -12,5 +12,6 @@ public sealed class Mon
     public bool DangBan { get; set; }
     public DateTime ThoiDiemTao { get; set; }
     public DateTime ThoiDiemCapNhat { get; set; }
+    public DateTime? CongBoTuLuc { get; set; }
     public byte[] PhienBanDuLieu { get; set; } = [];
 }

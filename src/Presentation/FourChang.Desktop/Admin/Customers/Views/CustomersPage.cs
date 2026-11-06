@@ -122,7 +122,7 @@ public sealed class CustomersPage : UserControl
         {
             if (e.RowIndex < 0) return;
             if (e.RowIndex == hoveredRow && !grid.Rows[e.RowIndex].Selected)
-                e.CellStyle!.BackColor = Color.FromArgb(255, 241, 222);
+                e.CellStyle!.BackColor = CafeTheme.Soft;
             if (e.ColumnIndex == 5 && e.Value is string value)
                 e.Value = StatusText(value);
         };
@@ -144,9 +144,9 @@ public sealed class CustomersPage : UserControl
         e.PaintBackground(e.ClipBounds, true);
         var (background, ink) = account.TrangThai switch
         {
-            "ACTIVE" => (Color.FromArgb(234, 245, 225), Color.FromArgb(76, 119, 53)),
-            "LOCKED" => (Color.FromArgb(255, 237, 207), Color.FromArgb(162, 101, 33)),
-            _ => (Color.FromArgb(239, 235, 229), Color.FromArgb(129, 116, 103))
+            "ACTIVE" => (CafeTheme.Sage, CafeTheme.SuccessInk),
+            "LOCKED" => (CafeTheme.Amber, CafeTheme.AmberInk),
+            _ => (CafeTheme.Soft, CafeTheme.Muted)
         };
         var text = StatusText(account.TrangThai); var width = Math.Min(e.CellBounds.Width - 12, TextRenderer.MeasureText(text, grid.Font).Width + 24);
         var box = new Rectangle(e.CellBounds.Left + 8, e.CellBounds.Top + (e.CellBounds.Height - 28) / 2, width, 28);

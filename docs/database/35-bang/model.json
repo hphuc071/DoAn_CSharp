@@ -409,6 +409,11 @@
           "nullable": true
         },
         {
+          "name": "DiaChiLienHe",
+          "sql": "nvarchar(500)",
+          "nullable": true
+        },
+        {
           "name": "NgayVaoLam",
           "sql": "datetime2(3)",
           "nullable": false

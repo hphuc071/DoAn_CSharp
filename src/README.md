@@ -15,6 +15,7 @@ src/
 │       │   ├── Access/Views/
 │       │   ├── Access/Controllers/
 │       │   ├── Dashboard/                Các nhóm ít file đặt trực tiếp
+│       │   ├── WorkSessions/             UC-ADM-13: giám sát, đối chiếu, chốt/bàn giao ca
 │       │   ├── Employees/
 │       │   └── Menu, Orders, Inventory…
 │       ├── Staff/                        Sales, Orders, WorkSessions, Invoices

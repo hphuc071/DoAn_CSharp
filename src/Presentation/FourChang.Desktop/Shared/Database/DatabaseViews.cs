@@ -33,12 +33,17 @@ public static class DatabaseViews
                 "orders" => Table("DonHang", false),
                 "cancel" => Ui.Panel("Hủy món", Ui.Label("Chọn đơn để tra cứu. Thao tác hủy sẽ được triển khai cùng luồng xử lý đơn."), Table("DonHang", false)),
                 "payment" => Table("HoaDon", false),
-                _ => Ui.Label("Chưa có màn hình")};
+                _ => Ui.Label("Chưa có màn hình")
+            };
         // UC-ADM-01 dùng màn hình nghiệp vụ riêng, thay bảng đọc thô ở chế độ chạy thật.
+        if (route == "menu")
+            return new FourChang.Desktop.Admin.Menu.MenuManagementPage();
         if (route == "customers")
             return new FourChang.Desktop.Admin.Customers.Views.CustomersPage();
         if (route == "access")
             return new FourChang.Desktop.Admin.Access.Views.AccessPage();
+        if (route == "work-sessions")
+            return new FourChang.Desktop.Admin.WorkSessions.WorkSessionsPage();
         if (route == "employees")
             return FourChang.Desktop.Admin.Employees.EmployeesPage.Create();
         if (route == "dashboard")
@@ -51,24 +56,36 @@ public static class DatabaseViews
     internal static Control Table(string name, bool admin)
     {
         var grid = Ui.Grid(new PreviewTable([], []), 440);
+        grid.Name = "ReadOnlyGrid_" + name;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells;
+        grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
         var error = Ui.Label("", 9, false, CafeTheme.Danger);
         error.Visible = false;
         var reload = Ui.Button("Tải lại", () =>
         {
         });
-        var box = Ui.Panel(DatabaseLabels.Table(name), Ui.Row(reload), error, grid);
+        var count = Ui.Label("Chưa tải dữ liệu", 9, false, CafeTheme.Muted);
+        count.Name = "LoadedRowCount_" + name;
+        var loading = Ui.Label("Đang tải dữ liệu…", 10, false, CafeTheme.Muted); loading.Name = "TableLoading_" + name;
+        var progress = new FourChang.Desktop.Shared.Controls.Admin.AdminLoadingStrip();
+        var box = Ui.Panel(DatabaseLabels.Table(name), Ui.Row(reload), error, loading, progress, grid, count);
         async Task Load()
         {
             if (box.IsDisposed)
                 return;
             reload.Enabled = false;
             error.Visible = false;
+            loading.Visible = true; progress.Running = CafeVisuals.MotionEnabled;
+            if (grid.Rows.Count == 0) grid.Visible = false;
             try
             {
                 var data = admin ? await LiveSession.Api.ReadTableAsync(name) : await LiveSession.Api.ReadPosTableAsync(name);
                 if (!grid.IsDisposed)
+                {
                     SetGrid(grid, data);
+                    count.Text = $"{data.Rows.Length:N0} dòng đã tải · {DateTime.Now:HH:mm:ss}";
+                    CafeVisuals.Apply(grid);
+                }
             }
             catch (CafeApiException exception)
             {
@@ -76,12 +93,15 @@ public static class DatabaseViews
                 {
                     error.Text = exception.Message;
                     error.Visible = true;
+                    count.Text = "Chưa xác nhận được dữ liệu mới";
                 }
             }
             finally
             {
                 if (!reload.IsDisposed)
-                    reload.Enabled = true;
+                {
+                    reload.Enabled = true; loading.Visible = false; progress.Running = false; grid.Visible = true;
+                }
             }
         }
 

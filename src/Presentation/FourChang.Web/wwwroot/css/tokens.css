@@ -1,1 +1,16 @@
-:root{--coffee:#75452d;--coffee-dark:#30241d;--coffee-deep:#4b2c1d;--cream:#f7f2ea;--surface:#fffdf9;--line:#e5dcd1;--ink:#2c2621;--muted:#81756a;--sage:#e4efdf;--sage-ink:#416a38;--amber:#fff0d5;--amber-ink:#9a6828;--danger:#ad493e;--danger-soft:#fcece7;--radius:12px;--shadow:0 8px 30px #422b1707;--font:"Segoe UI",Tahoma,Arial,sans-serif}
+/* Nguồn màu duy nhất của Web. Nâu espresso / kem giữ nhận diện của quán. */
+:root {
+    color-scheme: light;
+    --coffee: #805033; --coffee-dark: #30261f; --coffee-deep: #613a25;
+    --cream: #fbf8f2; --surface: #fffdf9; --soft: #f4ece0;
+    --line: #e1d5c5; --ink: #302922; --muted: #716252;
+    --sage: #e8f1e5; --sage-ink: #345f37;
+    --amber: #fff0d5; --amber-ink: #80561e;
+    --danger: #a53e33; --danger-soft: #faeae5;
+    --on-primary: #ffffff; --focus: #945c36;
+    --radius: 16px; --shadow: 0 8px 30px rgb(64 41 23 / 5%);
+    --font: "Segoe UI", Tahoma, Arial, sans-serif;
+    --control-line:#a28d77;
+    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-6:24px; --space-8:32px;
+    --motion-fast: 180ms; --motion-enter: 220ms;
+}

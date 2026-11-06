@@ -3,4 +3,5 @@
     <ProjectReference Include="../FourChang.Infrastructure/FourChang.Infrastructure.csproj" />
     <ProjectReference Include="../../Shared/FourChang.Presentation.Shared/FourChang.Presentation.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup><Content Include="../../../assets/images/*" Link="Assets/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

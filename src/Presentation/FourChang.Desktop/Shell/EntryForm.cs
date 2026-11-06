@@ -26,6 +26,7 @@ public sealed class EntryForm : Form
 {
     public EntryForm(string role, Action<string> onContinue)
     {
+        CafeVisuals.Initialize();
         var staff = role == "Staff";
         var windowIcon = BrandMark.CreateWindowIcon(); Icon = windowIcon; Disposed += (_, _) => windowIcon.Dispose();
         Text = $"{CafeTheme.Brand} · {(staff ? "Nhân viên — Mở ca" : "Quản lý — Đăng nhập")}";
@@ -55,13 +56,14 @@ public sealed class EntryForm : Form
         if (staff)
         {
             fields.Add(Field("Mã nhân viên", employeeId)); fields.Add(Field("Họ và tên", employeeName)); fields.Add(verified);
-            fields.Add(Ui.Row(Field("Ca làm việc", shift, 207), Field("Tiền đầu ca", opening, 207)));
+            fields.Add(Ui.Row(Field("Ca làm việc", shift, 205), Field("Tiền đầu ca", opening, 205)));
         }
         else { fields.Add(Field("Tài khoản quản lý", name)); fields.Add(Field("Mật khẩu", password)); }
         fields.Add(feedback); fields.Add(button);
         var card = new SurfacePanel { Width = 506, AutoSize = false, MinimumSize = new Size(506, 0), MaximumSize = new Size(506, 0), Padding = new Padding(28) };
         var layout = Ui.Stack(fields.ToArray()); foreach (Control field in layout.Controls) field.Margin = new Padding(0, 0, 0, 12);
-        card.Controls.Add(layout); main.Controls.Add(card); Controls.Add(main); Controls.Add(visual); AcceptButton = button;
+        card.Controls.Add(layout); main.Controls.Add(card);
+        Controls.Add(main); Controls.Add(visual); AcceptButton = button;
         // Tính chiều cao theo nội dung thực, tránh cắt nút mở ca khi thông báo hoặc chữ tiếng Việt xuống dòng.
         bool arranging = false;
         void Position()

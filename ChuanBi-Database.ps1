@@ -22,7 +22,7 @@ foreach($key in @('SQL_SA_PASSWORD','SQL_APP_PASSWORD','ADMIN_INITIAL_PASSWORD',
     $current=$lines[$found].Substring($key.Length+1).Trim()
     if([string]::IsNullOrWhiteSpace($current) -or $current -match '^(THAY_|DIEN_|CHANGE_|REPLACE_|<)') { $lines[$found]=$key+'='+(New-LocalSecret) }
 }
-foreach($pair in @('FOURCHANG_LOCAL=true','FOURCHANG_DATABASE=FourChangDb','FOURCHANG_SQL_SERVER=127.0.0.1,14330','FOURCHANG_API_URL=http://localhost:5181')) {
+foreach($pair in @('FOURCHANG_LOCAL=true','FOURCHANG_DATABASE=FourChangDb','FOURCHANG_SQL_SERVER=127.0.0.1,14330','FOURCHANG_API_URL=http://localhost:15181')) {
     $prefix=$pair.Split('=')[0]+'='
     if(-not ($lines | Where-Object { $_.StartsWith($prefix,[StringComparison]::Ordinal) })) { $lines.Add($pair) }
 }

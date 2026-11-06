@@ -12,6 +12,7 @@ public sealed class MonConfiguration : IEntityTypeConfiguration<Mon>
         {
             table.UseSqlOutputClause(false);
         });
+        b.Property(x => x.CongBoTuLuc).HasColumnType("datetime2(3)");
         b.HasKey("MaMon");
         b.Property(x => x.MaMon).UseIdentityColumn();
         b.Property(x => x.MaMon).HasColumnType("bigint").IsRequired();

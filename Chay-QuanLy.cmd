@@ -20,6 +20,6 @@ echo Khong mo duoc ung dung. Vui long gui noi dung loi o tren.
 pause
 exit /b 1
 :backendfailed
-echo Backend chua san sang. Chay ChuanBi-Database.ps1 truoc.
+echo Backend chua san sang. Xem loi cu the o tren va artifacts\run\api.stdout.log / api.stderr.log.
 pause
 exit /b 1

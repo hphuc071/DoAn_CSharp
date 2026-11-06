@@ -19,7 +19,7 @@ public static class WorkEndpoints
         app.MapGet("/api/pos/employees", async (HttpContext context, CafeDbContext db) =>
         {
             if (await PosAccess.Device(context.Request, db) is null) return Results.Unauthorized();
-            return Results.Ok(await db.NhanVien.AsNoTracking().Where(x => x.TrangThai == "ACTIVE").OrderBy(x => x.HoTen).Select(x => new Employee(x.MaNhanVien, x.HoTen, null, x.NgayVaoLam, x.TrangThai, null)).ToListAsync());
+            return Results.Ok(await db.NhanVien.AsNoTracking().Where(x => x.TrangThai == "ACTIVE").OrderBy(x => x.HoTen).Select(x => new Employee(x.MaNhanVien, x.HoTen, null, x.NgayVaoLam, x.TrangThai, null, null)).ToListAsync());
         });
         // POS-01: chỉ máy được cấp quyền mới kiểm tra hồ sơ. Không trả danh sách ứng viên theo tên.
         app.MapPost("/api/pos/employees/verify", async (VerifyEmployee input, HttpContext context, CafeDbContext db) =>
@@ -37,6 +37,7 @@ public static class WorkEndpoints
             input = input with { MaMay = device.MaMay };
             if (input.TenCa is not ("Sáng" or "Chiều" or "Tối") || string.IsNullOrWhiteSpace(input.MaMay) || input.MaMay.Length > 50 || input.TienMatDauCa < 0 || input.TienMatDauCa != decimal.Truncate(input.TienMatDauCa)) return Results.Problem(detail: "Ca làm, mã máy hoặc tiền đầu ca không hợp lệ.", statusCode: 400);
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await WorkforceOperation.Lock(db);
             var employee = await db.NhanVien.SingleOrDefaultAsync(x => x.MaNhanVien == input.MaNhanVien && x.TrangThai == "ACTIVE");
             // Kiểm tra lại ngay trong giao dịch mở ca: kết quả xác minh trước đó không thay thế kiểm tra máy chủ.
             if (employee is null || !EmployeeIdentity.Matches(employee.HoTen, input.HoTen)) return Results.Problem(detail: "Mã và họ tên không khớp nhân viên đang hoạt động. Vui lòng kiểm tra lại.", statusCode: 400);
@@ -47,6 +48,8 @@ public static class WorkEndpoints
                 return Results.Problem(detail: "Nhân viên hoặc máy đang có ca chưa kết thúc.", statusCode: 409);
             }
             var shift = new CaLamViec { MaCaHienThi = "CA-" + Guid.NewGuid().ToString("N")[..20], MaNhanVien = employee.MaNhanVien, TenCa = input.TenCa, MaMay = input.MaMay.Trim(), BatDauLuc = DateTime.UtcNow, TrangThai = "OPEN", TienMatDauCa = input.TienMatDauCa };
+            try { shift.MaCaBanGiaoTruoc = await HandoverLink.SourceForOpen(db, employee.MaNhanVien, device.MaMay); }
+            catch (WorkforceRule error) { return Results.Problem(statusCode: error.Status, detail: error.Message); }
             db.CaLamViec.Add(shift); await db.SaveChangesAsync();
             var audit = AuditFactory.Create("STAFF", shift.MaCaLamViec, "OPEN_SHIFT", "CaLamViec", shift.MaCaLamViec); audit.TenNguoiThucHienDaChot = employee.HoTen; audit.MaMayDaChot = shift.MaMay; db.NhatKyHeThong.Add(audit);
             await db.SaveChangesAsync(); await tx.CommitAsync();
@@ -57,9 +60,12 @@ public static class WorkEndpoints
             if (input.TienMatThucDem < 0 || input.TienMatThucDem != decimal.Truncate(input.TienMatThucDem)) return Results.Problem(detail: "Tiền thực đếm không hợp lệ.", statusCode: 400);
             var id = long.Parse(context.User.FindFirst("shift")!.Value);
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            await WorkforceOperation.Lock(db);
             var shift = await db.CaLamViec.SingleAsync(x => x.MaCaLamViec == id);
             if (shift.TrangThai != "OPEN") return Results.Conflict();
-            if (await db.DonHang.AnyAsync(x => x.MaCaLamViec == id && x.TrangThai != "COMPLETED" && x.TrangThai != "CANCELLED" && x.TrangThai != "REJECTED")) return Results.Problem(detail: "Cần xử lý hoặc bàn giao các đơn còn mở trước khi chốt ca.", statusCode: 409);
+            var reconciliation = await new ShiftReconciliation(db).Detail(shift);
+            if (reconciliation.DonDangXuLy.Count > 0 || reconciliation.KhoanChuaRo.Count > 0)
+                return Results.Problem(statusCode: 409, detail: "Còn đơn hoặc khoản chưa rõ cần xử lý/bàn giao trước khi kết thúc ca.");
             shift.TienMatDuKienCuoiCa = await FourChang.Api.Shared.WorkSessions.ShiftCash.Expected(db, shift);
             if (input.TienMatThucDem != shift.TienMatDuKienCuoiCa && string.IsNullOrWhiteSpace(input.LyDoChenhLech)) return Results.Problem(detail: "Bắt buộc ghi lý do chênh lệch tiền.", statusCode: 400);
             shift.TienMatThucDem = input.TienMatThucDem; shift.LyDoChenhLech = input.LyDoChenhLech; shift.KetThucLuc = DateTime.UtcNow; shift.TrangThai = "CLOSED";

@@ -135,7 +135,9 @@
       "sources": [
         "FourChang.Tests/QuanLy/UC-ADM-01/CustomerAdministrationTests.cs",
         "FourChang.Tests/QuanLy/UC-ADM-01/Web/TemporaryPasswordBrowserTests.cs",
-        "FourChang.Tests/QuanLy/UC-ADM-01/WinForms/CustomersUiTests.cs"
+        "FourChang.Tests/QuanLy/UC-ADM-01/WinForms/CustomersUiTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/CustomerAddressAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/ProfileAddressUiTests.cs"
       ],
       "filter": "UseCase=UC-ADM-01"
     },
@@ -155,10 +157,14 @@
       "code": "UC-ADM-03",
       "actor": "QuanLy",
       "name": "Quản lý thực đơn",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-03/MenuAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-03/MenuBrowserTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-03/MenuUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-03"
     },
     {
       "code": "UC-ADM-04",
@@ -236,19 +242,27 @@
       "code": "UC-ADM-12",
       "actor": "QuanLy",
       "name": "Quản lý danh sách nhân viên",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-12/EmployeeAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-12/WorkforceUiTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-12/EmployeeContactAddressTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/ProfileAddressUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-12"
     },
     {
       "code": "UC-ADM-13",
       "actor": "QuanLy",
       "name": "Quản lý ca làm việc",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-13/WorkSessionAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-12/WorkforceUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-13"
     }
   ]
 }

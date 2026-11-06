@@ -10,6 +10,8 @@ namespace FourChang.Infrastructure.Database.Context;
 
 public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(options)
 {
+    public DbSet<Banner> Banner => Set<Banner>();
+    public DbSet<SuKienDongBo> SuKienDongBo => Set<SuKienDongBo>();
     public DbSet<ThietBiPOS> ThietBiPOS => Set<ThietBiPOS>();
     public DbSet<TaiKhoanKhachHang> TaiKhoanKhachHang => Set<TaiKhoanKhachHang>();
     public DbSet<TaiKhoanQuanLy> TaiKhoanQuanLy => Set<TaiKhoanQuanLy>();

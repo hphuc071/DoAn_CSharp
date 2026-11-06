@@ -12,6 +12,7 @@ public static class DesktopLauncher
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetDefaultFont(CafeTheme.Body());
+        CafeVisuals.Initialize();
         FourChang.Desktop.Shared.Session.LiveSession.Preview = args.Contains("--preview") || args.Contains("--render-previews");
         if(args.Length>1 && args[0] is "--render-previews" or "--render-connected")
         {

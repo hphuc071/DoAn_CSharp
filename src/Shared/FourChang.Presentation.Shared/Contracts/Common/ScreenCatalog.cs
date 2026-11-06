@@ -18,6 +18,7 @@ public static class ScreenCatalog
         new("UC-POS-04", "Hủy món", "cancel", "Staff", "Chọn số ly chưa pha, lý do bắt buộc và khoản hoàn dự kiến."),
         new("UC-POS-05", "Thu tiền và hóa đơn", "payment", "Staff", "Tiền mặt/VietQR, tiền thừa, hóa đơn, in lại/xuất; Web không thu lại."),
         new("UC-ADM-01", "Khách hàng", "customers", "Admin", "Hồ sơ Customer, khóa/mở, mật khẩu tạm, lịch sử và xóa có điều kiện."),
+        new("UC-ADM-13", "Ca làm việc", "work-sessions", "Admin", "Giám sát, đối chiếu, chốt và bàn giao ca có truy vết."),
         new("UC-ADM-12", "Nhân viên", "employees", "Admin", "Hồ sơ nhân viên và trạng thái làm việc; không có tài khoản nhân viên."),
         new("UC-ADM-02", "Quyền truy cập", "access", "Admin", "Một tài khoản Quản lý, đổi mật khẩu, quyền và thiết bị POS."),
         new("UC-ADM-03", "Thực đơn", "menu", "Admin", "Danh mục, món/size/giá, tùy chọn, topping, banner và bật/tắt bán."),

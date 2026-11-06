@@ -75,8 +75,14 @@ internal sealed class NavigationButton : Button
             e.Graphics.DrawLine(pen, x + 6, y + 11, x + 14, y + 11);
             e.Graphics.DrawLine(pen, x + 6, y + 15, x + 11, y + 15);
         }
-        var textBounds = compact ? new Rectangle(3, 39, Width - 6, Height - 43) : new Rectangle(42, 0, Width - 46, Height);
-        TextRenderer.DrawText(e.Graphics, Text, Font, textBounds, ForeColor,
+        var textBounds = compact ? new Rectangle(3, 39, Width - 6, Height - 43) : new Rectangle(38, 0, Width - 42, Height);
+        // Xuống dòng theo cụm từ ở sidebar hẹp; giữ nguyên Text/AccessibleName và route.
+        var caption = !compact && Width < 175 ? route switch
+        {
+            "access" => "Quyền truy\ncập", "recipes" => "Công thức\nBOM",
+            "stock" => "Chứng từ\nkho", "reports" => "Báo cáo và\nnhật ký", _ => Text
+        } : Text;
+        TextRenderer.DrawText(e.Graphics, caption, Font, textBounds, ForeColor,
             TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix |
             (compact ? TextFormatFlags.HorizontalCenter : TextFormatFlags.Left));
         if (Focused) ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -4, -4));

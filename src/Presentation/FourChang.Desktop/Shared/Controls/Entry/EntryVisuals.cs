@@ -7,7 +7,7 @@ internal sealed class EntryInputFrame : Panel
 {
     internal EntryInputFrame(Control input)
     {
-        Size = new Size(442, 50); BackColor = CafeTheme.Surface; DoubleBuffered = true;
+        Size = new Size(442, 48); BackColor = CafeTheme.Surface; DoubleBuffered = true;
         input.Margin = Padding.Empty; Controls.Add(input);
         if (input is TextBox text) { text.BorderStyle = BorderStyle.None; text.BackColor = CafeTheme.Surface; text.Font = CafeTheme.Body(11); }
         if (input is ComboBox combo) { combo.FlatStyle = FlatStyle.Flat; combo.Font = CafeTheme.Body(11); }
@@ -19,7 +19,7 @@ internal sealed class EntryInputFrame : Panel
     {
         base.OnPaint(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = CafeTheme.Rounded(new RectangleF(.8f, .8f, Width - 2, Height - 2), 10);
-        using var pen = new Pen(ContainsFocus ? CafeTheme.Coffee : CafeTheme.Line, ContainsFocus ? 1.8f : 1f); e.Graphics.DrawPath(pen, path);
+        using var pen = new Pen(ContainsFocus ? CafeTheme.Accent : CafeTheme.InputBorder, ContainsFocus ? 1.8f : 1f); e.Graphics.DrawPath(pen, path);
     }
 }
 

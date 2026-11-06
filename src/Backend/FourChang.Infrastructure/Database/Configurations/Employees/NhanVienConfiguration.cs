@@ -19,6 +19,7 @@ public sealed class NhanVienConfiguration : IEntityTypeConfiguration<NhanVien>
         b.Property(x => x.MaNhanVien).HasColumnType("bigint").IsRequired();
         b.Property(x => x.HoTen).HasColumnType("nvarchar(120)").IsRequired();
         b.Property(x => x.SoDienThoai).HasColumnType("varchar(20)");
+        b.Property(x => x.DiaChiLienHe).HasColumnType("nvarchar(500)");
         b.Property(x => x.NgayVaoLam).HasColumnType("datetime2(3)").IsRequired();
         b.Property(x => x.TrangThai).HasColumnType("varchar(15)").IsRequired();
         b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");

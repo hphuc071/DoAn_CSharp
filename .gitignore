@@ -11,3 +11,12 @@ artifacts/
 
 .env.*
 !.env.example
+
+# Local database backups, certificates and device credentials
+*.bak
+*.trn
+*.pfx
+*.p12
+*.dpapi
+*.pem
+*.key

@@ -7,12 +7,12 @@ namespace FourChang.Desktop.Shared.Controls.Admin;
 // Bộ control dùng chung cho UC-ADM-01 và UC-ADM-02, đồng bộ với theme nâu–kem của ứng dụng.
 internal static class AdminColors
 {
-    internal static readonly Color Accent = ColorTranslator.FromHtml("#75452D");
-    internal static readonly Color Hover = ColorTranslator.FromHtml("#8B5B3C");
-    internal static readonly Color Surface = ColorTranslator.FromHtml("#FFFCF7");
-    internal static readonly Color Soft = ColorTranslator.FromHtml("#F3E9DA");
-    internal static readonly Color Border = ColorTranslator.FromHtml("#DDD3C3");
-    internal static readonly Color Muted = ColorTranslator.FromHtml("#796E60");
+    internal static Color Accent => CafeTheme.Coffee;
+    internal static Color Hover => ControlPaint.Light(CafeTheme.Coffee, .1f);
+    internal static Color Surface => CafeTheme.Surface;
+    internal static Color Soft => CafeTheme.Soft;
+    internal static Color Border => CafeTheme.Line;
+    internal static Color Muted => CafeTheme.Muted;
 }
 
 internal enum AdminIcon { Search, Refresh, Add, View, Edit, Lock, Key, Delete, Previous, Next }
@@ -31,20 +31,20 @@ internal sealed class AdminActionButton : Button
     {
         this.icon = icon; this.primary = primary; this.danger = danger;
         Text = caption; Font = CafeTheme.Strong(9); Cursor = Cursors.Hand;
-        Size = new Size(TextRenderer.MeasureText(caption, Font).Width + 54, 42);
-        MinimumSize = new Size(86, 42); Margin = new Padding(0, 0, 8, 8);
+        Size = new Size(TextRenderer.MeasureText(caption, Font).Width + 54, 44);
+        MinimumSize = new Size(86, 44); Margin = new Padding(0, 0, 8, 8);
         FlatStyle = FlatStyle.Flat; FlatAppearance.BorderSize = 0;
         DoubleBuffered = true; SetStyle(ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
         animation.Tick += (_, _) =>
         {
             var target = hovered && Enabled ? 1f : 0f;
-            blend = Math.Clamp(blend + (target > blend ? .16f : -.16f), 0, 1);
+            blend = Math.Clamp(blend + (target > blend ? .1f : -.1f), 0, 1);
             Invalidate(); if (Math.Abs(blend - target) < .01f) animation.Stop();
         };
     }
     // Chỉ đổi màu trong ~100 ms, không dịch chuyển layout hoặc cản trở thao tác liên tiếp.
-    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; animation.Start(); }
-    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; pressed = false; animation.Start(); }
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hovered = true; if (CafeVisuals.MotionEnabled) animation.Start(); else { blend = 1; Invalidate(); } }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hovered = false; pressed = false; if (CafeVisuals.MotionEnabled) animation.Start(); else { blend = 0; Invalidate(); } }
     protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); pressed = e.Button == MouseButtons.Left; Invalidate(); }
     protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); pressed = false; Invalidate(); }
     protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
@@ -55,18 +55,21 @@ internal sealed class AdminActionButton : Button
         var graphics = e.Graphics; graphics.Clear(Parent?.BackColor ?? AdminColors.Surface);
         graphics.SmoothingMode = SmoothingMode.AntiAlias;
         var fill = Enabled ? Mix(primary ? AdminColors.Accent : AdminColors.Surface,
-            primary ? AdminColors.Hover : AdminColors.Soft, blend) : Color.FromArgb(244, 239, 232);
+            primary ? AdminColors.Hover : AdminColors.Soft, blend) : CafeTheme.Soft;
         if (pressed && Enabled) fill = Mix(fill, Color.FromArgb(95, 53, 31), .12f);
-        var ink = !Enabled ? Color.FromArgb(172, 157, 143) : primary ? Color.White : danger ? CafeTheme.Danger : CafeTheme.Ink;
-        using var shape = CafeTheme.Rounded(new RectangleF(1, 1, Width - 3, Height - 3), 9);
+        var ink = !Enabled ? CafeTheme.Muted : primary ? Color.White : danger ? CafeTheme.Danger : CafeTheme.Ink;
+        using var shape = CafeTheme.Rounded(new RectangleF(1, 1, Width - 3, Height - 3), 10);
         using var brush = new SolidBrush(fill); graphics.FillPath(brush, shape);
         using var border = new Pen(Focused && Enabled ? AdminColors.Accent : primary ? fill : AdminColors.Border, Focused && Enabled ? 1.8f : 1);
         graphics.DrawPath(border, shape);
         using var pen = new Pen(ink, 1.5f) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round };
-        var state = graphics.Save(); graphics.TranslateTransform(15, Height / 2f - 8 + (pressed ? 1 : 0));
+        // Căn giữa cả cụm icon + chữ; nhấn chỉ đổi màu, không đẩy icon/chữ lệch xuống.
+        var textWidth = Math.Min(Width - 48, TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding).Width);
+        var left = Math.Max(12, (Width - textWidth - 24) / 2);
+        var state = graphics.Save(); graphics.TranslateTransform(left, Height / 2f - 8);
         DrawIcon(graphics, pen, icon); graphics.Restore(state);
-        TextRenderer.DrawText(graphics, Text, Font, new Rectangle(37, pressed ? 1 : 0, Width - 45, Height), ink,
-            TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(graphics, Text, Font, new Rectangle(left + 24, 0, textWidth, Height), ink,
+            TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
     }
     private static Color Mix(Color first, Color second, float amount) => Color.FromArgb(
         (int)(first.R + (second.R - first.R) * amount), (int)(first.G + (second.G - first.G) * amount), (int)(first.B + (second.B - first.B) * amount));
@@ -75,15 +78,15 @@ internal sealed class AdminActionButton : Button
         switch (icon)
         {
             case AdminIcon.Search: g.DrawEllipse(p, 1, 1, 10, 10); g.DrawLine(p, 10, 10, 15, 15); break;
-            case AdminIcon.Refresh: g.DrawArc(p, 1, 2, 13, 12, 35, 285); g.DrawLines(p, new Point[] {new(10, 1), new(15, 2), new(14, 7)}); break;
+            case AdminIcon.Refresh: g.DrawArc(p, 1, 2, 13, 12, 35, 285); g.DrawLines(p, new Point[] { new(10, 1), new(15, 2), new(14, 7) }); break;
             case AdminIcon.Add: g.DrawLine(p, 8, 2, 8, 14); g.DrawLine(p, 2, 8, 14, 8); break;
             case AdminIcon.View: g.DrawEllipse(p, 1, 4, 14, 9); g.DrawEllipse(p, 6, 6, 4, 4); break;
-            case AdminIcon.Edit: g.DrawLines(p, new Point[] {new(2, 11), new(11, 2), new(14, 5), new(5, 14), new(1, 15), new(2, 11)}); break;
+            case AdminIcon.Edit: g.DrawLines(p, new Point[] { new(2, 11), new(11, 2), new(14, 5), new(5, 14), new(1, 15), new(2, 11) }); break;
             case AdminIcon.Lock: g.DrawArc(p, 4, 1, 8, 10, 180, 180); g.DrawRectangle(p, 2, 7, 12, 8); g.DrawLine(p, 8, 10, 8, 12); break;
             case AdminIcon.Key: g.DrawEllipse(p, 1, 1, 7, 7); g.DrawLine(p, 7, 7, 14, 14); g.DrawLine(p, 11, 11, 13, 9); break;
-            case AdminIcon.Delete: g.DrawLine(p, 2, 4, 14, 4); g.DrawLine(p, 6, 1, 10, 1); g.DrawLines(p, new Point[] {new(3, 6), new(4, 15), new(12, 15), new(13, 6)}); g.DrawLine(p, 6, 7, 6, 12); g.DrawLine(p, 10, 7, 10, 12); break;
-            case AdminIcon.Previous: g.DrawLines(p, new Point[] {new(11, 2), new(5, 8), new(11, 14)}); break;
-            case AdminIcon.Next: g.DrawLines(p, new Point[] {new(5, 2), new(11, 8), new(5, 14)}); break;
+            case AdminIcon.Delete: g.DrawLine(p, 2, 4, 14, 4); g.DrawLine(p, 6, 1, 10, 1); g.DrawLines(p, new Point[] { new(3, 6), new(4, 15), new(12, 15), new(13, 6) }); g.DrawLine(p, 6, 7, 6, 12); g.DrawLine(p, 10, 7, 10, 12); break;
+            case AdminIcon.Previous: g.DrawLines(p, new Point[] { new(11, 2), new(5, 8), new(11, 14) }); break;
+            case AdminIcon.Next: g.DrawLines(p, new Point[] { new(5, 2), new(11, 8), new(5, 14) }); break;
         }
     }
     protected override void Dispose(bool disposing) { if (disposing) animation.Dispose(); base.Dispose(disposing); }
@@ -103,8 +106,14 @@ internal sealed class AdminSurface : Panel
 
 internal sealed class AdminSearchBox : Panel
 {
-    internal TextBox Input { get; } = new() { BorderStyle = BorderStyle.None, Font = CafeTheme.Body(10),
-        PlaceholderText = "Tìm mã, tên, tài khoản, email hoặc điện thoại", Name = "CustomerSearch", AccessibleName = "Tìm kiếm khách hàng" };
+    internal TextBox Input { get; } = new()
+    {
+        BorderStyle = BorderStyle.None,
+        Font = CafeTheme.Body(10),
+        PlaceholderText = "Tìm mã, tên, tài khoản, email hoặc điện thoại",
+        Name = "CustomerSearch",
+        AccessibleName = "Tìm kiếm khách hàng"
+    };
     internal AdminSearchBox()
     {
         Height = 44; DoubleBuffered = true; BackColor = AdminColors.Surface;
@@ -116,8 +125,8 @@ internal sealed class AdminSearchBox : Panel
     {
         e.Graphics.Clear(Parent?.BackColor ?? AdminColors.Surface); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var shape = CafeTheme.Rounded(new RectangleF(.8f, .8f, Width - 2, Height - 2), 9);
-        using var fill = new SolidBrush(Color.White); e.Graphics.FillPath(fill, shape);
-        using var border = new Pen(Input.Focused ? AdminColors.Accent : AdminColors.Border, Input.Focused ? 1.6f : 1);
+        using var fill = new SolidBrush(CafeTheme.Surface); e.Graphics.FillPath(fill, shape);
+        using var border = new Pen(Input.Focused ? CafeTheme.Accent : CafeTheme.InputBorder, Input.Focused ? 1.6f : 1);
         e.Graphics.DrawPath(border, shape);
         using var icon = new Pen(AdminColors.Muted, 1.5f);
         var state = e.Graphics.Save(); e.Graphics.TranslateTransform(14, Height / 2f - 8);

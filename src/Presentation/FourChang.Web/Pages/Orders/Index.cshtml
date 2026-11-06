@@ -1,4 +1,29 @@
 @page "/Orders"
 @model FourChang.Web.Pages.Orders.IndexModel
-@{ViewData["Title"]="Đơn của tôi";}
-<div class="page-heading"><div><h1>Đơn của tôi</h1><p class="muted">Theo dõi các đơn hàng của bạn.</p></div><a href="/" class="button primary">Xem thực đơn</a></div><section class="panel">@if(Model.Error is not null){<p role="alert">@Model.Error</p>}else if(Model.Orders.Count==0){<h2>Chưa có đơn hàng</h2><p>Những đơn hàng của bạn sẽ được hiển thị tại đây.</p>}else{foreach(var order in Model.Orders){<article><h3>@order.GetProperty("maDonHienThi").GetString()</h3><p>@order.GetProperty("trangThai").GetString()</p></article>}}</section>
+@{ ViewData["Title"] = "Đơn của tôi"; }
+
+<div class="page-heading">
+    <div><span class="eyebrow">4CHANG LINH NGU LAM</span><h1>Đơn của tôi</h1><p class="muted">Theo dõi các đơn hàng của bạn.</p></div>
+    <a href="/" class="button primary">Xem thực đơn</a>
+</div>
+<section class="panel order-list" aria-label="Danh sách đơn hàng">
+    @if (Model.Error is not null)
+    {
+        <div class="account-error" role="alert"><h2>Chưa tải được đơn hàng</h2><p>@Model.Error</p></div>
+    }
+    else if (Model.Orders.Count == 0)
+    {
+        <div class="orders-empty"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></svg><h2>Chưa có đơn hàng</h2><p>Những đơn hàng của bạn sẽ được hiển thị tại đây.</p></div>
+    }
+    else
+    {
+        foreach (var order in Model.Orders)
+        {
+            @* Hiển thị đúng hai trường API hiện cung cấp; không suy ra tiến độ, giá hoặc thời gian giả. *@
+            <article class="customer-order-row">
+                <div><span class="eyebrow">MÃ ĐƠN HÀNG</span><h2>@order.GetProperty("maDonHienThi").GetString()</h2></div>
+                <span class="status gray">@order.GetProperty("trangThai").GetString()</span>
+            </article>
+        }
+    }
+</section>

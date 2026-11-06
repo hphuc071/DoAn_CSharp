@@ -45,6 +45,8 @@ public sealed class TestApi : IAsyncDisposable
     /// </summary>
     private TestApi(string suite)
     {
+        // Tài khoản Admin của database test có mật khẩu riêng; không phụ thuộc mật khẩu khởi tạo trong .env thật.
+        Settings["ADMIN_INITIAL_PASSWORD"] = TestData.Password();
         Artifacts = Path.Combine(Root, "artifacts", "tests", "xunit", suite, Database);
         Directory.CreateDirectory(Artifacts);
     }
@@ -312,7 +314,7 @@ public sealed class TestApi : IAsyncDisposable
     /// <summary>
     /// Tạo hồ sơ nhân viên qua API Admin; không tạo tài khoản đăng nhập cá nhân cho nhân viên.
     /// </summary>
-    public async Task<JsonNode> Employee(Dictionary<string, string> admin, string name = "Nhân viên trùng tên kiểm thử") => (await Send("POST", "/api/admin/employees", TestData.Body(("HoTen", name), ("SoDienThoai", "0912345678"), ("NgayVaoLam", "2026-11-01"), ("TrangThai", "ACTIVE")), admin)).Expect(200, "Tạo nhân viên fixture").Json;
+    public async Task<JsonNode> Employee(Dictionary<string, string> admin, string name = "Nhân viên trùng tên kiểm thử") => (await Send("POST", "/api/admin/employees", TestData.Body(("MaThaoTac", TestData.NewId()), ("HoTen", name), ("SoDienThoai", "0912345678"), ("NgayVaoLam", "2026-11-01"), ("TrangThai", "ACTIVE")), admin)).Expect(200, "Tạo nhân viên fixture").Json;
 
     /// <summary>
     /// Chuẩn bị yêu cầu mở ca theo mã, họ tên nhân viên và đúng mã máy đã cấp quyền.

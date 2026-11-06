@@ -114,7 +114,7 @@ public sealed class BrowserFixture : IAsyncDisposable
     /// <summary>
     /// Lưu ảnh toàn trang vào thư mục bằng chứng của lần chạy để dễ kiểm tra lỗi bố cục.
     /// </summary>
-    public Task Screenshot(string name) => Page.ScreenshotAsync(new() { Path = Path.Combine(Api.Artifacts, name + ".png"), FullPage = true });
+    public Task Screenshot(string name) => Page.ScreenshotAsync(new() { Path = Path.Combine(Api.Artifacts, name + ".png"), FullPage = true, Animations = ScreenshotAnimations.Disabled });
 
     /// <summary>
     /// Đọc token từ cookie của trình duyệt test để đối chiếu trạng thái thu hồi phía API; không ghi token ra log.

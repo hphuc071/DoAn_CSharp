@@ -13,6 +13,8 @@ public static class DashboardPage
     public static Control Create()
     {
         var page=new Panel{Dock=DockStyle.Top,AutoSize=true};
+        var loading = Ui.Label("Đang tải tổng quan hoạt động…", 11, false, CafeTheme.Muted);
+        page.Controls.Add(loading);
         var loaded=false;
         page.HandleCreated+=async(_,_)=>
         {
@@ -45,9 +47,13 @@ public static class DashboardPage
                 var body=new TableLayoutPanel {Dock=DockStyle.Top,AutoSize=true,ColumnCount=1,Margin=Padding.Empty};
                 body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
                 foreach(var section in new Control[]{summary,top,lower}){section.Dock=DockStyle.Top;section.Margin=new Padding(0,0,0,12);body.Controls.Add(section);}
-                page.Controls.Add(body);
+                page.Controls.Remove(loading); loading.Dispose(); page.Controls.Add(body);
+                CafeVisuals.Apply(page);
             }
-            catch(CafeApiException ex){if(!page.IsDisposed)page.Controls.Add(Ui.Label(ex.Message,10,false,CafeTheme.Danger));}
+            catch(CafeApiException ex)
+            {
+                if (!page.IsDisposed) { page.Controls.Remove(loading); loading.Dispose(); page.Controls.Add(Ui.EmptyState("Chưa tải được tổng quan", ex.Message)); }
+            }
         };
         return page;
     }
@@ -81,12 +87,12 @@ public static class DashboardPage
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-            using var line=new Pen(CafeTheme.Line);using var ink=new SolidBrush(CafeTheme.Muted);
-            var bottom=Height-35;for(int i=0;i<4;i++){var y=18+(bottom-18)*i/3;e.Graphics.DrawLine(line,18,y,Width-20,y);}
-            using var valueFont=CafeTheme.Strong(22);using var labelFont=CafeTheme.Body(9);
-            TextRenderer.DrawText(e.Graphics,MoneyDisplay.Format(revenue),valueFont,new Rectangle(24,32,Width-48,50),CafeTheme.Coffee,TextFormatFlags.Left|TextFormatFlags.VerticalCenter);
-            TextRenderer.DrawText(e.Graphics,"Thực thu sau các khoản hoàn thành công",labelFont,new Rectangle(25,86,Width-50,30),CafeTheme.Muted,TextFormatFlags.Left|TextFormatFlags.WordBreak);
-            TextRenderer.DrawText(e.Graphics,"Tổng quan hiện tại",labelFont,new Rectangle(24,bottom,Width-48,26),CafeTheme.Muted,TextFormatFlags.Left);
+            using var valueFont = CafeTheme.Strong(27); using var labelFont = CafeTheme.Body(10);
+            var flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+            TextRenderer.DrawText(e.Graphics, "THỰC THU HIỆN TẠI", labelFont, new Rectangle(4, 14, Width - 8, 26), CafeTheme.Muted, flags);
+            TextRenderer.DrawText(e.Graphics, MoneyDisplay.Format(revenue), valueFont, new Rectangle(4, 52, Width - 8, 60), CafeTheme.Accent, flags);
+            using var pen = new Pen(CafeTheme.Line); e.Graphics.DrawLine(pen, 4, 138, Width - 4, 138);
+            TextRenderer.DrawText(e.Graphics, "Thu đã xác minh trừ khoản hoàn thành công", labelFont, new Rectangle(4, 154, Width - 8, 52), CafeTheme.Muted, TextFormatFlags.Left | TextFormatFlags.WordBreak);
         }
         public RevenueSummary() : this(0) { }
         protected override void OnCreateControl(){base.OnCreateControl();Dock=DockStyle.Top;Height=210;DoubleBuffered=true;}

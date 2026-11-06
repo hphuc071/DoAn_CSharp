@@ -19,8 +19,9 @@ public sealed class HttpRegressionTests
         var admin = await api.AdminLogin();
         (await api.Send("GET", "/api/admin/dashboard", headers: admin)).Expect(200, "Dashboard SQL");
         var employee = await api.Employee(admin);
-        var input = Body(("HoTen", employee.Text("hoTen") + " đã sửa"), ("SoDienThoai", null), ("NgayVaoLam", "2026-10-31T00:00:00Z"), ("TrangThai", "ACTIVE"), ("PhienBanDuLieu", employee.Text("phienBanDuLieu")));
+        var input = Body(("MaThaoTac", NewId()), ("LyDo", "Cập nhật kiểm thử"), ("HoTen", employee.Text("hoTen") + " đã sửa"), ("SoDienThoai", null), ("NgayVaoLam", "2026-10-31T00:00:00Z"), ("TrangThai", "ACTIVE"), ("PhienBanDuLieu", employee.Text("phienBanDuLieu")));
         var updated = (await api.Send("PUT", $"/api/admin/employees/{employee.Number("maNhanVien")}", input, admin)).Expect(200, "Sửa nhân viên");
+        input["MaThaoTac"] = NewId();
         (await api.Send("PUT", $"/api/admin/employees/{employee.Number("maNhanVien")}", input, admin)).Expect(409, "Rowversion nhân viên cũ");
         employee = updated.Json;
         var device = await api.NewDevice(admin);
@@ -34,6 +35,7 @@ public sealed class HttpRegressionTests
         (await api.Send("POST", "/api/pos/shifts/current/close", Body(("TienMatThucDem", 0), ("LyDoChenhLech", "")), staff)).Expect(400, "Lệch tiền cần lý do");
         (await api.Send("POST", "/api/pos/shifts/current/close", Body(("TienMatThucDem", 500000), ("LyDoChenhLech", "")), staff)).Expect(200, "Đóng ca đúng tiền");
         (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(401, "Ca đóng không truy cập");
+        input["MaThaoTac"] = NewId();
         input["TrangThai"] = "INACTIVE";
         input["PhienBanDuLieu"] = employee.Text("phienBanDuLieu");
         (await api.Send("PUT", $"/api/admin/employees/{employee.Number("maNhanVien")}", input, admin)).Expect(200, "Ngừng nhân viên giữ lịch sử");

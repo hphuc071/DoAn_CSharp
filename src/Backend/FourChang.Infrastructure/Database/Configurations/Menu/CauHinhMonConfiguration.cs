@@ -15,6 +15,8 @@ public sealed class CauHinhMonConfiguration : IEntityTypeConfiguration<CauHinhMo
             table.HasCheckConstraint("CK_CauHinhMon_2", "NhietDo IN ('HOT','ICED')");
             table.HasCheckConstraint("CK_CauHinhMon_3", "GiaBan >= 0");
         });
+        b.Property(x => x.LaMacDinh).HasColumnType("bit").HasDefaultValue(false);
+        b.HasIndex(x => x.MaMon).IsUnique().HasFilter("LaMacDinh=1").HasDatabaseName("UX_CauHinhMon_MacDinh");
         b.HasKey("MaCauHinhMon");
         b.Property(x => x.MaCauHinhMon).UseIdentityColumn();
         b.Property(x => x.MaCauHinhMon).HasColumnType("bigint").IsRequired();

@@ -45,12 +45,13 @@ public sealed class EmployeeIdentityTests
         open["HoTen"] = "Sai họ tên";
         (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(400, "Mở ca xác thực lại tên");
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.CaLamViec WHERE MaMay='{device.Input.Text("MaMay")}'"));
-        var change = Body(("HoTen", name), ("SoDienThoai", "0912345678"), ("NgayVaoLam", "2026-11-01"), ("TrangThai", "INACTIVE"), ("PhienBanDuLieu", first.Text("phienBanDuLieu")));
+        var change = Body(("MaThaoTac", NewId()), ("LyDo", "Ngừng làm kiểm thử"), ("HoTen", name), ("SoDienThoai", "0912345678"), ("NgayVaoLam", "2026-11-01"), ("TrangThai", "INACTIVE"), ("PhienBanDuLieu", first.Text("phienBanDuLieu")));
         var inactive = (await api.Send("PUT", $"/api/admin/employees/{first.Number("maNhanVien")}", change, admin)).Expect(200, "Ngừng làm fixture").Json;
         lookup["HoTen"] = name;
         (await api.Send("POST", "/api/pos/employees/verify", lookup, device.Headers)).Expect(404, "Nhân viên ngừng làm không xác minh");
         open["HoTen"] = name;
         (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(400, "Ngừng làm không mở ca");
+        change["MaThaoTac"] = NewId();
         change["TrangThai"] = "ACTIVE";
         change["PhienBanDuLieu"] = inactive.Text("phienBanDuLieu");
         first = (await api.Send("PUT", $"/api/admin/employees/{first.Number("maNhanVien")}", change, admin)).Expect(200, "Kích hoạt lại fixture").Json;

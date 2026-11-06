@@ -65,9 +65,9 @@ public static class DemoSeed
             db.Mon.Add(product);await db.SaveChangesAsync();
             foreach(var size in new[]{"S","M","L"})foreach(var temperature in (i is 3 or 5)?new[]{"ICED"}:new[]{"HOT","ICED"})
             {
-                var variant=new CauHinhMon{MaMon=product.MaMon,KichCo=size,NhietDo=temperature,GiaBan=prices[i]+(size=="S"?-5000:size=="L"?5000:0),DangBan=true};
+                var variant=new CauHinhMon{MaMon=product.MaMon,KichCo=size,NhietDo=temperature,GiaBan=prices[i]+(size=="S"?-5000:size=="L"?5000:0),DangBan=true,LaMacDinh=size=="M"&&temperature=="ICED"};
                 db.CauHinhMon.Add(variant);await db.SaveChangesAsync();
-                foreach(var sugar in new[]{0,25,50,75,100})foreach(var ice in temperature=="HOT"?new[]{0}:new[]{0,25,50,75,100})db.TuyChonPhaCheHopLe.Add(new(){MaCauHinhMon=variant.MaCauHinhMon,PhanTramDuong=sugar,PhanTramDa=ice,DangSuDung=true});
+                foreach(var sugar in new[]{0,25,50,75,100})foreach(var ice in temperature=="HOT"?new[]{0}:new[]{0,25,50,75,100})db.TuyChonPhaCheHopLe.Add(new(){MaCauHinhMon=variant.MaCauHinhMon,PhanTramDuong=sugar,PhanTramDa=ice,DangSuDung=true,LaMacDinh=sugar==50&&ice==(temperature=="HOT"?0:50)});
                 foreach(var topping in toppings)db.CauHinhMonThem.Add(new(){MaCauHinhMon=variant.MaCauHinhMon,MaMonThem=topping.MaMonThem,GioiHanMoiLy=3,DangSuDung=true});
                 var recipe=new CongThuc{MaCauHinhMon=variant.MaCauHinhMon,SoPhienBan=1,TenCongThuc=$"{product.TenMon} {size} {temperature}",TrangThai="DRAFT",MaQuanLyTao=1};
                 db.CongThuc.Add(recipe);await db.SaveChangesAsync();

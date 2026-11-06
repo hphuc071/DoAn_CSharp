@@ -10,7 +10,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        // Chỉ nhận ba kịch bản đã có, không thực thi đường dẫn hoặc lệnh do bên ngoài gửi vào.
+        // Chỉ nhận các kịch bản đã đăng ký, không thực thi đường dẫn hoặc lệnh do bên ngoài gửi vào.
         if (args.Length != 3 || args[0] != "--desktop-scenario")
         {
             Console.Error.WriteLine("Chạy kiểm thử bằng: dotnet test FourChang.sln");
@@ -23,6 +23,11 @@ internal static class Program
             {
                 "UC-ADM-01" => CustomersUiTests.RunHarness([args[2]]),
                 "UC-ADM-02" => AccessUiTests.RunHarness([args[2]]),
+                "RedesignConnected" => FourChang.Tests.Integration.RedesignConnectedTests.RunHarness(args[2]),
+                "Appearance" => FourChang.Tests.Integration.AppearanceDesktopTests.RunHarness(args[2]),
+                "ProfileAddresses" => FourChang.Tests.Admin.ProfileAddressUiTests.RunHarness(args[2]),
+                "Menu" => FourChang.Tests.Admin.MenuUiTests.RunHarness(args[2]),
+                "Workforce" => FourChang.Tests.Admin.WorkforceUiTests.RunHarness(args[2]),
                 "UC-POS-01" => EntryUiTests.RunHarness([args[2]]),
                 _ => 2
             };
