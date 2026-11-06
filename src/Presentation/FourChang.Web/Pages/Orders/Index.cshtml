@@ -80,6 +80,10 @@
 
 </section>
 
+<form id="orders-cancel-antiforgery" method="post" hidden>
+    @Html.AntiForgeryToken()
+</form>
+
 @section Scripts {
 <script>
 (() => {
@@ -128,6 +132,8 @@
         orders.forEach(order => {
             const article = document.createElement("article");
             article.className = "line-item";
+            article.dataset.orderId = String(order.maDonHang);
+            article.dataset.orderStatus = String(order.trangThai || "");
 
             const content = document.createElement("div");
             content.className = "item-content";
@@ -248,4 +254,5 @@
     );
 })();
 </script>
+<script src="~/js/orders-cancel.js" asp-append-version="true"></script>
 }

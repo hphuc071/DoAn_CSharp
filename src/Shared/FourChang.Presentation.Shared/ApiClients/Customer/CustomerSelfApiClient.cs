@@ -14,4 +14,13 @@ public sealed partial class CafeApiClient
     { try { return await SendAsync<CustomerSelfReceipt>(HttpMethod.Get, $"/api/customer/account/operations/{operation}"); } catch (CafeApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) { return null; } }
     public async Task<RegistrationReceipt?> GetRegistrationAsync(Guid operation)
     { try { return await SendAsync<RegistrationReceipt>(HttpMethod.Get, $"/api/auth/customer/registrations/{operation}"); } catch (CafeApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) { return null; } }
+
+    public Task<List<MenuVariantItem>> GetMenuVariantsAsync(long productId) =>
+        SendAsync<List<MenuVariantItem>>(HttpMethod.Get, $"/api/menu/{productId}/variants");
+
+    public Task<OrderPriceSummary> QuoteCustomerOrderAsync(CreateCustomerOrderRequest input) =>
+        SendAsync<OrderPriceSummary>(HttpMethod.Post, "/api/customer/orders/quote", input);
+
+    public Task<CustomerOrderReceipt> CreateCustomerOrderAsync(CreateCustomerOrderRequest input) =>
+        SendAsync<CustomerOrderReceipt>(HttpMethod.Post, "/api/customer/orders", input);
 }
