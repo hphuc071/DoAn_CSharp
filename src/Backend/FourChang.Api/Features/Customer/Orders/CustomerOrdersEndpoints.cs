@@ -63,8 +63,19 @@ public static class CustomerOrdersEndpoints
             {
                 return Results.BadRequest(new { message = ex.Message });
             }
+            // BR-17: payment deadline is an operator-configured policy, not a fixed 10-minute SLA.
+            // Refuse new order creation if the policy is missing or invalid; do not guess a deadline.
+            var timeoutText = app.Configuration["Orders:PendingPaymentTimeoutMinutes"];
+            if (!int.TryParse(timeoutText, System.Globalization.NumberStyles.None,
+                    System.Globalization.CultureInfo.InvariantCulture, out var timeoutMinutes)
+                || timeoutMinutes is < 1 or > 1440)
+            {
+                return Results.Problem(
+                    "Chưa cấu hình thời hạn chờ thanh toán hợp lệ cho đơn Web (1 đến 1440 phút).",
+                    statusCode: 503);
+            }
             var now = DateTime.UtcNow;
-            var expiresAt = now.AddMinutes(10);
+            var expiresAt = now.AddMinutes(timeoutMinutes);
             var variantIds = req.Items.Select(x => x.MaCauHinhMon).Distinct().ToList();
             var variants = await (
                 from v in db.CauHinhMon.AsNoTracking()
