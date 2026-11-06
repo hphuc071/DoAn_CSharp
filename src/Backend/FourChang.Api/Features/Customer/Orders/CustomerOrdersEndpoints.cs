@@ -272,5 +272,6 @@ public static class CustomerOrdersEndpoints
 
         // Giữ API hủy đơn UC-WEB-08 của Thái.
         CustomerOrderCancellation.Map(app);
+        OrderExpiryReview.Map(app);
     }
 }
