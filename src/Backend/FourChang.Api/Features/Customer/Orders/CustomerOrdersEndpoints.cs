@@ -1,4 +1,6 @@
+using System.Data;
 using System.Security.Claims;
+using FourChang.Domain.Entities.Payments;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Domain.Entities.Orders;
 using FourChang.Infrastructure.Database.Context;
@@ -72,13 +74,16 @@ public static class CustomerOrdersEndpoints
             var toppingsMap = await db.MonThem.AsNoTracking()
                 .Where(x => x.DangSuDung)
                 .ToDictionaryAsync(x => x.MaMonThem, ct);
+            // The active topping recipe is keyed by MaMonThem, not by a null variant ID.
+            var toppingRecipes = recipes.Where(r => r.MaMonThem.HasValue)
+                .ToDictionary(r => r.MaMonThem!.Value);
             var ingredientsMap = await (
                 from n in db.NguyenLieu.AsNoTracking()
                 join d in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals d.MaDonVi
                 select new { n.MaNguyenLieu, n.TenNguyenLieu, d.KyHieu, n.TonAnToan, n.DangSuDung }
             ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
 
-            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
             var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
             var totalRequiredByIngredient = new Dictionary<long, decimal>();
             var perItemIngredientRequirements = new List<Dictionary<long, decimal>>();
@@ -97,6 +102,29 @@ public static class CustomerOrdersEndpoints
                     if (perCup > 0m)
                         itemReq[line.MaNguyenLieu] = itemReq.GetValueOrDefault(line.MaNguyenLieu) + perCup;
                 }
+                // Add the ingredient requirements of every topping serving as well.
+                foreach (var top in item.Toppings ?? [])
+                {
+                    if (!toppingsMap.ContainsKey(top.MaMonThem) ||
+                        !toppingRecipes.TryGetValue(top.MaMonThem, out var topRecipe))
+                        return Results.Conflict(new { message = $"Topping {top.MaMonThem} chưa có công thức đang hiệu lực." });
+
+                    var toppingLines = recipeLines.Where(l => l.MaCongThuc == topRecipe.MaCongThuc).ToList();
+                    if (toppingLines.Count == 0)
+                        return Results.Conflict(new { message = $"Topping {top.MaMonThem} chưa có định mức nguyên liệu." });
+
+                    foreach (var line in toppingLines)
+                    {
+                        if (line.TyLeHaoHut is < 0m or >= 1m || line.DinhMucCoSo < 0m)
+                            return Results.Conflict(new { message = "Định mức nguyên liệu topping không hợp lệ." });
+                        // Topping recipes describe each topping portion, independent of drink sugar/ice choices.
+                        var perPortion = decimal.Ceiling(line.DinhMucCoSo / (1m - line.TyLeHaoHut) * 10000m) / 10000m;
+                        if (perPortion > 0m)
+                            itemReq[line.MaNguyenLieu] = itemReq.GetValueOrDefault(line.MaNguyenLieu)
+                                + perPortion * top.SoPhanMoiLy;
+                    }
+                }
+
                 foreach (var kv in itemReq)
                     totalRequiredByIngredient[kv.Key] = totalRequiredByIngredient.GetValueOrDefault(kv.Key) + kv.Value * qty;
                 perItemIngredientRequirements.Add(itemReq);
@@ -117,7 +145,9 @@ public static class CustomerOrdersEndpoints
                 maBan = ban?.MaBan;
             }
 
-            var orderCode = $"ORD-{now:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}";
+            // 16 hex characters (64 random bits) instead of only 9,000 possibilities per day.
+            // Database UNIQUE index is still the final collision safeguard.
+            var orderCode = $"ORD-{now:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..16]}";
             var order = new DonHang
             {
                 MaDonHienThi = orderCode,
@@ -166,8 +196,9 @@ public static class CustomerOrdersEndpoints
                 await db.SaveChangesAsync(ct);
                 foreach (var top in item.Toppings ?? [])
                 {
-                    if (!toppingsMap.TryGetValue(top.MaMonThem, out var mt)) continue;
-                    var topRecipe = recipes.FirstOrDefault(r => r.MaCauHinhMon == null) ?? variantRecipe;
+                    // Both were checked before any writes. Never silently discard a topping.
+                    var mt = toppingsMap[top.MaMonThem];
+                    var topRecipe = toppingRecipes[top.MaMonThem];
                     db.MonThemChiTietDonHang.Add(new MonThemChiTietDonHang
                     {
                         MaChiTietDonHang = detail.MaChiTietDonHang,
@@ -210,6 +241,22 @@ public static class CustomerOrdersEndpoints
                     stocks[ingId].ThoiDiemCapNhat = now;
                 }
             }
+            // Create an unpaid payment intent in the same transaction as the order.
+            // QR generation and payment verification are NOT performed here.
+            db.ThanhToan.Add(new ThanhToan
+            {
+                MaThanhToanHienThi = $"PAY-{order.MaDonHang:D12}",
+                MaDonHang = order.MaDonHang,
+                PhuongThuc = "BANK_TRANSFER",
+                SoTienYeuCau = priceSummary.TongCong,
+                SoTienDaXacMinh = 0m,
+                TrangThai = "PENDING",
+                MaThaoTac = Guid.NewGuid(),
+                HetHanLuc = expiresAt,
+                ThoiDiemTao = now,
+                ThoiDiemCapNhat = now
+            });
+
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
 
