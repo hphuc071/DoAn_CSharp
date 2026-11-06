@@ -95,8 +95,8 @@
           if (matches.length !== 1)
             throw new Error(`Topping "${item.topping}" không được bán cho biến thể đã chọn.`);
           if (!Number.isInteger(qtyTop) || qtyTop < 1 ||
-              qtyTop > Number(matches[0].gioiHanMoiLy) || qtyTop > 2)
-            throw new Error("Số phần topping không hợp lệ hoặc chưa được API tạo đơn hỗ trợ.");
+              qtyTop > Number(matches[0].gioiHanMoiLy))
+            throw new Error("Số phần topping vượt giới hạn cấu hình món.");
           toppings.push({ maMonThem: matches[0].maMonThem, soPhanMoiLy: qtyTop });
         }
         return {

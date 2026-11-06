@@ -24,14 +24,32 @@ public static class CustomerOrdersEndpoints
 
         app.MapPost("/api/customer/orders/quote", async (CreateCustomerOrderRequest req, CafeDbContext db, CancellationToken ct) =>
         {
-            var summary = await OrderPricingService.CalculateOrderTotalAsync(db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
-            return Results.Ok(summary);
+            try
+            {
+                var summary = await OrderPricingService.CalculateOrderTotalAsync(db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
+                return Results.Ok(summary);
+            }
+            catch (OrderQuoteValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
         });
 
         app.MapPost("/api/customer/orders", async (CreateCustomerOrderRequest req, HttpContext context, CafeDbContext db, CancellationToken ct) =>
         {
             if (req.Items is null || req.Items.Count == 0)
                 return Results.BadRequest(new { message = "Giỏ hàng đang trống." });
+            // Validate before stock checks or any database writes.
+            OrderPriceSummary priceSummary;
+            try
+            {
+                priceSummary = await OrderPricingService.CalculateOrderTotalAsync(
+                    db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
+            }
+            catch (OrderQuoteValidationException ex)
+            {
+                return Results.BadRequest(new { message = ex.Message });
+            }
             var claim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!long.TryParse(claim, out var customerId) || customerId <= 0)
                 return Results.Unauthorized();
@@ -66,7 +84,7 @@ public static class CustomerOrdersEndpoints
             var perItemIngredientRequirements = new List<Dictionary<long, decimal>>();
             foreach (var item in req.Items)
             {
-                var qty = Math.Max(1, item.SoLuong);
+                var qty = item.SoLuong;
                 var variantRecipe = recipes.FirstOrDefault(r => r.MaCauHinhMon == item.MaCauHinhMon);
                 if (variantRecipe is null)
                     return Results.Conflict(new { message = $"Món {variants[item.MaCauHinhMon].TenMon} chưa có công thức pha chế." });
@@ -91,7 +109,7 @@ public static class CustomerOrdersEndpoints
                 if (available < needed)
                     return Results.Conflict(new { message = $"Nguyên liệu '{ing.TenNguyenLieu}' vừa hết, vui lòng chỉnh lại giỏ hàng." });
             }
-            var priceSummary = await OrderPricingService.CalculateOrderTotalAsync(db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
+
             long? maBan = null;
             if (string.Equals(req.HinhThucNhanMon, "DINE_IN", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(req.MaBanHienThi))
             {
@@ -126,7 +144,7 @@ public static class CustomerOrdersEndpoints
             {
                 var item = req.Items[idx];
                 var v = variants[item.MaCauHinhMon];
-                var qty = Math.Max(1, item.SoLuong);
+                var qty = item.SoLuong;
                 var variantRecipe = recipes.First(r => r.MaCauHinhMon == item.MaCauHinhMon);
                 var detail = new ChiTietDonHang
                 {
@@ -156,7 +174,7 @@ public static class CustomerOrdersEndpoints
                         MaMonThem = mt.MaMonThem,
                         MaCongThuc = topRecipe.MaCongThuc,
                         TenMonThemDaChot = mt.TenMonThem,
-                        SoPhanMoiLy = Math.Clamp(top.SoPhanMoiLy, 1, 2),
+                        SoPhanMoiLy = top.SoPhanMoiLy,
                         GiaMoiPhanDaChot = mt.GiaMoiPhan,
                         ThoiDiemTao = now,
                         ThoiDiemCapNhat = now

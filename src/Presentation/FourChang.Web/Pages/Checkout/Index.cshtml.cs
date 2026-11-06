@@ -58,7 +58,7 @@ public sealed class IndexModel(CafeApiClient api) : PageModel
         if (request.Items.Any(i => i.MaCauHinhMon <= 0 || i.SoLuong is < 1 or > 99 ||
             i.PhanTramDuong is < 0 or > 100 || i.PhanTramDa is < 0 or > 100 ||
             (i.Toppings?.Count ?? 0) > 10 ||
-            (i.Toppings?.Any(t => t.MaMonThem <= 0 || t.SoPhanMoiLy is < 1 or > 2) ?? false)))
+            (i.Toppings?.Any(t => t.MaMonThem <= 0 || t.SoPhanMoiLy < 1) ?? false)))
             return BadRequest(new { message = "Cấu hình món hoặc số lượng không hợp lệ." });
 
         try
