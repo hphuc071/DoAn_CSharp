@@ -20,10 +20,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="../FourChang.IntegrationClosure/FixtureSessionClock.cs" Link="Shared/FixtureSessionClock.cs" />
     <ProjectReference Include="../../src/Backend/FourChang.Infrastructure/FourChang.Infrastructure.csproj" />
     <ProjectReference Include="../../src/Presentation/FourChang.Desktop/FourChang.Desktop.csproj" />
     <!-- Build API/Web để fixture có thể mở backend thật trước khi kiểm thử. -->
-    <ProjectReference Include="../../src/Backend/FourChang.Api/FourChang.Api.csproj" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="../../src/Presentation/FourChang.Web/FourChang.Web.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../../src/Backend/FourChang.Api/FourChang.Api.csproj" />
+    <ProjectReference Include="../../src/Presentation/FourChang.Web/FourChang.Web.csproj" />
   </ItemGroup>
 </Project>
