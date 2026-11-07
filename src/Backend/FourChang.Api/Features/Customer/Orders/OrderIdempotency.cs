@@ -114,6 +114,13 @@ internal static class OrderIdempotency
             Convert.ToInt32(result, CultureInfo.InvariantCulture) < 0)
             return Results.Conflict(new { message = "Yêu cầu đang được xử lý. Vui lòng thử lại với cùng Idempotency-Key." });
 
+        // Different GUIDs can share SERIALIZABLE audit/payment index gaps and stock rows.
+        // Coordinate Customer Create before reading them, avoiding S-range -> insert conversion
+        // deadlocks. Existing receipt-only replays bypass this gate; no automatic retry.
+        if (!await OrderIntegrationSafety.LockAsync(db, transaction, "4chang.customerorder.create", ct))
+            return Results.Conflict(new { code = "CUSTOMER_ORDER_CREATE_BUSY",
+                message = "Đang xử lý đơn khác. Giữ nguyên Idempotency-Key và nội dung để thử lại." });
+
         // Double-check AFTER acquiring the transaction lock, to close the
         // race where two identical requests both saw "not found" initially.
         return await ReplayAsync(db, customerId, key, fingerprint, acceptedTotal, ct);
