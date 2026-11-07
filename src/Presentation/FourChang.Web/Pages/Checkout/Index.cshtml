@@ -22,9 +22,8 @@
         </div>
 
         <div class="tab-panel" id="dinein" hidden>
-            <div class="notice">Mã bàn bên dưới là ví dụ. Chưa có bước xác thực QR bàn thật.</div>
-            <label class="field">Mã bàn từ QR <input value="TABLE-05" readonly /></label>
-            <label class="field">Ghi chú phục vụ <textarea placeholder="Ví dụ: mang món lên cùng lúc"></textarea></label>
+            <div class="notice" role="status">Đặt tại bàn đang khóa. Cần token QR do quán cấp và kiểm chứng phiên bản, thu hồi, thời hạn trên máy chủ khi quét và khi gửi. QR bàn không phải QR thanh toán.</div>
+            <p>Chưa có bàn được xác minh. Quét lại QR hợp lệ hoặc liên hệ nhân viên. Giỏ và thao tác đang chờ được giữ nguyên; không nhập mã bàn để bỏ qua xác minh.</p>
         </div>
 
         <div class="tab-panel" id="takeaway">
@@ -38,13 +37,13 @@
         </div>
 
         <div class="tab-panel" id="delivery" hidden>
-            <div class="field-grid">
+            <fieldset disabled class="field-grid">
                 <label class="field">Người nhận <input placeholder="Họ và tên người nhận" /></label>
                 <label class="field">Điện thoại <input type="tel" placeholder="Số điện thoại" /></label>
                 <label class="field wide">Địa chỉ giao hàng <input placeholder="Địa chỉ giao hàng" /></label>
                 <label class="field wide">Ghi chú giao hàng <textarea rows="2" placeholder="Tòa nhà, cổng vào, hướng dẫn liên hệ…"></textarea></label>
-            </div>
-            <div class="notice">Phí giao hàng chưa được xác định. Không sử dụng khoảng cách hoặc mức phí mẫu để tạo đơn.</div>
+            </fieldset>
+            <div class="notice" role="status">Đặt giao hàng đang khóa. Cần xác minh điểm giao, khoảng cách tuyến đường và chính sách phí được phê duyệt. Chưa có báo phí hợp lệ; không dùng khoảng cách hoặc phí mẫu. Không hỗ trợ COD.</div>
         </div>
 
         <label class="inline-label" style="margin-top:25px">

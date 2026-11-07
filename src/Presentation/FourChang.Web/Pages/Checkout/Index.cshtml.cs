@@ -108,6 +108,46 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
     public sealed record CheckoutCommand(Guid Operation, decimal? AcceptedTotal, CreateCustomerOrderRequest? Order,
         string? OwnerProof = null);
 
+    // Separate read-only preparation; never forwards a Create command or alters pending/cart data.
+    // Razor Pages applies antiforgery just as for the existing checkout handlers.
+    public async Task<IActionResult> OnPostFulfillmentPreviewAsync(CancellationToken ct)
+    {
+        Response.Headers.CacheControl = "no-store";
+        if (!bool.TryParse(configuration["Checkout:FulfillmentPreviewEnabled"], out var enabled) || !enabled)
+            return StatusCode(503, new { code = "FULFILLMENT_PREVIEW_DISABLED" });
+        if (Request.Cookies[CustomerCookie.Name] is not { Length: > 0 } token)
+            return StatusCode(401, new { code = "CUSTOMER_REQUIRED" });
+        FulfillmentPreviewRequest? input;
+        try
+        {
+            input = await Request.ReadFromJsonAsync<FulfillmentPreviewRequest>(cancellationToken: ct);
+        }
+        catch (Exception ex) when (ex is JsonException or BadHttpRequestException or NotSupportedException or InvalidOperationException)
+        { return BadRequest(new { code = "FULFILLMENT_INPUT_INVALID" }); }
+        if (input is null) return BadRequest(new { code = "FULFILLMENT_INPUT_INVALID" });
+        try
+        {
+            api.Token = token;
+            var preview = await api.PreviewCustomerFulfillmentAsync(input, ct);
+            if (preview.CreationEnabled || preview.Method != input.Method ||
+                preview.Method is not ("DINE_IN" or "DELIVERY") ||
+                string.IsNullOrWhiteSpace(preview.Proof) || preview.Proof.Length > 8192 ||
+                preview.ExpiresAt <= DateTimeOffset.UtcNow ||
+                preview.Price is null || preview.Price.TienHang < 0 || preview.Price.PhiGiaoHang < 0 ||
+                preview.Price.TongCong != preview.Price.TienHang + preview.Price.PhiGiaoHang ||
+                (preview.Method == "DINE_IN" && (string.IsNullOrWhiteSpace(preview.TableCode) || preview.Price.PhiGiaoHang != 0)) ||
+                (preview.Method == "DELIVERY" && preview.TableCode is not null))
+                return StatusCode(502, new { code = "FULFILLMENT_PREVIEW_INVALID" });
+            return new JsonResult(preview);
+        }
+        catch (CafeApiException ex) { return StatusCode((int?)ex.StatusCode ?? 503, new { code = ex.Code ?? "FULFILLMENT_PREVIEW_UNAVAILABLE" }); }
+        catch (Exception ex) when (ex is JsonException or BadHttpRequestException or NotSupportedException or InvalidOperationException)
+        { return StatusCode(502, new { code = "FULFILLMENT_PREVIEW_INVALID" }); }
+        catch (HttpRequestException) { return StatusCode(503, new { code = "FULFILLMENT_PREVIEW_UNAVAILABLE" }); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        { return StatusCode(504, new { code = "FULFILLMENT_PREVIEW_TIMEOUT" }); }
+    }
+
     public async Task<IActionResult> OnPostCreateAsync(CancellationToken ct)
     {
         Response.Headers.CacheControl = "no-store";
