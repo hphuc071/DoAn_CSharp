@@ -45,10 +45,22 @@ public static class CustomerOrdersEndpoints
         });
 
         app.MapPost("/api/customer/orders", CreateAsync).RequireAuthorization("Customer");
+        app.MapPost("/api/customer/orders/fulfillment-preview", FulfillmentPreviewAsync)
+            .RequireAuthorization("Customer");
 
         // Giữ API hủy đơn UC-WEB-08 của Thái.
         CustomerOrderCancellation.Map(app);
         OrderExpiryReview.Map(app);
+    }
+    public static async Task<IResult> FulfillmentPreviewAsync(FulfillmentPreviewRequest request,
+        HttpContext context, [Microsoft.AspNetCore.Mvc.FromServices] FulfillmentPreviewService service,
+        CancellationToken ct)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        if (!CustomerOrderReadEndpoints.Owner(context, out var owner)) return Results.Unauthorized();
+        try { return Results.Ok(await service.PreviewAsync(owner, request, ct)); }
+        catch (FulfillmentUnavailable ex) { return Results.Json(new { code = ex.Code }, statusCode: ex.Status); }
+        catch (OrderQuoteValidationException) { return Results.Json(new { code = "CART_INVALID" }, statusCode: 400); }
     }
     // A separate Backend capability: Web configuration cannot secure a direct API caller.
     public static async Task<IResult> CreateAsync(CreateCustomerOrderRequest req, HttpContext context,
@@ -61,31 +73,38 @@ public static class CustomerOrdersEndpoints
             return Results.Unauthorized();
         if (!OrderIdempotency.TryReadKey(context, out var idempotencyKey))
             return Results.BadRequest(new { message = "Cần Idempotency-Key là một GUID khác rỗng cho mỗi lần xác nhận đặt hàng." });
+        // Read-only previews do not authorize writes. No flag may bypass the missing atomic
+        // QR/quote revalidation + snapshot integration. Preserve the existing TAKEAWAY protocol.
+        if (string.Equals(req.HinhThucNhanMon, "DINE_IN", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(req.HinhThucNhanMon, "DELIVERY", StringComparison.OrdinalIgnoreCase))
+            return Results.Json(new { code = "FULFILLMENT_CREATION_NOT_VALIDATED" }, statusCode: 503);
+        // Customer WEB always requires consent, including direct API calls and replays.
+        // This is independent of POS/Admin contracts and precedes any business SQL.
+        if (!OrderIdempotency.TryReadAcceptedTotal(context, out var acceptedTotal))
+            return Results.BadRequest(new { code = "CHECKOUT_ACCEPTED_TOTAL_INVALID",
+                message = "Cần một X-Checkout-Accepted-Total duy nhất, không âm và theo định dạng số bất biến." });
         var requestFingerprint = OrderIdempotency.Hash(req);
         var earlyReplay = await OrderIdempotency.ReplayAsync(
-            db, customerId, idempotencyKey, requestFingerprint, ct);
+            db, customerId, idempotencyKey, requestFingerprint, acceptedTotal, ct);
         if (earlyReplay is not null)
             return earlyReplay;
 
-        // Additive checkout protocol; the request DTO/hash and legacy API callers stay unchanged.
-        decimal? acceptedTotal = null;
-        if (context.Request.Headers.TryGetValue("X-Checkout-Accepted-Total", out var totalHeader))
-        {
-            if (totalHeader.Count != 1 || !decimal.TryParse(totalHeader[0],
-                System.Globalization.NumberStyles.AllowDecimalPoint,
-                System.Globalization.CultureInfo.InvariantCulture, out var total) || total < 0m)
-                return Results.BadRequest(new { message = "Tổng tiền chấp thuận không hợp lệ." });
-            acceptedTotal = total;
-            if (!string.Equals(req.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
+        // Historical DTO hashes/receipts are retained. Validate new operations only after replay.
+        if (!string.Equals(req.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
                 string.IsNullOrWhiteSpace(req.TenNguoiNhan) || req.TenNguoiNhan.Length > 120 ||
                 req.TenNguoiNhan.Any(char.IsControl) ||
                 !System.Text.RegularExpressions.Regex.IsMatch(req.DienThoaiNguoiNhan ?? "", @"^\+?[0-9]{9,15}\z") ||
                 req.MaBanHienThi is not null || req.DiaChiGiao is not null || req.KhoangCachKm is not null)
-                return Results.BadRequest(new { message = "Thông tin nhận mang đi không hợp lệ." });
-        }
+            return Results.BadRequest(new { message = "Thông tin nhận mang đi không hợp lệ." });
 
         if (req.Items is null || req.Items.Count == 0)
             return Results.BadRequest(new { message = "Giỏ hàng đang trống." });
+        // Hold menu/recipe read locks until commit, so the authoritative total and persisted
+        // line/topping/BOM snapshots cannot come from different menu versions.
+        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
+        var lockedReplay = await OrderIdempotency.LockAndReplayAsync(
+            db, tx, customerId, idempotencyKey, requestFingerprint, acceptedTotal, ct);
+        if (lockedReplay is not null) return lockedReplay;
         // Validate before stock checks or any database writes.
         OrderPriceSummary priceSummary;
         try
@@ -97,6 +116,8 @@ public static class CustomerOrdersEndpoints
         {
             return Results.BadRequest(new { message = ex.Message });
         }
+        if (!OrderIdempotency.MatchesAcceptedTotal(acceptedTotal, priceSummary))
+            return Results.Conflict(new { code = "CHECKOUT_PRICE_CHANGED", message = "Giá đã thay đổi. Vui lòng lấy báo giá mới và xác nhận lại trước khi đặt." });
         // BR-17: payment deadline is an operator-configured policy, not a fixed 10-minute SLA.
         // Refuse new order creation if the policy is missing or invalid; do not guess a deadline.
         var timeoutText = configuration["Orders:PendingPaymentTimeoutMinutes"];
@@ -134,17 +155,6 @@ public static class CustomerOrdersEndpoints
             join d in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals d.MaDonVi
             select new { n.MaNguyenLieu, n.TenNguyenLieu, d.KyHieu, n.TonAnToan, n.DangSuDung }
         ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
-
-        await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
-        var lockedReplay = await OrderIdempotency.LockAndReplayAsync(
-            db, tx, customerId, idempotencyKey, requestFingerprint, ct);
-        if (lockedReplay is not null)
-            return lockedReplay;
-
-        // Only a new operation is checked. Replay always returns the original receipt.
-        // No stock/order writes have happened; the transaction lock excludes a concurrent commit with this key.
-        if (acceptedTotal.HasValue && acceptedTotal.Value != priceSummary.TongCong)
-            return Results.Conflict(new { code = "CHECKOUT_PRICE_CHANGED", message = "Giá đã thay đổi. Vui lòng lấy báo giá mới và xác nhận lại trước khi đặt." });
 
         var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
         // Keep full decimal precision until aggregating each ingredient over the WHOLE order.

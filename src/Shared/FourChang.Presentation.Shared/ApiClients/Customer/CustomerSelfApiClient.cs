@@ -25,6 +25,37 @@ public sealed partial class CafeApiClient
     public Task<OrderPriceSummary> QuoteCustomerOrderAsync(CreateCustomerOrderRequest input) =>
         SendAsync<OrderPriceSummary>(HttpMethod.Post, "/api/customer/orders/quote", input);
 
+    public async Task<FulfillmentPreview> PreviewCustomerFulfillmentAsync(FulfillmentPreviewRequest input,
+        CancellationToken ct = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/customer/orders/fulfillment-preview")
+        { Content = JsonContent.Create(input) };
+        if (Token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Token);
+        using var response = await http.SendAsync(request, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            string? code = null;
+            try
+            {
+                var problem = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: ct);
+                if (problem.ValueKind == JsonValueKind.Object && problem.TryGetProperty("code", out var c) && c.ValueKind == JsonValueKind.String)
+                    code = c.GetString();
+            }
+            catch (Exception ex) when (ex is JsonException or NotSupportedException) { }
+            throw new CafeApiException("Chưa xác minh được hình thức nhận món. Giữ nguyên giỏ và thao tác đang chờ.", response.StatusCode, code);
+        }
+        // Preview is a synchronous read: 201/202 must never masquerade as a valid quote.
+        if (response.StatusCode != HttpStatusCode.OK)
+            throw new CafeApiException("Trạng thái báo giá không hợp lệ.", HttpStatusCode.BadGateway);
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<FulfillmentPreview>(cancellationToken: ct)
+                ?? throw new CafeApiException("Báo giá rỗng.", HttpStatusCode.BadGateway);
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        { throw new CafeApiException("Báo giá không hợp lệ.", HttpStatusCode.BadGateway); }
+    }
+
     // Request-scoped headers: never put an operation key on HttpClient.DefaultRequestHeaders.
     public async Task<(CustomerOrderReceipt Receipt, int Status)> CreateCustomerOrderAsync(
         CreateCustomerOrderRequest input, Guid operation, decimal acceptedTotal,

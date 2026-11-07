@@ -32,6 +32,11 @@ try
     builder.Services.AddScoped<CustomerSelfService>();
     builder.Services.AddScoped<ICustomerOrderReader, CustomerOrderReader>();
     builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddDataProtection();
+    builder.Services.AddScoped<ITableQrLookup, SqlTableQrLookup>();
+    builder.Services.AddSingleton<IDeliveryRouteSource, UnavailableDeliveryRouteSource>();
+    builder.Services.AddScoped<IFulfillmentCartPricer, FulfillmentCartPricer>();
+    builder.Services.AddScoped<FulfillmentPreviewService>();
     builder.Services.AddScoped<FourChang.Api.Features.Customer.Payments.SqlBankPaymentService>();
     builder.Services.AddSingleton<IExpiryBankReconciliation, UnavailableExpiryBankReconciliation>();
     builder.Services.AddScoped<SqlOrderExpiryWorker>(); // Explicit invocation only; never AddHostedService.

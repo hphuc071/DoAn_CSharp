@@ -29,9 +29,21 @@ internal static class OrderIdempotency
     internal static byte[] Hash(CreateCustomerOrderRequest request) =>
         SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(request));
 
+    internal static bool TryReadAcceptedTotal(HttpContext context, out decimal total)
+    {
+        total = default;
+        return context.Request.Headers.TryGetValue("X-Checkout-Accepted-Total", out var values) &&
+            values.Count == 1 && decimal.TryParse(values[0], NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out total) && total >= 0m;
+    }
+
+    internal static bool MatchesAcceptedTotal(decimal acceptedTotal, OrderPriceSummary price)
+        => acceptedTotal >= 0m && price.TienHang >= 0m && price.PhiGiaoHang >= 0m &&
+           price.TongCong == price.TienHang + price.PhiGiaoHang && acceptedTotal == price.TongCong;
+
     // null = first request for this key. Non-null = replay or conflict.
     internal static async Task<IResult?> ReplayAsync(
-        CafeDbContext db, long customerId, Guid key, byte[] fingerprint, CancellationToken ct)
+        CafeDbContext db, long customerId, Guid key, byte[] fingerprint, decimal acceptedTotal, CancellationToken ct)
     {
         var previous = await db.NhatKyHeThong.AsNoTracking()
             .SingleOrDefaultAsync(x => x.MaThaoTac == key, ct);
@@ -46,6 +58,12 @@ internal static class OrderIdempotency
                 : null;
         }
 
+        return ReplayResult(previous, customerId, fingerprint, acceptedTotal);
+    }
+
+    // The original receipt binds consent without changing historical DTO hashes or audit schema.
+    internal static IResult ReplayResult(NhatKyHeThong previous, long customerId, byte[] fingerprint, decimal acceptedTotal)
+    {
         // A key used for a different owner/purpose must never expose a receipt.
         if (previous.LoaiTacNhan != "CUSTOMER" ||
             previous.MaKhachHang != customerId ||
@@ -62,6 +80,9 @@ internal static class OrderIdempotency
         CustomerOrderReceipt? receipt;
         try { receipt = JsonSerializer.Deserialize<CustomerOrderReceipt>(previous.KetQuaDaChotJson); }
         catch (JsonException) { receipt = null; }
+        if (receipt is not null && acceptedTotal != receipt.TongCong)
+            return Results.Conflict(new { code = "CHECKOUT_ACCEPTED_TOTAL_CONFLICT",
+                message = "Idempotency-Key đã được xác nhận với tổng tiền khác. Giữ nguyên thao tác gốc để đối soát." });
         return receipt is null
             ? Results.Conflict(new { message = "Biên nhận đã lưu không hợp lệ." })
             : Results.Ok(receipt);
@@ -69,7 +90,7 @@ internal static class OrderIdempotency
 
     internal static async Task<IResult?> LockAndReplayAsync(
         CafeDbContext db, IDbContextTransaction transaction,
-        long customerId, Guid key, byte[] fingerprint, CancellationToken ct)
+        long customerId, Guid key, byte[] fingerprint, decimal acceptedTotal, CancellationToken ct)
     {
         // This command participates in the SAME EF transaction as all order,
         // stock, payment and audit writes. Never take a session-owned lock.
@@ -95,7 +116,7 @@ internal static class OrderIdempotency
 
         // Double-check AFTER acquiring the transaction lock, to close the
         // race where two identical requests both saw "not found" initially.
-        return await ReplayAsync(db, customerId, key, fingerprint, ct);
+        return await ReplayAsync(db, customerId, key, fingerprint, acceptedTotal, ct);
     }
 
     internal static NhatKyHeThong CreateAudit(

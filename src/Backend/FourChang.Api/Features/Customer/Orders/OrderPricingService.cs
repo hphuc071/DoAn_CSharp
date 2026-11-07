@@ -11,19 +11,6 @@ public sealed class OrderQuoteValidationException : Exception
 
 public static class OrderPricingService
 {
-    // Retained for future server-verified DELIVERY calculations. Do not accept
-    // a client-provided distance as an authoritative shipping quote.
-    public static decimal CalculateShippingFee(string fulfillmentType, decimal? distanceKm)
-    {
-        if (!string.Equals(fulfillmentType, "DELIVERY", StringComparison.OrdinalIgnoreCase))
-            return 0m;
-
-        var km = distanceKm ?? 2.4m;
-        if (km <= 0m) return 0m;
-        if (km <= 3m) return 15000m;
-        return 15000m + decimal.Ceiling(km - 3m) * 5000m;
-    }
-
     public static async Task<OrderPriceSummary> CalculateOrderTotalAsync(
         CafeDbContext db,
         string fulfillmentType,
