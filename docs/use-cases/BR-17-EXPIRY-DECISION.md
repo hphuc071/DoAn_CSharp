@@ -1,5 +1,68 @@
 # BR-17 — Biểu diễn hết hạn chờ thanh toán
 
+## Cập nhật trình phê duyệt — 2026-11-08, HEAD 7205993
+
+**PROPOSED / NOT APPROVED.** Khuyến nghị **A: EXPIRED terminal riêng**; không dùng CANCELLED
+thay thế, không backfill lịch sử. Phần dưới giữ lịch sử các đợt triển khai, không phải bằng
+chứng mọi phần còn thiếu đã hoàn tất. Đã đọc trực tiếp BR-15/17/18 trong `dac-25-Uc.docx`:
+đặc tả yêu cầu chốt ánh xạ, không tự cấp quyền thêm mã hay chạy migration.
+
+### Quyết định cần chữ ký/phạm vi riêng
+
+| Mã | Khuyến nghị trình duyệt hiện tại | Phải ghi rõ khi phê duyệt |
+| --- | --- | --- |
+| D1 | EXPIRED chỉ cho WEB/PENDING_PAYMENT quá hạn; terminal riêng | Mapping, phạm vi triển khai, không đổi historical CANCELLED |
+| D2 | Giữ fail-closed hiện tại: cả bank timestamp và thời điểm quyết định phải trước hạn; tại/sau hạn đối soát | Chấp nhận/đổi chính sách delayed callback, watermark và nguồn thời gian của provider |
+| D3 | Fixture đầu chỉ zero-paid; thiếu tiền/partial và tiền muộn giữ đối soát | Actor hợp lệ cho refund/partial expiry; có cho SYSTEM hay dùng workflow quản lý; không tự nới CHECK |
+| D4 | Giữ snapshot giá/BOM và audit; không dùng HoanTatLuc làm giờ expiry | Nghĩa vụ hiệu lực/Remaining sau EXPIRED và mốc kết thúc; UI không thể tự quyết API tài chính |
+| D5 | Tái sử dụng audit journal + outbox hiện có, không thêm hệ thống sự kiện trùng | Event/reconciliation/consumer contract; xử lý ordering/idempotency, monitoring và sink production |
+| D6 | Fixture hoàn toàn mới; up/down và DML phải có quyền riêng | Container/storage/port/DB, script hashes, người chạy, kế hoạch rollback và giới hạn ghi |
+
+Chưa có người/ngày/phạm vi phê duyệt. Mỗi quyết định trên vẫn **CHƯA DUYỆT**; D1 không
+tự cấp D2-D6 hoặc quyền bật worker. Test SQL/outbox/HTTP Customer trước đây không thay thế
+expiry SQL, provider hay migration proof.
+
+### Kết quả review kỹ thuật mới
+
+- Worker hiện bounded batch10, chọn WEB/PENDING_PAYMENT/deadline đã qua; chỉ zero-paid,
+  BANK_TRANSFER một request có reference và bank proof, recheck rowversion/state trong
+  SERIALIZABLE, release phần chưa tiêu hao và stamp order.expired trong audit transaction.
+  Không hosted service/public writer route; default provider không cung cấp proof.
+- Sửa lỗi guard CHECK làm mất ký tự literal: trước đây loại khoảng trắng/dấu ngoặc trước
+  kiểm token nên có thể coi `'E X P I R E D'`/`'EX[PIRED]'` là EXPIRED. Parser nay kiểm
+  literal gốc trước; proposal up/down cũng giữ nguyên literal và so binary. Chỉ sửa file
+  proposal, **không thực thi SQL** hoặc cập nhật canonical schema/context/model.
+- Worker được đồng bộ với invariant giữ kho đã có trong planner: không release hold
+  CONSUMED hoặc terminal RELEASED/EXPIRED nhưng lượng đã release chưa bằng lượng giữ.
+  CHECK hiện tại chỉ ràng buộc lượng và tập status độc lập, nên không thay thế guard này.
+  Bổ sung validation trước mutation, không đổi công thức release hay context/schema SQL.
+- Cùng `4chang.orderstate.<id>` và SERIALIZABLE là điều kiện cần, chưa đủ chứng minh
+  concurrency: expiry lấy orderstate trước đọc audit; payment/cancel đọc audit trước lấy
+  orderstate. Range locks trên audit và stock có thể tạo chu kỳ. Gate Customer Create
+  của commit7205993 không phối hợp toàn bộ writer. Giữ worker OFF; chưa coi đây là lỗi
+  SQL1205 đã tái hiện ở expiry, nhưng là rủi ro bắt buộc kiểm chứng/sửa trước kích hoạt.
+- Candidate đầu cần đối soát làm worker `break`, có thể chặn các candidate sau. Chưa có
+  scheduler/fairness/backoff đã duyệt; không tự bỏ qua blocker rồi báo xử lý hết batch.
+- Create TAKEAWAY hiện chưa có nguồn tham chiếu thanh toán production đầy đủ; thiếu
+  `MaThamChieuChuyenKhoan` làm worker trả EXPIRY_BANK_REFERENCE_REQUIRED, không tự đoán.
+- EXPIRED đọc được bằng opt-in `ExpiryStatusReadEnabled`, nhưng canonical EF/schema/model
+  vẫn11 states. POS `WorkEndpoints` và `PosDeviceService` vẫn loại COMPLETED/CANCELLED/
+  REJECTED khi tính đơn mở, chưa xử lý EXPIRED. Admin/báo cáo và Remaining cần D4/compatibility.
+- Migration proposal kiểm baseline trước BEGIN TRANSACTION: chỉ chạy trong cửa sổ migration
+  độc quyền đã phê duyệt; race schema drift/bounded DDL phải được kiểm thử trước vận hành.
+  Down từ chối khi còn EXPIRED; không xóa/chuyển mã hoặc khôi phục hold để ép rollback.
+
+Runner chuẩn bị: `tests/FourChang.Br17Integration` có `--plan` offline và preflight SELECT-only
+đòi approval/identity/hash riêng; **chưa có provisioning/migration/business-DML runner**.
+Đích dự kiến mới14340/FourChangBr17MigrationFixture chưa được tạo hoặc xác minh khả dụng.
+Các assertion/competition/migration cases cụ thể: [BR17-SQL-TEST-PLAN.md](BR17-SQL-TEST-PLAN.md).
+Không đánh dấu PASS_SQL_EXPIRY khi mới compile hoặc mock/schema-parser PASS.
+
+Điều kiện bật worker: D1-D6 + provisioning/migration quyền riêng; schema/EF/manifest đồng bộ;
+reader/POS/Admin/report và nghĩa vụ D4 đã đạt; trusted bank reference/watermark + SQL expiry,
+rollback, race hai chiều và cross-writer locks PASS; sink/reconciliation/monitoring sẵn sàng;
+deployment phê duyệt riêng mới bật process-local flags. Hiện mọi điều kiện kích hoạt còn khóa.
+
 > Rà soát UC06 đa hình thức, 2026-11-07: **vẫn PROPOSED / NOT APPROVED**. Không áp dụng up/down hoặc chạy worker. Bằng chứng outbox/HTTP Customer mới hơn nằm trong `artifacts/final-review/INTEGRATION-CLOSURE-V2.md` (88 assertions, fixture 14335), không chứng minh EXPIRED. Các câu lịch sử bên dưới về outbox chưa tích hợp phải đọc theo thời điểm của chúng. QR bàn/delivery mới chỉ chuẩn bị read-only; không mở writer hoặc thay đổi quyết định BR17. Checklist nghiệm thu hiện hành: `artifacts/final-review/REMAINING-ACCEPTANCE-CHECKLIST.md`.
 
 > Hồ sơ trình duyệt sau SQL fixture V2, 2026-11-07: **PROPOSED / NOT APPROVED**.
