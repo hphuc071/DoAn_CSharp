@@ -86,6 +86,26 @@ public sealed class BackendCreateSafetyTests
         Assert.Equal(0, monitor.Attempts);
     }
 
+    [Theory]
+    [InlineData("DINE_IN")] [InlineData("DELIVERY")] [InlineData("dine_in")] [InlineData("delivery")]
+    public async Task Fulfillment_preview_flags_never_unlock_create_or_open_sql(string method)
+    {
+        var monitor = new BlockSql();
+        await using var db = new CafeDbContext(new DbContextOptionsBuilder<CafeDbContext>()
+            .UseSqlServer("Server=forbidden.invalid;Database=NoDatabase;Integrated Security=true")
+            .AddInterceptors(monitor).Options);
+        var context = new DefaultHttpContext();
+        context.User = new(new ClaimsIdentity([new(ClaimTypes.NameIdentifier, "6")], "Offline"));
+        context.Request.Headers["Idempotency-Key"] = Guid.NewGuid().ToString();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> {
+            ["Orders:CustomerCreationEnabled"] = "true", ["Checkout:OrderCreationEnabled"] = "true",
+            ["Orders:FulfillmentPreviewEnabled"] = "true", ["Orders:TableQrProtocolValidated"] = "true",
+            ["Orders:DeliveryPolicy:Approved"] = "true" }).Build();
+        var result = await CustomerOrdersEndpoints.CreateAsync(Request() with { HinhThucNhanMon = method }, context, db, default, config);
+        Assert.Equal(503, ((IStatusCodeHttpResult)result).StatusCode);
+        Assert.Equal(0, monitor.Attempts); Assert.Empty(db.ChangeTracker.Entries());
+    }
+
     [Fact]
     public async Task Delivery_sql_store_rejects_all_calls_without_flags_before_opening_sql()
     {

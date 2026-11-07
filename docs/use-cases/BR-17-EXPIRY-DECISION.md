@@ -1,5 +1,7 @@
 # BR-17 — Biểu diễn hết hạn chờ thanh toán
 
+> Rà soát UC06 đa hình thức, 2026-11-07: **vẫn PROPOSED / NOT APPROVED**. Không áp dụng up/down hoặc chạy worker. Bằng chứng outbox/HTTP Customer mới hơn nằm trong `artifacts/final-review/INTEGRATION-CLOSURE-V2.md` (88 assertions, fixture 14335), không chứng minh EXPIRED. Các câu lịch sử bên dưới về outbox chưa tích hợp phải đọc theo thời điểm của chúng. QR bàn/delivery mới chỉ chuẩn bị read-only; không mở writer hoặc thay đổi quyết định BR17. Checklist nghiệm thu hiện hành: `artifacts/final-review/REMAINING-ACCEPTANCE-CHECKLIST.md`.
+
 > Hồ sơ trình duyệt sau SQL fixture V2, 2026-11-07: **PROPOSED / NOT APPROVED**.
 > Hồ sơ đề nghị phê duyệt đầu tài liệu là cập nhật hiện hành; các mục Phase 3/4/5 bên dưới giữ bối cảnh lịch sử.
 > V2 chứng minh payment/cancellation trực tiếp trên SQL, không chứng minh expiry hoặc migration.

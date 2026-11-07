@@ -51,7 +51,7 @@ public sealed partial class CheckoutBrowserTests : IAsyncLifetime
             else if (uri.Query.Contains("handler=Quote"))
                 await route.FulfillAsync(new() { ContentType = "application/json", Body = """{"tienHang":45000,"phiGiaoHang":0,"tongCong":45000}""" });
             else if (uri.AbsolutePath == "/Checkout" && route.Request.Method == "GET")
-                await route.FulfillAsync(new() { ContentType = "text/html", Body = html });
+                await route.FulfillAsync(new() { ContentType = "text/html; charset=utf-8", Body = html });
             else await route.AbortAsync();
         });
     }
