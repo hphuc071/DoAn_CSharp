@@ -6,6 +6,7 @@ using FourChang.Domain.Entities.Orders;
 using FourChang.Domain.Entities.Payments;
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
 
 namespace FourChang.Api.Features.Customer.Orders;
 
@@ -13,7 +14,7 @@ namespace FourChang.Api.Features.Customer.Orders;
 // Không thực hiện chi hoàn tiền ngân hàng; chỉ tạo HoSoHoanTien REQUESTED.
 public static class CustomerOrderCancellation
 {
-    public sealed record CancelRequest(string? Reason);
+    public sealed record CancelRequest(string? Reason, string? ExpectedVersion = null);
 
     public static void Map(WebApplication app)
     {
@@ -21,28 +22,51 @@ public static class CustomerOrderCancellation
            .RequireAuthorization("Customer");
     }
 
-    private static async Task<IResult> CancelAsync(
+    public static async Task<IResult> CancelAsync(
         long orderId,
         CancelRequest request,
         HttpContext context,
         CafeDbContext db,
-        CancellationToken ct)
+        CancellationToken ct,
+        IConfiguration configuration)
     {
+        // Fail before opening SQL, including manual API POST. Environment name never enables writes.
+        if (!OrderIntegrationSafety.Enabled(configuration, "CancellationEnabled"))
+            return Results.Json(new { code = "CANCELLATION_DISABLED" }, statusCode: 503);
         if (!long.TryParse(
                 context.User.FindFirstValue(ClaimTypes.NameIdentifier),
                 out var customerId) || customerId <= 0)
             return Results.Unauthorized();
 
         var reason = request.Reason?.Trim() ?? "";
-        if (orderId <= 0 || reason.Length < 3 || reason.Length > 400)
+        if (orderId <= 0 || reason.Length < 3 || reason.Length > 400 || reason.Any(char.IsControl) ||
+            !OrderIdempotency.TryReadKey(context, out var operation) ||
+            !OrderIntegrationSafety.ValidVersion(request.ExpectedVersion, out var expectedVersion))
             return Results.BadRequest(new
             {
-                message = "Lý do hủy phải có từ 3 đến 400 ký tự."
+                message = "Cần lý do 3–400 ký tự, Idempotency-Key GUID và ExpectedVersion rowversion hợp lệ."
             });
 
         // SERIALIZABLE + rowversion: các cập nhật đơn/kho/hoàn tiền cùng một giao dịch.
         await using var tx = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, ct);
+        var hash = OrderIntegrationSafety.Hash(new { orderId, request.Reason, request.ExpectedVersion });
+        if (!await OrderIntegrationSafety.LockAsync(db, tx, "4chang.order." + operation.ToString("N"), ct))
+            return Results.Conflict(new { code = "OPERATION_BUSY" });
+        var previous = await db.NhatKyHeThong.AsNoTracking().SingleOrDefaultAsync(x => x.MaThaoTac == operation, ct);
+        if (previous is not null)
+        {
+            if (previous.MaKhachHang != customerId || previous.HanhDong != "CANCEL_ORDER" ||
+                previous.MaDoiTuong != orderId.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
+                previous.MaBamYeuCau is null || !CryptographicOperations.FixedTimeEquals(previous.MaBamYeuCau, hash) ||
+                string.IsNullOrWhiteSpace(previous.KetQuaDaChotJson))
+                return Results.Conflict(new { code = "IDEMPOTENCY_CONFLICT" });
+            return Results.Content(previous.KetQuaDaChotJson, "application/json", statusCode: 200);
+        }
+        if (await db.ThanhToan.AnyAsync(x => x.MaThaoTac == operation, ct))
+            return Results.Conflict(new { code = "OPERATION_KEY_IN_USE" });
+        if (!await OrderIntegrationSafety.LockAsync(db, tx, "4chang.orderstate." + orderId, ct))
+            return Results.Conflict(new { code = "ORDER_BUSY" });
 
         var order = await db.DonHang.SingleOrDefaultAsync(x =>
             x.MaDonHang == orderId &&
@@ -51,6 +75,8 @@ public static class CustomerOrderCancellation
 
         if (order is null)
             return Results.NotFound(new { message = "Không tìm thấy đơn hàng." });
+        if (!order.PhienBanDuLieu.AsSpan().SequenceEqual(expectedVersion))
+            return Results.Conflict(new { code = "VERSION_CONFLICT", message = "Đơn đã thay đổi; tải lại trạng thái." });
 
         if (order.TrangThai != "PENDING_CONFIRMATION")
             return Results.Conflict(new
@@ -80,15 +106,12 @@ public static class CustomerOrderCancellation
         var holds = await db.GiuChoNguyenLieu
             .Where(x => detailIds.Contains(x.MaChiTietDonHang))
             .ToListAsync(ct);
+        if (holds.Count == 0 || detailIds.Any(id => !holds.Any(x => x.MaChiTietDonHang == id)) ||
+            holds.Any(x => x.TrangThai is not ("RESERVED" or "PARTIAL" or "RELEASED" or "EXPIRED")))
+            return Results.Conflict(new { code = "INVENTORY_RECONCILIATION_REQUIRED" });
 
         // All release checks and updates are shared with future expiration handling.
         // This method requires the caller's active SERIALIZABLE transaction.
-        var now = DateTime.UtcNow;
-        var releaseError = await OrderInventoryRelease.ReleaseAllUnconsumedAsync(
-            db, holds, "RELEASED", now, ct);
-        if (releaseError is not null)
-            return Results.Conflict(new { message = releaseError });
-
         var payments = await db.ThanhToan
             .Where(x => x.MaDonHang == orderId)
             .ToListAsync(ct);
@@ -104,7 +127,11 @@ public static class CustomerOrderCancellation
                 message = "Đơn đã có hồ sơ hoàn tiền; cần đối soát trước khi hủy."
             });
 
-        var groupId = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+        var releaseError = await OrderInventoryRelease.ReleaseAllUnconsumedAsync(db, holds, "RELEASED", now, ct);
+        if (releaseError is not null) return Results.Conflict(new { message = releaseError });
+
+        var groupId = operation;
         var originalStatus = order.TrangThai;
         var originalShippingFee = order.PhiGiaoHangHienTai;
 
@@ -163,10 +190,17 @@ public static class CustomerOrderCancellation
         order.PhiGiaoHangHienTai = 0m;
         order.HoanTatLuc = now;
 
-        db.NhatKyHeThong.Add(new NhatKyHeThong
+        var receipt = new
+        {
+            maDonHang = orderId, trangThai = "CANCELLED", soTienDeNghiHoan = refundRequested,
+            thongBao = "Đã hủy và ghi nhận nghĩa vụ hoàn nếu có; chưa thực hiện chi hoàn."
+        };
+        db.NhatKyHeThong.Add(OrderAuditOutbox.Stamp(new NhatKyHeThong
         {
             MaLienKetXuLy = groupId,
-            MaThaoTac = Guid.NewGuid(),
+            MaThaoTac = operation,
+            MaBamYeuCau = hash,
+            KetQuaDaChotJson = JsonSerializer.Serialize(receipt),
             LoaiTacNhan = "CUSTOMER",
             MaKhachHang = customerId,
             TenNguoiThucHienDaChot = context.User.Identity?.Name
@@ -186,19 +220,11 @@ public static class CustomerOrderCancellation
             LyDo = reason,
             KetQua = "SUCCESS",
             PhatSinhLuc = now
-        });
+        }));
 
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        return Results.Ok(new
-        {
-            maDonHang = orderId,
-            trangThai = "CANCELLED",
-            soTienDeNghiHoan = refundRequested,
-            thongBao = refundRequested > 0
-                ? "Đã hủy đơn và tạo yêu cầu hoàn tiền; chưa thực hiện chi hoàn."
-                : "Đã hủy đơn và giải phóng nguyên liệu đang giữ."
-        });
+        return Results.Ok(receipt);
     }
 }

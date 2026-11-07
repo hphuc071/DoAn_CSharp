@@ -30,6 +30,14 @@ try
     builder.Services.AddScoped<CustomerAccountService>();
     builder.Services.AddScoped<CustomerAccessService>();
     builder.Services.AddScoped<CustomerSelfService>();
+    builder.Services.AddScoped<ICustomerOrderReader, CustomerOrderReader>();
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddScoped<FourChang.Api.Features.Customer.Payments.SqlBankPaymentService>();
+    builder.Services.AddSingleton<IExpiryBankReconciliation, UnavailableExpiryBankReconciliation>();
+    builder.Services.AddScoped<SqlOrderExpiryWorker>(); // Explicit invocation only; never AddHostedService.
+    builder.Services.AddSingleton<IInvoiceDocumentSource, UnavailableInvoiceDocumentSource>();
+    builder.Services.AddSingleton<FourChang.Api.Features.Customer.Payments.IPaymentVerificationSource,
+        FourChang.Api.Features.Customer.Payments.UnavailablePaymentVerificationSource>();
     builder.Services.AddScoped<AdminAccountService>();
     builder.Services.AddScoped<PosDeviceService>();
     builder.Services.AddAuthentication("Session").AddScheme<AuthenticationSchemeOptions,SessionAuthentication>("Session",_=>{});
@@ -45,6 +53,8 @@ try
         catch(Exception exception){app.Logger.LogError(exception,"Lỗi xử lý yêu cầu {Path}",context.Request.Path);await Problem(context,500,"Không thể xử lý yêu cầu. Vui lòng thử lại.");}
     });
     app.UseRateLimiter();app.UseAuthentication();app.UseAuthorization();
+    app.MapCustomerOrderDetails();
+    app.MapCustomerInvoiceDocuments();
     app.MapGet("/health/live",()=>Results.Ok(new{status="ok"}));
     app.MapGet("/health/ready",async(CafeDbContext db)=>
     {

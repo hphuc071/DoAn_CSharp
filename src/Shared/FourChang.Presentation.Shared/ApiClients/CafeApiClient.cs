@@ -7,9 +7,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 namespace FourChang.Presentation.Shared.ApiClients;
 
-public sealed class CafeApiException(string message, System.Net.HttpStatusCode? statusCode = null) : Exception(message)
+public sealed class CafeApiException(string message, System.Net.HttpStatusCode? statusCode = null, string? code = null) : Exception(message)
 {
     public System.Net.HttpStatusCode? StatusCode { get; } = statusCode;
+    public string? Code { get; } = code;
 }
 public sealed partial class CafeApiClient(HttpClient http)
 {
