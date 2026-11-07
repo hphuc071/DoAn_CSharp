@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using FourChang.Domain.Entities.Inventory;
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -82,6 +83,10 @@ public sealed class SqlOrderExpiryWorker(CafeDbContext db, IConfiguration config
             var holds = await db.GiuChoNguyenLieu.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync(ct);
             if (holds.Count == 0 || ids.Any(id => !holds.Any(x => x.MaChiTietDonHang == id)))
             { results.Add("EXPIRY_HOLDS_REQUIRED"); break; }
+            // SQL CHECKs bound quantities but do not tie terminal hold status to released
+            // quantity. Match the existing lifecycle planner; never release inconsistent rows.
+            if (holds.Any(x => !HoldReady(x)))
+            { results.Add("EXPIRY_INVENTORY_CONFLICT"); break; }
             now = clock.GetUtcNow().UtcDateTime;
             var released = await OrderInventoryRelease.ReleaseAllUnconsumedAsync(db, holds, "EXPIRED", now, ct);
             if (released is not null) { results.Add("EXPIRY_INVENTORY_CONFLICT"); break; }
@@ -98,6 +103,12 @@ public sealed class SqlOrderExpiryWorker(CafeDbContext db, IConfiguration config
         return results;
     }
 
+    internal static bool HoldReady(GiuChoNguyenLieu hold) =>
+        hold.SoLuongGiuCho >= 0m && hold.SoLuongDaTieuHao == 0m &&
+        hold.SoLuongDaGiaiPhong >= 0m && hold.SoLuongDaGiaiPhong <= hold.SoLuongGiuCho &&
+        (hold.TrangThai is "RESERVED" or "PARTIAL" or "RELEASED" or "EXPIRED") &&
+        (hold.TrangThai is not ("RELEASED" or "EXPIRED") || hold.SoLuongDaGiaiPhong == hold.SoLuongGiuCho);
+
     private async Task<bool> SchemaReadyAsync(CancellationToken ct)
     {
         await db.Database.OpenConnectionAsync(ct);
@@ -112,11 +123,13 @@ public sealed class SqlOrderExpiryWorker(CafeDbContext db, IConfiguration config
     public static bool IsApprovedConstraint(string? definition)
     {
         if (definition is null) return false;
-        var normalized = Regex.Replace(definition, @"[\s\[\]\(\)]", "").ToUpperInvariant();
-        var tokens = Regex.Matches(normalized, "'([^']*)'").Select(x => x.Groups[1].Value).ToArray();
+        // Literal values must be checked BEFORE removing SQL formatting. Otherwise
+        // 'E X P I R E D' or 'EX[PIRED]' could masquerade as the approved status.
+        var tokens = Regex.Matches(definition, "'([^']*)'").Select(x => x.Groups[1].Value).ToArray();
         var expected = FourChang.Presentation.Shared.Contracts.Customer.CustomerOrderStates.Orders.Append("EXPIRED").ToHashSet(StringComparer.Ordinal);
         if (tokens.Length != expected.Count || !tokens.ToHashSet(StringComparer.Ordinal).SetEquals(expected)) return false;
-        var shape = Regex.Replace(normalized, "'[^']*'", "VALUE");
+        var shape = Regex.Replace(Regex.Replace(definition, "'[^']*'", "VALUE"),
+            @"[\s\[\]\(\)]", "").ToUpperInvariant();
         return Regex.IsMatch(shape, @"\ATRANGTHAIINVALUE(?:,VALUE){11}\z") ||
             Regex.IsMatch(shape, @"\ATRANGTHAI=VALUE(?:ORTRANGTHAI=VALUE){11}\z");
     }

@@ -13,18 +13,30 @@ DECLARE @definition nvarchar(max) = (SELECT definition FROM sys.check_constraint
     WHERE parent_object_id=OBJECT_ID(N'dbo.DonHang') AND name=N'CK_DonHang_7'
     AND is_disabled=0 AND is_not_trusted=0);
 IF @definition IS NULL THROW 51202, 'Expected visible/trusted status constraint not found.', 1;
-DECLARE @shape nvarchar(max) = UPPER(@definition);
-SET @shape=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-    @shape,N' ',N''),N'[',N''),N']',N''),N'(',N''),N')',N''),CHAR(9),N''),CHAR(13),N''),CHAR(10),N'');
+-- Strip formatting only OUTSIDE quoted literals. Never approve a different value
+-- such as 'E X P I R E D', 'EX[PIRED]' or 'EXPIRED ' by normalizing its text.
+DECLARE @shape nvarchar(max) = N'', @position int = 1, @quoted bit = 0,
+    @character nchar(1);
+WHILE @position <= LEN(@definition)
+BEGIN
+    SET @character = SUBSTRING(@definition,@position,1);
+    IF @character=N'''' SET @quoted=CASE WHEN @quoted=0 THEN 1 ELSE 0 END;
+    IF @quoted=1 OR @character=N''''
+        SET @shape+=@character;
+    ELSE IF @character NOT IN (N' ',N'[',N']',N'(',N')',NCHAR(9),NCHAR(13),NCHAR(10))
+        SET @shape+=UPPER(@character);
+    SET @position+=1;
+END;
+IF @quoted<>0 THROW 51205, 'Unbalanced status literal. Stop for review.', 1;
 IF LEFT(@shape,11)=N'TRANGTHAIIN' SET @shape=SUBSTRING(@shape,12,LEN(@shape));
 ELSE SET @shape=REPLACE(REPLACE(@shape,N'TRANGTHAI=',N''),N'OR',N',');
 DECLARE @expected TABLE (status nvarchar(40) PRIMARY KEY);
 INSERT INTO @expected(status) VALUES (N'DRAFT'),(N'PENDING_PAYMENT'),(N'PENDING_CONFIRMATION'),(N'ACCEPTED'),(N'PREPARING'),(N'READY'),(N'DELIVERING'),(N'COMPLETED'),(N'REJECTED'),(N'CANCELLED'),(N'DELIVERY_FAILED'),(N'EXPIRED');
 IF (SELECT COUNT(*) FROM STRING_SPLIT(@shape,N',')) <> (SELECT COUNT(*) FROM @expected)
     OR EXISTS (SELECT 1 FROM STRING_SPLIT(@shape,N',') s
-        WHERE NOT EXISTS (SELECT 1 FROM @expected e WHERE s.value=N''''+e.status+N''''))
+        WHERE NOT EXISTS (SELECT 1 FROM @expected e WHERE s.value COLLATE Latin1_General_100_BIN2=(N''''+e.status+N'''') COLLATE Latin1_General_100_BIN2))
     OR EXISTS (SELECT 1 FROM @expected e
-        WHERE NOT EXISTS (SELECT 1 FROM STRING_SPLIT(@shape,N',') s WHERE s.value=N''''+e.status+N''''))
+        WHERE NOT EXISTS (SELECT 1 FROM STRING_SPLIT(@shape,N',') s WHERE s.value COLLATE Latin1_General_100_BIN2=(N''''+e.status+N'''') COLLATE Latin1_General_100_BIN2))
     THROW 51205, 'Status CHECK differs from the reviewed baseline. Stop for review.', 1;
 BEGIN TRY
     BEGIN TRANSACTION;

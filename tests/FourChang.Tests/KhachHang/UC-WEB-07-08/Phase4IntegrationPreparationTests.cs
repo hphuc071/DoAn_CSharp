@@ -86,6 +86,37 @@ public sealed class Phase4IntegrationPreparationTests
         Assert.False(SqlOrderExpiryWorker.IsApprovedConstraint(null));
     }
 
+    [Theory]
+    [InlineData("E X P I R E D")]
+    [InlineData("EX[PIRED]")]
+    [InlineData("EX(PIRED)")]
+    [InlineData("EXPIRED ")]
+    [InlineData("expired")]
+    public void Expiry_schema_guard_preserves_literal_values_when_removing_sql_formatting(string drift)
+    {
+        var states = CustomerOrderStates.Orders.Append(drift);
+        var sql = "([TrangThai] IN (" + string.Join(",", states.Select(x => "'" + x + "'")) + "))";
+        Assert.False(SqlOrderExpiryWorker.IsApprovedConstraint(sql));
+        Assert.False(SqlOrderExpiryWorker.IsApprovedConstraint(string.Join(" OR ", states.Select(x => "[TrangThai]='" + x + "'"))));
+    }
+
+    [Theory]
+    [InlineData("RESERVED", 0, true)]
+    [InlineData("PARTIAL", 4, true)]
+    [InlineData("CONSUMED", 0, false)]
+    [InlineData("RELEASED", 4, false)]
+    [InlineData("EXPIRED", 4, false)]
+    [InlineData("EXPIRED", 10, true)]
+    public void Sql_expiry_rejects_inconsistent_terminal_holds_before_release(string status, int released, bool expected)
+    {
+        var hold = new FourChang.Domain.Entities.Inventory.GiuChoNguyenLieu
+        {
+            TrangThai = status, SoLuongGiuCho = 10, SoLuongDaGiaiPhong = released, SoLuongDaTieuHao = 0
+        };
+        Assert.Equal(expected, SqlOrderExpiryWorker.HoldReady(hold));
+        Assert.Equal(released, hold.SoLuongDaGiaiPhong); // Validation never mutates the row.
+    }
+
     [Fact]
     public void Reader_compatibility_is_opt_in_and_does_not_approve_a_write_mapping()
     {
