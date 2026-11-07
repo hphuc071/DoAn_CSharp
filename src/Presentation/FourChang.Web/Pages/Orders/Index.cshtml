@@ -1,258 +1,49 @@
-
 @page "/Orders"
 @model FourChang.Web.Pages.Orders.IndexModel
-
-@{
-    ViewData["Title"] = "Đơn của tôi";
-}
-
-<div class="page-heading">
-    <div>
-        <span class="eyebrow">UC-WEB-08</span>
-        <h1>Đơn hàng của tôi</h1>
-        <p class="muted">
-            Theo dõi tiến trình xử lý đơn hàng của bạn.
-        </p>
-    </div>
-
-    <a href="/" class="button primary">
-        Xem thực đơn
-    </a>
-</div>
-
+@using FourChang.Presentation.Shared.Contracts.Customer
+@{ ViewData["Title"] = "Đơn hàng của tôi"; }
+<div class="page-heading"><h1>Đơn hàng của tôi</h1><a href="/" class="button secondary">Thực đơn</a></div>
 <section class="panel">
-
-    <h2>Danh sách đơn hàng</h2>
-
-    <p id="orders-refresh-status"
-       class="muted"
-       role="status">
-        Đang kiểm tra trạng thái đơn hàng...
-    </p>
-
-    <div id="orders-list">
-
-        @if (Model.Error is not null)
+    <p id="order-snapshot-connection" role="status" hidden></p>
+    <form method="get" asp-page="/Orders/Index">
+        <label>Trạng thái <select asp-for="Status"><option value="">Tất cả</option>
+            @foreach (var state in CustomerOrderStates.Orders) { <option value="@state">@state</option> }
+            @if (Model.ExpiryReadEnabled) { <option value="EXPIRED">EXPIRED</option> }
+        </select></label>
+        <label>Từ thời điểm (UTC) <input asp-for="FromUtc" type="datetime-local" /></label>
+        <label>Đến trước thời điểm (UTC) <input asp-for="ToUtc" type="datetime-local" /></label>
+        <button class="button primary" type="submit">Lọc / Tải lại</button>
+        <a asp-page="/Orders/Index">Bỏ lọc</a>
+    </form>
+    <p class="muted">Snapshot tại thời điểm tải, không cập nhật trực tiếp. Bấm tải lại để xem trạng thái mới; mở lại trang không tạo giao dịch.</p>
+    @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
+    @if (Model.Snapshot is { } snapshot)
+    {
+        <div data-order-private>
+        <p role="status">Cập nhật UTC: @snapshot.SnapshotUtc.ToString("u") · @snapshot.TotalCount đơn phù hợp</p>
+        @if (snapshot.Items.Count == 0) { <p>Chưa có đơn phù hợp với bộ lọc.</p> }
+        @foreach (var order in snapshot.Items)
         {
-            <p role="alert">@Model.Error</p>
+            <article class="line-item"><div>
+                <h2><a asp-page="/Orders/Details" asp-route-orderId="@order.Id" asp-route-ReturnPage="@Model.PageNumber"
+                       asp-route-ReturnStatus="@Model.Status" asp-route-ReturnFromUtc="@(Model.FromUtc?.ToString("O"))"
+                       asp-route-ReturnToUtc="@(Model.ToUtc?.ToString("O"))">@order.Code</a></h2>
+                <p>@order.Status · @order.Fulfilment</p>
+                <p>Tạo UTC: @order.CreatedUtc.ToString("u") · Cập nhật UTC: @order.UpdatedUtc.ToString("u")</p>
+            </div></article>
         }
-        else if (Model.Orders.Count == 0)
-        {
-            <div class="empty-state">
-                <h3>Chưa có đơn hàng</h3>
-                <p>
-                    Các đơn hàng của bạn sẽ xuất hiện tại đây.
-                </p>
-                <a href="/" class="button secondary">
-                    Chọn món ngay
-                </a>
-            </div>
-        }
-        else
-        {
-            foreach (var order in Model.Orders)
-            {
-                <article class="line-item">
-                    <div class="item-content">
-                        <h3>
-                            Đơn hàng
-                            @(order.GetProperty("maDonHienThi").GetString())
-                        </h3>
-
-                        <p>
-                            Trạng thái:
-                            <strong>
-                                @(order.GetProperty("trangThai").GetString())
-                            </strong>
-                        </p>
-                    </div>
-                </article>
+        <nav aria-label="Phân trang đơn hàng">
+            @if (snapshot.Page > 1) {
+                <a asp-page="/Orders/Index" asp-route-PageNumber="@(snapshot.Page - 1)" asp-route-Status="@Model.Status"
+                   asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))">Trang trước</a>
             }
-        }
-
-    </div>
-
-    <p class="fine-print">
-        Trạng thái được đồng bộ định kỳ từ hệ thống.
-        Việc xác nhận thanh toán và hủy đơn
-        phải được xử lý tại Backend.
-    </p>
-
+            <span>Trang @snapshot.Page</span>
+            @if ((long)snapshot.Page * snapshot.PageSize < snapshot.TotalCount) {
+                <a asp-page="/Orders/Index" asp-route-PageNumber="@(snapshot.Page + 1)" asp-route-Status="@Model.Status"
+                   asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))">Trang sau</a>
+            }
+        </nav>
+        </div>
+    }
 </section>
-
-<form id="orders-cancel-antiforgery" method="post" hidden>
-    @Html.AntiForgeryToken()
-</form>
-
-@section Scripts {
-<script>
-(() => {
-    "use strict";
-
-    const list = document.getElementById("orders-list");
-    const status = document.getElementById(
-        "orders-refresh-status"
-    );
-
-    if (!list || !status) return;
-
-    let loading = false;
-    let stopped = false;
-
-    function createText(tag, value, className = "") {
-        const element = document.createElement(tag);
-
-        element.textContent = value;
-
-        if (className) {
-            element.className = className;
-        }
-
-        return element;
-    }
-
-    function renderOrders(orders) {
-        const fragment = document.createDocumentFragment();
-
-        if (orders.length === 0) {
-            const empty = document.createElement("div");
-            empty.className = "empty-state";
-
-            empty.append(
-                createText("h3", "Chưa có đơn hàng"),
-                createText(
-                    "p",
-                    "Các đơn hàng của bạn sẽ xuất hiện tại đây."
-                )
-            );
-
-            fragment.append(empty);
-        }
-
-        orders.forEach(order => {
-            const article = document.createElement("article");
-            article.className = "line-item";
-            article.dataset.orderId = String(order.maDonHang);
-            article.dataset.orderStatus = String(order.trangThai || "");
-
-            const content = document.createElement("div");
-            content.className = "item-content";
-
-            const orderCode =
-                order.maDonHienThi ||
-                order.maDonHang ||
-                "Chưa có mã";
-
-            content.append(
-                createText(
-                    "h3",
-                    "Đơn hàng " + orderCode
-                ),
-                createText(
-                    "p",
-                    "Trạng thái: " +
-                    (order.trangThai || "Chưa xác định")
-                ),
-                createText(
-                    "p",
-                    "Hình thức nhận: " +
-                    (order.hinhThucNhanMon || "Chưa xác định"),
-                    "muted"
-                )
-            );
-
-            article.append(content);
-            fragment.append(article);
-        });
-
-        // Thay thế danh sách cũ, không tạo đơn trùng.
-        list.replaceChildren(fragment);
-    }
-
-    async function refreshOrders() {
-        if (loading || stopped || document.hidden) return;
-
-        loading = true;
-
-        try {
-            const response = await fetch(
-                "/Orders?handler=Status",
-                {
-                    credentials: "same-origin",
-                    cache: "no-store",
-                    headers: {
-                        Accept: "application/json"
-                    }
-                }
-            );
-
-            if (response.status === 401 ||
-                response.status === 403) {
-                stopped = true;
-
-                status.textContent =
-                    "Phiên đăng nhập đã hết hạn. " +
-                    "Vui lòng đăng nhập lại.";
-
-                return;
-            }
-
-            if (!response.ok) {
-                throw new Error(
-                    "HTTP " + response.status
-                );
-            }
-
-            const orders = await response.json();
-
-            if (!Array.isArray(orders)) {
-                throw new Error("Dữ liệu không hợp lệ.");
-            }
-
-            renderOrders(orders);
-
-            status.textContent =
-                "Cập nhật lúc " +
-                new Date().toLocaleTimeString("vi-VN") +
-                " · Tự động kiểm tra mỗi 15 giây";
-
-        } catch (error) {
-            console.error(
-                "Không thể cập nhật đơn hàng:",
-                error
-            );
-
-            status.textContent =
-                "Không thể cập nhật trạng thái. " +
-                "Đang giữ dữ liệu lần gần nhất.";
-        } finally {
-            loading = false;
-        }
-    }
-
-    // Tải trạng thái khi mở trang.
-    refreshOrders();
-
-    // Cập nhật định kỳ.
-    const timer = setInterval(refreshOrders, 15000);
-
-    // Khi quay lại tab trình duyệt.
-    document.addEventListener(
-        "visibilitychange",
-        () => {
-            if (!document.hidden) {
-                refreshOrders();
-            }
-        }
-    );
-
-    // Dừng kiểm tra khi rời trang.
-    window.addEventListener(
-        "pagehide",
-        () => clearInterval(timer),
-        { once: true }
-    );
-})();
-</script>
-<script src="~/js/orders-cancel.js" asp-append-version="true"></script>
-}
+@section Scripts { <script src="~/js/order-snapshot.js" asp-append-version="true"></script> }

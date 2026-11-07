@@ -4,6 +4,7 @@ using Microsoft.Extensions.FileProviders;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddCustomerServices();
+builder.Services.AddSingleton<IPaymentQrSource, UnavailablePaymentQrSource>();
 var app = builder.Build();
 app.UseStaticFiles();
 var assets = Path.Combine(AppContext.BaseDirectory,"Assets");
