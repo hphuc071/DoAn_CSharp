@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.EntityFrameworkCore;
@@ -8,12 +10,26 @@ public static class CatalogEndpoints
 {
     public static void MapCatalog(this WebApplication app)
     {
-        app.MapGet("/api/menu", async (CafeDbContext db) =>
+        app.MapGet("/api/menu", async (
+            string? q,
+            string? category,
+            decimal? minPrice,
+            decimal? maxPrice,
+            bool? availableOnly,
+            string? sort,
+            CafeDbContext db) =>
         {
+            if ((minPrice.HasValue && minPrice.Value < 0) ||
+                (maxPrice.HasValue && maxPrice.Value < 0) ||
+                (minPrice.HasValue && maxPrice.HasValue && minPrice.Value > maxPrice.Value))
+            {
+                return Results.Problem(detail: "Khoảng giá lọc không hợp lệ.", statusCode: 400);
+            }
+
             var variants = await (
                 from v in db.CauHinhMon.AsNoTracking()
-                join m in db.Mon on v.MaMon equals m.MaMon
-                join c in db.DanhMucMon on m.MaDanhMuc equals c.MaDanhMuc
+                join m in db.Mon.AsNoTracking() on v.MaMon equals m.MaMon
+                join c in db.DanhMucMon.AsNoTracking() on m.MaDanhMuc equals c.MaDanhMuc
                 where m.DaCongBo && c.DaCongBo && c.DangSuDung
                 select new
                 {
@@ -36,7 +52,7 @@ public static class CatalogEndpoints
             var requirements = await db.ChiTietCongThuc.AsNoTracking().ToListAsync();
             var stocks = await (
                 from n in db.NguyenLieu.AsNoTracking()
-                join t in db.TonKho on n.MaNguyenLieu equals t.MaNguyenLieu
+                join t in db.TonKho.AsNoTracking() on n.MaNguyenLieu equals t.MaNguyenLieu
                 select new { n.MaNguyenLieu, n.DangSuDung, Available = t.TonThucTe - t.TongGiuCho - n.TonAnToan }
             ).ToDictionaryAsync(x => x.MaNguyenLieu);
             var choices = await db.TuyChonPhaCheHopLe.AsNoTracking().Where(x => x.DangSuDung).ToListAsync();
@@ -56,17 +72,59 @@ public static class CatalogEndpoints
                     }));
             }
 
-            return variants.GroupBy(x => x.MaMon).OrderBy(g => g.First().ThuTuHienThi).Select(g =>
+            var completedCounts = await (
+                from d in db.ChiTietDonHang.AsNoTracking()
+                join o in db.DonHang.AsNoTracking() on d.MaDonHang equals o.MaDonHang
+                join v in db.CauHinhMon.AsNoTracking() on d.MaCauHinhMon equals v.MaCauHinhMon
+                where o.TrangThai == "COMPLETED"
+                group d by v.MaMon into g
+                select new { MaMon = g.Key, SoldQty = g.Sum(x => x.SoLuongDat) }
+            ).ToDictionaryAsync(x => x.MaMon, x => x.SoldQty);
+
+            var products = variants.GroupBy(x => x.MaMon).OrderBy(g => g.First().ThuTuHienThi).Select(g =>
             {
                 var item = g.OrderBy(x => x.KichCo == "M" ? 0 : 1).ThenBy(x => x.NhietDo == "ICED" ? 0 : 1).First();
-                var available = item.Enabled && Available(item.MaCauHinhMon);
+                var available = g.Any(v => v.Enabled && Available(v.MaCauHinhMon));
                 var image = int.TryParse(item.DuongDanAnh?.Replace("sprite:", "", StringComparison.Ordinal), out var index) ? index : 0;
                 return new MenuProduct(item.MaCauHinhMon, item.MaMon, item.TenMon, item.TenDanhMuc, item.GiaBan, image, available, available ? "" : "Tạm hết");
-            });
+            }).ToList();
+
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                var normCat = NormalizeVietnamese(category);
+                products = products.Where(p => NormalizeVietnamese(p.Category) == normCat).ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var normQuery = NormalizeVietnamese(q);
+                products = products.Where(p =>
+                    NormalizeVietnamese(p.Name).Contains(normQuery, StringComparison.Ordinal) ||
+                    NormalizeVietnamese(p.Category).Contains(normQuery, StringComparison.Ordinal)).ToList();
+            }
+
+            if (minPrice.HasValue) products = products.Where(p => p.Price >= minPrice.Value).ToList();
+            if (maxPrice.HasValue) products = products.Where(p => p.Price <= maxPrice.Value).ToList();
+            if (availableOnly == true) products = products.Where(p => p.Available).ToList();
+
+            products = (sort?.ToLowerInvariant()) switch
+            {
+                "price_asc" => products.OrderBy(p => p.Price).ToList(),
+                "price_desc" => products.OrderByDescending(p => p.Price).ToList(),
+                "bestseller" => products.OrderByDescending(p => completedCounts.GetValueOrDefault(p.MaMon, 0)).ThenBy(p => p.MaMon).ToList(),
+                "newest" => products.OrderByDescending(p => p.MaMon).ToList(),
+                _ => products
+            };
+
+            return Results.Ok(products);
         });
 
         app.MapGet("/api/menu/{product:long}/variants", async (long product, CafeDbContext db) =>
         {
+            var mon = await db.Mon.AsNoTracking().FirstOrDefaultAsync(m => m.MaMon == product);
+            if (mon is null || !mon.DaCongBo || !mon.DangBan)
+                return Results.Problem(detail: "Món hiện ngừng phục vụ.", statusCode: 404);
+
             var now = DateTime.UtcNow;
             var variants = await db.CauHinhMon.AsNoTracking()
                 .Where(x => x.MaMon == product && x.DangBan)
@@ -116,19 +174,33 @@ public static class CatalogEndpoints
                     }));
             }
 
-            return variants.Select(v => new MenuVariantItem(
+            return Results.Ok(variants.Select(v => new MenuVariantItem(
                 v.MaCauHinhMon,
                 v.KichCo,
                 v.NhietDo,
                 v.GiaBan,
                 IsVariantAvailable(v.MaCauHinhMon),
                 choices.Where(c => c.MaCauHinhMon == v.MaCauHinhMon)
+                       .Where(c => !string.Equals(v.NhietDo, "HOT", StringComparison.OrdinalIgnoreCase) || c.PhanTramDa == 0)
                        .Select(c => new MenuBrewOption(c.PhanTramDuong, c.PhanTramDa))
                        .ToList(),
                 toppings.Where(t => t.MaCauHinhMon == v.MaCauHinhMon)
                         .Select(t => new MenuToppingItem(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMoiLy, true))
                         .ToList()
-            )).ToList();
+            )).ToList());
         });
+    }
+
+    private static string NormalizeVietnamese(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        var normalized = input.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(normalized.Length);
+        foreach (var c in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c is 'đ' or 'Đ' ? 'd' : c);
+        }
+        return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 }

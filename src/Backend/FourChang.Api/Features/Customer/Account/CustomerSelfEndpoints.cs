@@ -1,3 +1,4 @@
+using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;
 namespace FourChang.Api.Features.Customer.Account;
 
@@ -14,5 +15,6 @@ public static class CustomerSelfEndpoints
         group.MapPost("/addresses/{id:long}/remove", (long id, RemoveSelfAddress i, HttpContext c, CustomerSelfService s) => s.Remove(id, i, c));
         group.MapPost("/password", (ChangeSelfPassword i, HttpContext c, CustomerSelfService s) => s.Password(i, c));
         app.MapGet("/api/customer/account/operations/{id:guid}", (Guid id, HttpContext c, CustomerSelfService s) => s.Operation(id, c));
+        app.MapPost("/api/auth/customer/logout", (HttpContext c, CafeDbContext db) => new CustomerAccessService(db).Logout(c));
     }
 }

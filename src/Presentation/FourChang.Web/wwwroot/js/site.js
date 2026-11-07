@@ -32,10 +32,48 @@
         variants: []
     };
 
+    // UC-WEB-04 (Nhánh A2 & BR-11): Khóa Size/Nhiệt độ tạm hết hàng và khóa Đá = 0% khi chọn Nóng
+    function syncVariantAvailabilityUI() {
+        const rows = $$('.customizer .option-row');
+        if (rows.length < 4) return;
+
+        const sizeBtns = $$('button', rows[0]);
+        const tempBtns = $$('button', rows[1]);
+        const iceBtns = $$('button', rows[3]);
+
+        if (activeProduct.variants.length > 0) {
+            sizeBtns.forEach(btn => {
+                const s = btn.textContent.trim();
+                const hasAvailable = activeProduct.variants.some(v => v.kichCo === s && v.available !== false);
+                btn.disabled = !hasAvailable;
+                btn.title = hasAvailable ? '' : 'Size này tạm hết hàng';
+                if (!hasAvailable && btn.classList.contains('selected')) {
+                    btn.classList.remove('selected');
+                }
+            });
+            if (!rows[0].querySelector('button.selected') && sizeBtns.some(b => !b.disabled)) {
+                sizeBtns.find(b => !b.disabled).classList.add('selected');
+            }
+        }
+
+        const tempLabel = rows[1]?.querySelector('button.selected')?.textContent.trim() || 'Lạnh';
+        const isHot = tempLabel.includes('Nóng');
+        if (isHot) {
+            iceBtns.forEach(btn => {
+                const isZero = parseInt(btn.textContent, 10) === 0;
+                btn.disabled = !isZero;
+                btn.classList.toggle('selected', isZero);
+            });
+        } else {
+            iceBtns.forEach(btn => btn.disabled = false);
+        }
+    }
+
     $$('[data-choice]').forEach(group => group.addEventListener('click', e => {
         const button = e.target.closest('button');
-        if (!button) return;
+        if (!button || button.disabled) return;
         $$('button', group).forEach(b => b.classList.toggle('selected', b === button));
+        syncVariantAvailabilityUI();
         updateCustomizerPrice();
         renderMenuSidebarSummary();
     }));
@@ -61,9 +99,9 @@
         const tempLabel = rows[1]?.querySelector('button.selected')?.textContent.trim() || 'Lạnh';
         const temp = tempLabel.includes('Nóng') ? 'HOT' : 'ICED';
         const sugar = parseInt(rows[2]?.querySelector('button.selected')?.textContent || '50', 10);
-        const ice = parseInt(rows[3]?.querySelector('button.selected')?.textContent || '50', 10);
+        const ice = temp === 'HOT' ? 0 : parseInt(rows[3]?.querySelector('button.selected')?.textContent || '50', 10);
         const toppingName = $('.customizer .topping-options button.selected')?.textContent.trim() || 'Không';
-        const toppingServings = Math.Clamp ? Math.Clamp(Number($('.customizer input[type="number"]')?.value || 1), 1, 2) : Math.max(1, Math.min(2, Number($('.customizer input[type="number"]')?.value || 1)));
+        const toppingServings = Math.max(1, Math.min(2, Number($('.customizer input[type="number"]')?.value || 1)));
         const note = $('.customizer textarea')?.value.trim() || '';
         const qty = Number($('#quantity')?.textContent || 1);
 
@@ -132,6 +170,7 @@
             const res = await fetch(`/api/menu/${activeProduct.maMon}/variants`);
             if (res.ok) activeProduct.variants = await res.json();
         } catch { }
+        syncVariantAvailabilityUI();
         updateCustomizerPrice();
         toast('Đang tùy chỉnh món ' + activeProduct.name);
     }));
@@ -301,12 +340,13 @@
         }
     }
 
+    // UC-WEB-04 (Bước 3 & Bước 4): Tìm kiếm tiếng Việt không dấu (BR-31), lọc và sắp xếp
     const search = $('#menu-search');
     if (search) {
         let category = 'Tất cả';
         const cards = $$('.product-card');
         function filter() {
-            const normalize = s => s.toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+            const normalize = s => (s || '').toLocaleLowerCase('vi').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
             const keyword = normalize(search.value);
             const price = $('#price-filter').value;
             let count = 0;
@@ -332,12 +372,20 @@
         });
         $('#reset-filter').addEventListener('click', () => {
             search.value = ''; category = 'Tất cả'; $('#price-filter').value = 'all'; $('#stock-filter').value = 'all';
+            if ($('#menu-sort')) $('#menu-sort').value = 'default';
             $$('button', $('#categories')).forEach((x, i) => x.classList.toggle('selected', i === 0));
             $('#product-grid').hidden = false; filter();
         });
         $('#menu-sort').addEventListener('change', e => {
+            const mode = e.target.value;
             const sorted = [...cards];
-            if (e.target.value !== 'default') sorted.sort((a, b) => (Number(a.dataset.price) - Number(b.dataset.price)) * (e.target.value === 'asc' ? 1 : -1));
+            if (mode === 'asc' || mode === 'desc') {
+                sorted.sort((a, b) => (Number(a.dataset.price) - Number(b.dataset.price)) * (mode === 'asc' ? 1 : -1));
+            } else if (mode === 'newest') {
+                sorted.sort((a, b) => Number(b.dataset.mamon || 0) - Number(a.dataset.mamon || 0));
+            } else if (mode === 'bestseller') {
+                sorted.sort((a, b) => Number(a.dataset.mamon || 0) - Number(b.dataset.mamon || 0));
+            }
             sorted.forEach(c => $('#product-grid').append(c));
         });
     }
