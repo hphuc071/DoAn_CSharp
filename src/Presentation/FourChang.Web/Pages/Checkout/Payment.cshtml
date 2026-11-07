@@ -1,3 +1,45 @@
 @page
-@{ViewData["Title"]="Thanh toán VietQR";}
-<div class="breadcrumb"><a href="/Checkout">Thông tin nhận</a> / Thanh toán</div><section class="panel payment-panel"><span class="eyebrow">UC-WEB-07 · ĐƠN MẪU WEB027</span><h1 style="font-size:32px">Chỉ còn một bước nhỏ.</h1><p class="muted">Đơn Website được tiếp nhận sau khi xác minh đủ tiền.</p><div class="amount">99.000đ</div><div class="qr-placeholder" aria-label="Ô QR minh họa, không dùng để chuyển khoản"><strong>QR MINH HỌA<br/><small>Không thanh toán</small></strong></div><dl class="bank-details"><div><dt>Ngân hàng</dt><dd>Ngân hàng minh họa</dd></div><div><dt>Tài khoản</dt><dd>•••• •••• 0123</dd></div><div><dt>Người nhận</dt><dd>4CHANG LINH NGU LAM · DEMO</dd></div><div><dt>Nội dung</dt><dd>4CHANG WEB027</dd></div><div><dt>Thời gian còn lại</dt><dd>09:42 · mẫu</dd></div></dl><div class="payment-status notice" id="payment-status">Đang chờ xác minh chuyển khoản</div><button class="button primary" data-preview="Kiểm tra trạng thái thanh toán" data-copy="Nút này chỉ yêu cầu tra cứu trạng thái trong thiết kế. Việc khách bấm Đã chuyển không được coi là bằng chứng đã nhận tiền.">Tôi đã chuyển khoản</button><a class="button secondary" href="/Orders">Theo dõi đơn</a><div class="payment-state-buttons"><button class="button secondary" data-payment-state="Chờ xác minh">Đang chờ</button><button class="button secondary" data-payment-state="Đã xác minh đủ tiền · Chờ xác nhận">Đã trả đủ</button><button class="button secondary" data-payment-state="Thiếu tiền · Đã nhận 90.000đ / 99.000đ">Thiếu tiền</button><button class="button secondary" data-payment-state="Đã nhận thừa 10.000đ · Chờ đối soát khoản hoàn">Thừa tiền</button><button class="button secondary" data-payment-state="EXPIRED · Đơn đã hết hạn; tiền đến muộn cần đối soát">Hết hạn</button><button class="button secondary" data-payment-state="Chưa khớp tham chiếu · Đang đối soát">Chưa khớp</button></div><p class="fine-print">Các nút trạng thái chỉ dùng để xem bố cục minh họa. Không tạo QR thật, callback hay giao dịch ngân hàng.</p></section>
+@model FourChang.Web.Pages.Checkout.PaymentModel
+@using FourChang.Web.Services
+@{ ViewData["Title"] = "Thanh toán đơn hàng"; }
+<a asp-page="/Orders/Index" asp-route-PageNumber="@Model.ReturnPage" asp-route-Status="@Model.ReturnStatus"
+   asp-route-FromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ReturnToUtc?.ToString("O"))">Đơn hàng của tôi</a>
+<section class="panel payment-panel">
+    <p id="order-snapshot-connection" role="status" hidden></p>
+    <h1>Thanh toán đơn hàng</h1>
+    @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
+    @if (Model.Detail is { } order)
+    {
+        <div data-order-private>
+        <h2>@order.Order.Code</h2>
+        <p>Trạng thái đơn: <strong>@order.Order.Status</strong></p>
+        <p>Tổng hiện tại: @order.CurrentTotal.ToString("N0") đ · Đã xác minh thu: @order.Collected.ToString("N0") đ · Đã chi hoàn: @order.Refunded.ToString("N0") đ</p>
+        @if (order.Order.Status == "EXPIRED") {
+            <p role="status">Đơn đã hết hạn. Không chuyển khoản; nghĩa vụ thu/hoàn cần đối soát riêng với giao dịch thực nhận.</p>
+        } else { <p>Còn thu theo số dư: <strong>@order.Remaining.ToString("N0") đ</strong></p> }
+        <p>Hạn đơn UTC: @(order.ExpiresUtc?.ToString("u") ?? "Backend chưa cung cấp")</p>
+        @if (order.Payments.Count == 0) { <p>Chưa có yêu cầu thanh toán. Trang này không tự tạo yêu cầu mới.</p> }
+        @foreach (var payment in order.Payments)
+        {
+            <article>
+                <h3>@payment.Code · @payment.Status</h3>
+                <p>Yêu cầu: @payment.Requested.ToString("N0") đ · Đã xác minh: @payment.Verified.ToString("N0") đ</p>
+                <p>Tham chiếu: @(payment.Reference ?? "Chưa có tham chiếu từ Backend")</p>
+                <p>Hạn UTC: @(payment.ExpiresUtc?.ToString("u") ?? "Chưa có") · Xác minh UTC: @(payment.VerifiedUtc?.ToString("u") ?? "Chưa có")</p>
+                <p role="status">@CustomerOrderPresentation.PaymentMessage(payment, DateTime.UtcNow)</p>
+            </article>
+        }
+        @if (Model.Qr is { } qr) {
+            <img src="@qr.PngDataUri" data-payment-qr alt="VietQR từ nguồn đã kiểm tra thụ hưởng, số tiền và tham chiếu" width="260" height="260" />
+        } else {
+            <p class="notice">Chưa hỗ trợ VietQR đã được xác minh từ nhà cung cấp/cấu hình tin cậy. Không có mã QR để thanh toán trên trang này.</p>
+        }
+        <p class="fine-print">Snapshot UTC: @order.SnapshotUtc.ToString("u"). Tải lại chỉ đọc trạng thái; không tự xác nhận PAID, không yêu cầu chuyển lại khi chưa rõ kết quả.</p>
+        <a class="button primary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
+        <a class="button secondary" asp-page="/Orders/Details" asp-route-orderId="@order.Order.Id"
+           asp-route-ReturnPage="@Model.ReturnPage" asp-route-ReturnStatus="@Model.ReturnStatus"
+           asp-route-ReturnFromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ReturnToUtc="@(Model.ReturnToUtc?.ToString("O"))">Chi tiết đơn</a>
+        </div>
+    }
+</section>
+@section Scripts { <script src="~/js/order-snapshot.js" asp-append-version="true"></script> }
