@@ -1,6 +1,6 @@
 ﻿/*
  * UC-WEB-05 -> UC-WEB-06: read-only synchronization of the local cart draft.
- * No POST requests, no payment instructions, and no order creation.
+ * This renderer never submits orders; checkout-order.js owns order creation.
  * The Backend remains authoritative for variant, topping, stock, fees and totals.
  */
 (() => {
@@ -120,8 +120,9 @@
         }
     });
     window.addEventListener("storage", event => {
-        if (event.key === KEY) render();
+        if (event.key === KEY || event.key === null) render();
     });
     window.addEventListener("pageshow", render);
+    window.addEventListener("checkout:refresh", render);
     render();
 })();

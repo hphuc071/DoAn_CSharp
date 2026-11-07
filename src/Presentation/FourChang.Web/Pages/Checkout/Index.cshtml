@@ -7,9 +7,9 @@
 <div class="breadcrumb"><a href="/Cart">Giỏ hàng</a> / Thông tin nhận hàng</div>
 <div class="page-heading">
     <div>
-        <span class="eyebrow">UC-WEB-06 · ĐỒNG BỘ GIỎ NHÁP</span>
+        <span class="eyebrow">UC-WEB-06 · ĐẶT MANG ĐI</span>
         <h1>Nhận món theo cách của bạn</h1>
-        <p class="muted">Kiểm tra giỏ hàng trước khi đặt món. Chức năng tạo đơn thật chưa được bật.</p>
+        <p class="muted">Kiểm tra thông tin và tổng tiền trước khi đặt mang đi. Đơn tạo thành công sẽ chờ thanh toán chuyển khoản.</p>
     </div>
 </div>
 
@@ -17,8 +17,8 @@
     <section class="panel">
         <div class="tabs" data-tabs>
             <button type="button" data-tab="dinein">⌗ Tại bàn</button>
-            <button type="button" data-tab="takeaway">♧ Mang đi</button>
-            <button type="button" class="selected" data-tab="delivery">⌁ Giao tận nơi</button>
+            <button type="button" class="selected" data-tab="takeaway">♧ Mang đi</button>
+            <button type="button" data-tab="delivery">⌁ Giao tận nơi</button>
         </div>
 
         <div class="tab-panel" id="dinein" hidden>
@@ -27,17 +27,17 @@
             <label class="field">Ghi chú phục vụ <textarea placeholder="Ví dụ: mang món lên cùng lúc"></textarea></label>
         </div>
 
-        <div class="tab-panel" id="takeaway" hidden>
+        <div class="tab-panel" id="takeaway">
             <div class="field-grid">
-                <label class="field">Người nhận <input placeholder="Họ và tên người nhận" /></label>
-                <label class="field">Số điện thoại <input type="tel" placeholder="Số điện thoại" /></label>
-                <label class="field">Giờ nhận <select><option>Nhận sớm nhất</option><option>11:30</option><option>12:00</option></select></label>
+                <label class="field">Người nhận <input id="takeaway-name" maxlength="120" required autocomplete="name" placeholder="Họ và tên người nhận" /></label>
+                <label class="field">Số điện thoại <input id="takeaway-phone" type="tel" maxlength="16" required autocomplete="tel" placeholder="9–15 chữ số, có thể bắt đầu bằng +" /></label>
+                <label class="field">Giờ nhận <input value="Nhận sớm nhất" readonly /></label>
                 <label class="field">Điểm lấy món <input value="Quầy 4CHANG LINH NGU LAM" readonly /></label>
             </div>
             <p class="success-note">Mang đi: phí giao hàng 0đ.</p>
         </div>
 
-        <div class="tab-panel" id="delivery">
+        <div class="tab-panel" id="delivery" hidden>
             <div class="field-grid">
                 <label class="field">Người nhận <input placeholder="Họ và tên người nhận" /></label>
                 <label class="field">Điện thoại <input type="tel" placeholder="Số điện thoại" /></label>
@@ -49,7 +49,7 @@
 
         <label class="inline-label" style="margin-top:25px">
             <input type="checkbox" id="checkout-confirmed" />
-            Tôi xác nhận thông tin nhận hàng sau khi hệ thống kiểm tra giá và địa chỉ.
+            Tôi chấp thuận thông tin nhận mang đi và tổng tiền Backend báo ở bên cạnh.
         </label>
     </section>
 
@@ -66,11 +66,33 @@
             Giá cuối cùng cần được Backend xác nhận, bao gồm topping và phí giao hàng.
         </p>
 
-        <button type="button" id="checkout-proceed" class="button primary full" disabled>
-            Đặt đơn thật · Chưa khả dụng
+        <p id="checkout-disabled" class="notice" hidden="@Model.OrderCreationEnabled">Chức năng tạo đơn đang tắt. Bạn có thể xem giỏ và báo giá. Thao tác đang chờ vẫn được giữ; liên hệ người vận hành trước khi thử lại.</p>
+        <button type="button" id="checkout-proceed" class="button primary full" disabled
+                data-order-creation-enabled="@(Model.OrderCreationEnabled ? "true" : "false")"
+                data-customer-id="@Model.CustomerId" data-owner-proof="@Model.OwnerProof">
+            Đặt mang đi
         </button>
-        <p class="fine-print">Bản này chỉ đồng bộ dữ liệu UC-WEB-05 → UC-WEB-06. Chưa tạo đơn trong database hoặc thanh toán ngân hàng.</p>
-        <a class="button secondary full" href="/Checkout/Payment">Xem giao diện VietQR minh họa</a>
+        <p id="checkout-order-status" role="status" aria-live="polite"></p>
+        <p id="checkout-pending-details" class="notice" hidden></p>
+        <section id="checkout-receipt" hidden aria-live="polite">
+            <h3>Đã tạo đơn chờ thanh toán</h3>
+            <dl class="totals">
+                <div><dt>Mã đơn</dt><dd id="receipt-code"></dd></div>
+                <div><dt>Tổng tiền</dt><dd id="receipt-total"></dd></div>
+                <div><dt>Trạng thái khi tạo</dt><dd>PENDING_PAYMENT</dd></div>
+                <div><dt>Hạn thanh toán</dt><dd id="receipt-deadline"></dd></div>
+            </dl>
+            <a class="button secondary full" href="/Orders">Theo dõi trạng thái hiện tại</a>
+            <button id="checkout-new-order" type="button" class="button secondary full">Bắt đầu đơn tiếp theo</button>
+        </section>
+        <a id="checkout-login" href="/Account/Login" hidden>Đăng nhập Customer rồi quay lại Checkout để thử lại</a>
+        <details>
+            <summary>Thao tác đang chờ và thông tin trên máy dùng chung</summary>
+            <p>Để thử lại đúng đơn khi mất phản hồi, trình duyệt lưu tên, số điện thoại, giỏ và mã thao tác trên máy này. Đóng tab hoặc đăng xuất không xóa dữ liệu đó; người dùng cùng hồ sơ trình duyệt có thể đọc được.</p>
+            <p>Khi chưa rõ kết quả, không xóa dữ liệu trang, đổi mã thao tác hoặc đặt lại trên thiết bị khác. Quay lại cùng trình duyệt, cùng địa chỉ website, đăng nhập đúng tài khoản và chỉ thử lại thao tác cũ khi chức năng được mở; nếu bị khóa, liên hệ người vận hành để đối soát.</p>
+            <p>Trên máy dùng chung, nên dùng hồ sơ trình duyệt riêng. Nếu còn thao tác chờ, giữ hồ sơ đó được bảo vệ cho tới khi có kết quả. Sau biên nhận hợp lệ, nút “Bắt đầu đơn tiếp theo” xóa bản thao tác đã lưu; hãy kiểm tra giỏ còn lại và đăng xuất trước khi bàn giao máy.</p>
+        </details>
+        <p class="fine-print">Chỉ nhận sớm nhất; chưa hỗ trợ hẹn giờ. VietQR thật chưa được tích hợp tại bước này. Chưa xác minh tiền và chưa tiếp nhận pha chế.</p>
         <a class="text-button" href="/Cart">Quay lại chỉnh sửa giỏ hàng</a>
     </aside>
 </div>
@@ -80,4 +102,5 @@
 @section Scripts {
     <script src="~/js/checkout-cart.js" asp-append-version="true"></script>
     <script src="~/js/checkout-quote.js" asp-append-version="true"></script>
+    <script src="~/js/checkout-order.js" asp-append-version="true"></script>
 }

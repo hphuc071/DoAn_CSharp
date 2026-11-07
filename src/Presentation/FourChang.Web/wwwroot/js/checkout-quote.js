@@ -1,4 +1,4 @@
-/* UC-WEB-06: server quote preview only. Never POST /api/customer/orders. */
+/* UC-WEB-06: quote only. checkout-order.js owns order creation and recovery. */
 (() => {
   "use strict";
   const KEY = "fourchang.cart-draft.v1";
@@ -42,6 +42,8 @@
   }
 
   async function refresh() {
+    window.fourchangCheckoutQuote = null;
+    window.dispatchEvent(new Event("checkout:quote"));
     const seq = ++current;
     controller?.abort();
     controller = new AbortController();
@@ -59,6 +61,7 @@
     total.textContent = "Đang báo giá...";
     warning.textContent = "Đang kiểm tra biến thể, đường/đá và topping theo Backend.";
     try {
+      const cartRaw = localStorage.getItem(KEY) || "[]";
       const cart = getCart();
       if (cart.length < 1 || cart.length > 50)
         throw new Error("Giỏ hàng trống hoặc quá nhiều dòng món.");
@@ -130,6 +133,7 @@
       });
       const price = await json(res);
       if (seq !== current || signal.aborted) return;
+      if ((localStorage.getItem(KEY) || "[]") !== cartRaw) return;
       if (![price.tienHang, price.phiGiaoHang, price.tongCong].every(x =>
         typeof x === "number" && Number.isFinite(x) && x >= 0))
         throw new Error("Báo giá từ Backend không hợp lệ.");
@@ -137,8 +141,9 @@
       if (baseLabel) baseLabel.textContent = "Tiền món (Backend báo giá)";
       shipping.textContent = money(price.phiGiaoHang);
       total.textContent = money(price.tongCong);
-      warning.textContent = "Báo giá thử từ Backend, đã tính topping; chưa tạo đơn. " +
-        "API tạo đơn vẫn cần kiểm tra tồn kho đồng thời, thanh toán và chống tạo đơn trùng.";
+      warning.textContent = "Giá Backend đã gồm topping; phí mang đi 0đ. Xác nhận tổng tiền trước khi đặt. Tồn kho sẽ được kiểm tra lúc tạo đơn.";
+      window.fourchangCheckoutQuote = { payload, price, cartRaw };
+      window.dispatchEvent(new Event("checkout:quote"));
     } catch (error) {
       if (seq !== current || signal.aborted) return;
       fail(error instanceof Error ? error.message : "Không thể báo giá giỏ hàng.");
@@ -149,6 +154,7 @@
     if (!event.target.closest("[data-tab]")) return;
     queueMicrotask(refresh);
   });
-  window.addEventListener("storage", event => { if (event.key === KEY) refresh(); });
+  window.addEventListener("storage", event => { if (event.key === KEY || event.key === null) refresh(); });
   window.addEventListener("pageshow", refresh);
+  window.addEventListener("checkout:refresh", refresh);
 })();
