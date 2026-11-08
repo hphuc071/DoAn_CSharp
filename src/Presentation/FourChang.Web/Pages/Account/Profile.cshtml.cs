@@ -10,7 +10,6 @@ namespace FourChang.Web.Pages.Account;
 [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
 public sealed class ProfileModel(CafeApiClient api) : PageModel
 {
-    // Các form chỉ gửi trường của thao tác đó; API kiểm tra bắt buộc, không bắt nhập lại form khác.
     public CustomerSelfProfile? Profile { get; private set; }
     public string? Error { get; private set; }
     [BindProperty] public Guid MaThaoTac { get; set; } = Guid.NewGuid();
@@ -49,17 +48,21 @@ public sealed class ProfileModel(CafeApiClient api) : PageModel
     }
     public Task<IActionResult> OnPostSaveAsync() => Run(() => api.SaveSelfProfileAsync(new(MaThaoTac, Version(PhienBan), HoTen, Email, SoDienThoai)));
     public Task<IActionResult> OnPostAddressAsync() => Run(() => api.SaveSelfAddressAsync(MaDiaChi, new(MaThaoTac, Version(PhienBan), PhienBanDiaChi is null ? null : Version(PhienBanDiaChi), NhanDiaChi, TenNguoiNhan, DienThoaiNguoiNhan, DiaChiChiTiet, ViDo, KinhDo, GhiChuGiaoHang, LaDiaChiMacDinh)));
+    public Task<IActionResult> OnPostSetDefaultAsync() => Run(async () =>
+    {
+        if (MaDiaChi is not { } id) throw new FormatException();
+        var currentProfile = await api.GetSelfProfileAsync();
+        var target = currentProfile.DiaChi.SingleOrDefault(x => x.MaDiaChi == id) ?? throw new FormatException();
+        return await api.SaveSelfAddressAsync(id, new(MaThaoTac, Version(PhienBan), Version(PhienBanDiaChi ?? ""), target.NhanDiaChi, target.TenNguoiNhan, target.DienThoaiNguoiNhan, target.DiaChiChiTiet, target.ViDo, target.KinhDo, target.GhiChuGiaoHang, true));
+    });
     public Task<IActionResult> OnPostRemoveAsync() => Run(() => MaDiaChi is { } id ? api.RemoveSelfAddressAsync(id, new(MaThaoTac, Version(PhienBan), Version(PhienBanDiaChi ?? ""))) : throw new FormatException());
     public Task<IActionResult> OnPostPasswordAsync() => Run(() => api.ChangeSelfPasswordAsync(new(MaThaoTac, Version(PhienBan), MatKhauHienTai, MatKhauMoi, XacNhanMatKhau)));
     private async Task<IActionResult> Run(Func<Task<CustomerSelfReceipt>> action)
     {
         if (!Authenticate()) return RedirectToPage("Login");
-        // Mỗi form chỉ gửi trường của chính nó; không bắt nhập mật khẩu khi khách chỉ sửa tên.
-        // API vẫn kiểm tra đầy đủ trường bắt buộc của lệnh, kể cả khi trình duyệt bỏ trường.
         foreach (var key in ModelState.Keys.Where(key => !Request.Form.ContainsKey(key)).ToArray()) ModelState.Remove(key);
         try
         {
-            // Kiểm tra kết quả cũ trước POST lại, kể cả sau đổi mật khẩu đã thu hồi token nguồn.
             var result = await api.GetSelfOperationAsync(MaThaoTac);
             if (result is null) { if (!ModelState.IsValid) { Error = "Dữ liệu nhập không hợp lệ. Kiểm tra lại trường đang sửa."; return await Redisplay(); } result = await action(); }
             if (result.CanDangNhapLai) { Response.Cookies.Delete(CustomerCookie.Name); return RedirectToPage("Login"); }
@@ -74,7 +77,6 @@ public sealed class ProfileModel(CafeApiClient api) : PageModel
     }
     private async Task<IActionResult> Redisplay()
     {
-        // Chỉ tải phần hiển thị; giữ nguyên version và nháp đã gửi để không âm thầm ghi đè bản mới.
         foreach (var name in new[] { nameof(MatKhauHienTai), nameof(MatKhauMoi), nameof(XacNhanMatKhau) }) ModelState.Remove(name);
         MatKhauHienTai = MatKhauMoi = XacNhanMatKhau = "";
         try { Profile = await api.GetSelfProfileAsync(); } catch (CafeApiException) { }

@@ -41,27 +41,43 @@ public sealed class CustomerSelfService(CafeDbContext db)
         if (string.IsNullOrWhiteSpace(input.TenNguoiNhan) || input.TenNguoiNhan.Trim().Length > 120 || input.DienThoaiNguoiNhan is null || !Regex.IsMatch(input.DienThoaiNguoiNhan.Trim(), @"^\+?[0-9]{9,15}$") || string.IsNullOrWhiteSpace(input.DiaChiChiTiet) || input.DiaChiChiTiet.Trim().Length > 500 || input.NhanDiaChi?.Length > 50 || input.GhiChuGiaoHang?.Length > 500 || input.ViDo is < -90 or > 90 || input.KinhDo is < -180 or > 180 || (input.ViDo is null) != (input.KinhDo is null)) throw new Rule(400, "Tên người nhận, số điện thoại, địa chỉ hoặc tọa độ không hợp lệ.");
         var a = id is null ? new DiaChiKhachHang { MaKhachHang = u.MaKhachHang, DangSuDung = true } : await db.DiaChiKhachHang.SingleOrDefaultAsync(x => x.MaDiaChi == id && x.MaKhachHang == u.MaKhachHang && x.DangSuDung) ?? throw new Rule(404, "Không tìm thấy địa chỉ của bạn.");
         if (id is not null) Version(input.PhienBanDiaChi, a.PhienBanDuLieu);
-        if (input.LaDiaChiMacDinh)
+        var hasOtherActive = await db.DiaChiKhachHang.AnyAsync(x => x.MaKhachHang == u.MaKhachHang && x.DangSuDung && x.MaDiaChi != a.MaDiaChi);
+        var setAsDefault = input.LaDiaChiMacDinh || !hasOtherActive;
+        if (setAsDefault)
         {
-            // Bỏ cờ mặc định cũ trước để không vi phạm unique filtered index trong cùng transaction.
+            // Bỏ cờ mặc định cũ trước để không vi phạm unique filtered index trong cùng transaction (BR-28).
             var previous = await db.DiaChiKhachHang.Where(x => x.MaKhachHang == u.MaKhachHang && x.DangSuDung && x.LaDiaChiMacDinh && x.MaDiaChi != a.MaDiaChi).ToListAsync();
             foreach (var item in previous) item.LaDiaChiMacDinh = false; await db.SaveChangesAsync();
         }
-        a.NhanDiaChi = CustomerRules.Normalize(input.NhanDiaChi); a.TenNguoiNhan = input.TenNguoiNhan.Trim(); a.DienThoaiNguoiNhan = input.DienThoaiNguoiNhan.Trim(); a.DiaChiChiTiet = input.DiaChiChiTiet.Trim(); a.ViDo = input.ViDo; a.KinhDo = input.KinhDo; a.GhiChuGiaoHang = CustomerRules.Normalize(input.GhiChuGiaoHang); a.LaDiaChiMacDinh = input.LaDiaChiMacDinh;
+        a.NhanDiaChi = CustomerRules.Normalize(input.NhanDiaChi); a.TenNguoiNhan = input.TenNguoiNhan.Trim(); a.DienThoaiNguoiNhan = input.DienThoaiNguoiNhan.Trim(); a.DiaChiChiTiet = input.DiaChiChiTiet.Trim(); a.ViDo = input.ViDo; a.KinhDo = input.KinhDo; a.GhiChuGiaoHang = CustomerRules.Normalize(input.GhiChuGiaoHang); a.LaDiaChiMacDinh = setAsDefault;
         if (id is null) db.DiaChiKhachHang.Add(a);
     });
     public Task<IResult> Remove(long id, RemoveSelfAddress input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_ADDRESS_REMOVED", new { id, input }, input.PhienBanHoSo, context, async u =>
     {
         var a = await db.DiaChiKhachHang.SingleOrDefaultAsync(x => x.MaDiaChi == id && x.MaKhachHang == u.MaKhachHang && x.DangSuDung) ?? throw new Rule(404, "Không tìm thấy địa chỉ của bạn."); Version(input.PhienBanDiaChi, a.PhienBanDuLieu);
-        // Bỏ địa chỉ khỏi sổ bằng trạng thái có sẵn; giữ bản ghi và snapshot để không phá lịch sử đơn.
+        var wasDefault = a.LaDiaChiMacDinh;
+        // Bỏ địa chỉ khỏi sổ bằng trạng thái có sẵn; giữ bản ghi và snapshot để không phá lịch sử đơn (BR-28).
         a.DangSuDung = false; a.LaDiaChiMacDinh = false;
+        if (wasDefault)
+        {
+            await db.SaveChangesAsync();
+            var replacement = await db.DiaChiKhachHang.Where(x => x.MaKhachHang == u.MaKhachHang && x.DangSuDung && x.MaDiaChi != a.MaDiaChi).OrderBy(x => x.MaDiaChi).FirstOrDefaultAsync();
+            if (replacement is not null) replacement.LaDiaChiMacDinh = true;
+        }
     });
     public Task<IResult> Password(ChangeSelfPassword input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_PASSWORD_CHANGED", input, input.PhienBanDuLieu, context, async u =>
     {
         if (input.MatKhauHienTai is null || !CustomerRules.ValidPassword(input.MatKhauMoi) || input.MatKhauMoi != input.XacNhanMatKhau) throw new Rule(400, "Mật khẩu mới phải có 10–128 ký tự và xác nhận khớp.");
         if (!Passwords.Verify(input.MatKhauHienTai, u.MatKhauBam))
         {
-            // E3: lưu sự kiện thất bại an toàn, không ghi mật khẩu hoặc digest mật khẩu hiện tại.
+            // E3 (UC-WEB-03 & BR-07): tăng bộ đếm thử sai, nếu chạm ngưỡng 5 lần thì tạm khóa 15 phút và thu hồi phiên.
+            u.SoLanDangNhapSai++;
+            if (u.SoLanDangNhapSai >= 5)
+            {
+                u.KhoaDenLuc = DateTime.UtcNow.AddMinutes(15);
+                var activeSessions = await db.PhienDangNhap.Where(x => x.MaKhachHang == u.MaKhachHang && x.ThuHoiLuc == null).ToListAsync();
+                foreach (var s in activeSessions) { s.ThuHoiLuc = DateTime.UtcNow; s.LyDoThuHoi = "PASSWORD_ATTEMPTS_EXCEEDED"; }
+            }
             var failed = AuditFactory.Create("CUSTOMER", u.MaKhachHang, "CUSTOMER_PASSWORD_DENIED", "TaiKhoanKhachHang", u.MaKhachHang); failed.KetQua = "DENIED"; db.NhatKyHeThong.Add(failed); await db.SaveChangesAsync();
             throw new Rule(400, "Mật khẩu hiện tại không đúng.");
         }
@@ -93,7 +109,7 @@ public sealed class CustomerSelfService(CafeDbContext db)
         try
         {
             var user = await db.TaiKhoanKhachHang.SingleAsync(x => x.MaKhachHang == owner); Version(version, user.PhienBanDuLieu);
-            if (user.TrangThai != "ACTIVE" || (temporary ? !user.BatBuocDoiMatKhau : user.BatBuocDoiMatKhau)) return Results.Unauthorized();
+            if (user.TrangThai != "ACTIVE" || user.KhoaDenLuc > DateTime.UtcNow || (temporary ? !user.BatBuocDoiMatKhau : user.BatBuocDoiMatKhau)) return Results.Unauthorized();
             var before = password ? null : JsonSerializer.Serialize(await Profile(owner)); await mutate(user);
             // Mọi thay đổi sổ địa chỉ cũng tăng version hồ sơ, giúp hai thiết bị không ghi đè nhau.
             user.ThoiDiemCapNhat = DateTime.UtcNow; db.Entry(user).Property(x => x.ThoiDiemCapNhat).IsModified = true; await db.SaveChangesAsync();
@@ -104,7 +120,7 @@ public sealed class CustomerSelfService(CafeDbContext db)
         }
         catch (Rule ex)
         {
-            // Chỉ commit sự kiện sai mật khẩu; các thay đổi nghiệp vụ khác luôn rollback khi lỗi.
+            // Chỉ commit sự kiện sai mật khẩu (kèm tăng bộ đếm thử sai); các thay đổi nghiệp vụ khác luôn rollback khi lỗi.
             if (db.ChangeTracker.Entries<NhatKyHeThong>().Any(x => x.Entity.HanhDong == "CUSTOMER_PASSWORD_DENIED")) await tx.CommitAsync();
             return Results.Problem(detail: ex.Message, statusCode: ex.Code);
         }

@@ -1,4 +1,26 @@
 @page
 @model FourChang.Web.Pages.Account.LoginModel
 @{ViewData["Title"]="Đăng nhập";}
-<div class="auth-layout auth-layout-v3"><section class="auth-visual"><span class="eyebrow">RẤT VUI ĐƯỢC GẶP LẠI BẠN</span><img class="auth-brand-mark" src="~/assets/brand-mark.svg" alt="Logo 4CHANG LINH NGU LAM" width="160" height="160" asp-append-version="true"/><div class="auth-wordmark">4CHANG<span>LINH NGU LAM</span></div><h1>Một khoảng nghỉ,<br/>một chút bình yên.</h1><p>Món quen luôn đợi bạn.</p></section><section class="auth-form"><span class="auth-kicker">TÀI KHOẢN KHÁCH HÀNG</span><h1>Chào mừng trở lại</h1><p>Tiếp tục đặt món và xem những đơn của bạn.</p><form method="post"><input asp-for="MaThaoTac" type="hidden"/><div asp-validation-summary="All" role="alert"></div><label class="field">Tên đăng nhập, email hoặc số điện thoại<input asp-for="TenDangNhap" autocomplete="username" required/></label><label class="field">Mật khẩu<input asp-for="MatKhau" type="password" autocomplete="current-password" required/></label><button class="button primary full">Đăng nhập</button></form><p>Chưa có tài khoản? <a href="/Account/Register"><strong>Đăng ký ngay</strong></a></p></section></div>
+<div class="auth-layout auth-layout-v3">
+    <section class="auth-visual">
+        <span class="eyebrow">RẤT VUI ĐƯỢC GẶP LẠI BẠN</span>
+        <img class="auth-brand-mark" src="~/assets/brand-mark.svg" alt="Logo 4CHANG LINH NGU LAM" width="160" height="160" asp-append-version="true"/>
+        <div class="auth-wordmark">4CHANG<span>LINH NGU LAM</span></div>
+        <h1>Một khoảng nghỉ,<br/>một chút bình yên.</h1>
+        <p>Món quen luôn đợi bạn.</p>
+    </section>
+    <section class="auth-form">
+        <span class="auth-kicker">TÀI KHOẢN KHÁCH HÀNG</span>
+        <h1>Chào mừng trở lại</h1>
+        <p>Tiếp tục đặt món và xem những đơn của bạn.</p>
+        <form method="post">
+            <input asp-for="MaThaoTac" type="hidden"/>
+            <div asp-validation-summary="All" role="alert"></div>
+            <label class="field">Tên đăng nhập, email hoặc số điện thoại<input asp-for="TenDangNhap" autocomplete="username" required/></label>
+            <label class="field">Mật khẩu<input asp-for="MatKhau" type="password" autocomplete="current-password" required/></label>
+            <button class="button primary full">Đăng nhập</button>
+        </form>
+        <p class="fine-print">Quên mật khẩu? Liên hệ cửa hàng để được Quản lý đặt lại mật khẩu tạm.</p>
+        <p>Chưa có tài khoản? <a href="/Account/Register"><strong>Đăng ký ngay</strong></a></p>
+    </section>
+</div>

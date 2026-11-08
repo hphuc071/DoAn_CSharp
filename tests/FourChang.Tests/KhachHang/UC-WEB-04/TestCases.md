@@ -1,0 +1,4 @@
+| Mã TC | Luồng đặc tả | Tình huống | Tiền điều kiện và dữ liệu | Các bước thực hiện | Kết quả mong đợi | BR |
+| --- | --- | --- | --- | --- | --- | --- |
+| TC-KH-WEB04-001 | Luồng chính | Duyệt thực đơn, tìm kiếm không dấu và xem biến thể | Có danh mục, món công bố và công thức BOM | 1. GET /api/menu; 2. GET /api/menu/{id}/variants | Trả đúng danh sách món công bố, trạng thái khả dụng BOM, đường/đá/topping | BR-03, BR-30, BR-31 |
+| TC-KH-WEB04-002 | Ngoại lệ E2, E3 | Lọc khoảng giá sai hoặc xem món ngừng bán | minPrice > maxPrice hoặc mã món ẩn/ngừng bán | 1. GET /api/menu?minPrice=100000&maxPrice=20000; 2. GET /api/menu/999999/variants | Trả 400 BadRequest cho bộ lọc sai và 404 NotFound cho món ngừng bán | BR-08, BR-24 |

@@ -1,16 +1,14 @@
 {
-  "useCases": [
-    {
-      "code": "UC-WEB-01",
-      "actor": "KhachHang",
-      "name": "Đăng ký tài khoản",
-      "status": "DaCoTest",
-      "project": "FourChang.Tests/FourChang.Tests.csproj",
-      "sources": [
-        "FourChang.Tests/KhachHang/UC-WEB-01/RegistrationTests.cs"
-      ],
-      "filter": "UseCase=UC-WEB-01"
-    },
+  "code": "UC-WEB-01",
+  "actor": "KhachHang",
+  "name": "Đăng ký tài khoản",
+  "status": "DaCoTest",
+  "project": "FourChang.Tests/FourChang.Tests.csproj",
+  "sources": [
+    "FourChang.Tests/KhachHang/UC-WEB-01/RegistrationTests.cs"
+  ],
+  "filter": "UseCase=UC-WEB-01"
+},
     {
       "code": "UC-WEB-02",
       "actor": "KhachHang",
@@ -18,7 +16,7 @@
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
-        "FourChang.Tests/KhachHang/UC-WEB-02/SessionTests.cs"
+        "FourChang.Tests/KhachHang/UC-WEB-02/LoginAndSessionTests.cs"
       ],
       "filter": "UseCase=UC-WEB-02"
     },
@@ -29,7 +27,7 @@
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
-        "FourChang.Tests/KhachHang/UC-WEB-03/ProfileTests.cs"
+        "FourChang.Tests/KhachHang/UC-WEB-03/CustomerProfileTests.cs"
       ],
       "filter": "UseCase=UC-WEB-03"
     },
@@ -37,28 +35,34 @@
       "code": "UC-WEB-04",
       "actor": "KhachHang",
       "name": "Duyệt và tra cứu thực đơn",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
-    },
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-04/MenuCatalogTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-04"
+    }
     {
       "code": "UC-WEB-05",
       "actor": "KhachHang",
       "name": "Tùy chỉnh món và quản lý giỏ hàng",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-05/MenuCustomizationTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-05"
     },
     {
       "code": "UC-WEB-06",
       "actor": "KhachHang",
       "name": "Đặt món đa hình thức",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-06/CreateOrderTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-06"
     },
     {
       "code": "UC-WEB-07",

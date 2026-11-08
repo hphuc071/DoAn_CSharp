@@ -1,0 +1,4 @@
+| Mã TC | Luồng đặc tả | Tình huống | Tiền điều kiện và dữ liệu | Các bước thực hiện | Kết quả mong đợi | BR |
+| --- | --- | --- | --- | --- | --- | --- |
+| TC-KH-WEB06-001 | Luồng chính | Đặt món đa hình thức & giữ chỗ kho | Khách đã đăng nhập, nguyên liệu tồn kho đủ | 1. Gửi POST /api/customer/orders | Tạo đơn trạng thái AWAITING_PAYMENT, tăng tồn giữ chỗ trên kho | BR-ORD-01 |
+| TC-KH-WEB06-002 | Luồng ngoại lệ | Đặt món khi nguyên liệu không đủ | Tồn khả dụng của nguyên liệu nhỏ hơn định mức | 1. Gửi POST /api/customer/orders với số lượng lớn | Trả về 409 Conflict, chặn tạo đơn | BR-INV-01 |

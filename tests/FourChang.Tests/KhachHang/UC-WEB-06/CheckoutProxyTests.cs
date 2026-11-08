@@ -272,6 +272,10 @@ public sealed class CheckoutProxyTests
             Assert.Equal(flag == "true", banner.Contains("hidden", StringComparison.Ordinal));
             var button = System.Text.RegularExpressions.Regex.Match(html!, "<button[^>]*id=\"checkout-proceed\"[^>]*>").Value;
             Assert.Contains("disabled", button);
+            // The auto-merged legacy Web proxy must never bypass Razor ownership/CSRF/consent.
+            using var legacy = await http.PostAsJsonAsync("/api/customer/orders", Order);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, legacy.StatusCode);
+            Assert.Contains("CHECKOUT_HANDLER_REQUIRED", await legacy.Content.ReadAsStringAsync());
             var command = new Checkout.CheckoutCommand(Operation, 45000, Order);
             using var missing = await http.PostAsJsonAsync("/Checkout?handler=Create", command);
             Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode);

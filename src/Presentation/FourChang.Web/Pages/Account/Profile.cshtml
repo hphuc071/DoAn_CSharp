@@ -13,7 +13,7 @@
 <label class="field">Số điện thoại<input asp-for="SoDienThoai" type="tel" maxlength="20"/></label>
 <p>Cần ít nhất email hoặc số điện thoại.</p><button class="button primary">Lưu hồ sơ</button></form>
 </section>
-<section class="panel"><h2>Đổi mật khẩu</h2><p>Đổi thành công sẽ yêu cầu đăng nhập lại trên các phiên hiện tại.</p>
+<section class="panel"><h2>Đổi mật khẩu</h2><p>Đổi thành công sẽ thu hồi toàn bộ phiên và yêu cầu đăng nhập lại.</p>
 <form method="post" asp-page-handler="Password" data-account-draft><input asp-for="MaThaoTac" type="hidden"/><input asp-for="PhienBan" type="hidden"/>
 <label class="field">Mật khẩu hiện tại<input asp-for="MatKhauHienTai" type="password" autocomplete="current-password" maxlength="128" required/></label>
 <label class="field">Mật khẩu mới<input asp-for="MatKhauMoi" type="password" autocomplete="new-password" minlength="10" maxlength="128" required/></label>
@@ -23,7 +23,11 @@
 <section class="panel account-section"><h2>Địa chỉ đã lưu</h2>
 @if(Model.Profile is not null){foreach(var address in Model.Profile.DiaChi){
 <article class="account-address"><div><h3>@(address.NhanDiaChi??"Địa chỉ nhận hàng") @(address.LaDiaChiMacDinh?"· Mặc định":"")</h3><p>@address.TenNguoiNhan · @address.DienThoaiNguoiNhan</p><p>@address.DiaChiChiTiet</p><p>@address.GhiChuGiaoHang</p></div>
-<div class="account-actions"><a class="button secondary" asp-page="Profile" asp-route-address="@address.MaDiaChi">Sửa địa chỉ</a>
+<div class="account-actions">
+@if(!address.LaDiaChiMacDinh){
+<form method="post" asp-page-handler="SetDefault"><input name="MaThaoTac" type="hidden" value="@Guid.NewGuid()"/><input name="PhienBan" type="hidden" value="@Convert.ToBase64String(Model.Profile.PhienBanDuLieu)"/><input name="MaDiaChi" type="hidden" value="@address.MaDiaChi"/><input name="PhienBanDiaChi" type="hidden" value="@Convert.ToBase64String(address.PhienBanDuLieu)"/><button class="button secondary">Đặt mặc định</button></form>
+}
+<a class="button secondary" asp-page="Profile" asp-route-address="@address.MaDiaChi">Sửa địa chỉ</a>
 <form method="post" asp-page-handler="Remove" data-confirm-remove><input name="MaThaoTac" type="hidden" value="@Guid.NewGuid()"/><input name="PhienBan" type="hidden" value="@Convert.ToBase64String(Model.Profile.PhienBanDuLieu)"/><input name="MaDiaChi" type="hidden" value="@address.MaDiaChi"/><input name="PhienBanDiaChi" type="hidden" value="@Convert.ToBase64String(address.PhienBanDuLieu)"/><button class="button secondary">Bỏ địa chỉ</button></form></div></article>
 }if(Model.Profile.DiaChi.Count==0){<p>Bạn chưa có địa chỉ đã lưu.</p>}}
 <h3>@(Model.MaDiaChi is null?"Thêm địa chỉ":"Sửa địa chỉ")</h3>
