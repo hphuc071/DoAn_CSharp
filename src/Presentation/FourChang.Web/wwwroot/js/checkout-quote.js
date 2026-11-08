@@ -91,7 +91,18 @@
           Number(x.phanTramDuong) === sugar && Number(x.phanTramDa) === ice))
           throw new Error(`${item.name || "Món"} không hỗ trợ tỷ lệ đường/đá đã chọn.`);
         const toppings = [];
-        if (item.topping && normalize(item.topping) !== normalize("Không")) {
+        if (item.draftVersion === 2) {
+          if (!Array.isArray(item.toppings) || item.toppings.length > 10 ||
+              new Set(item.toppings.map(t => t?.id)).size !== item.toppings.length)
+            throw new Error("Snapshot topping không hợp lệ; hãy sửa dòng giỏ.");
+          for (const top of item.toppings) {
+            const matches = (variant.toppings || []).filter(t => t.maMonThem === top?.id && t.available === true);
+            if (matches.length !== 1 || !Number.isSafeInteger(top.portions) || top.portions < 1 ||
+                top.portions > matches[0].gioiHanMoiLy)
+              throw new Error("Topping không còn hiệu lực hoặc số phần vượt giới hạn. Hãy sửa giỏ.");
+            toppings.push({ maMonThem: top.id, soPhanMoiLy: top.portions });
+          }
+        } else if (item.topping && normalize(item.topping) !== normalize("Không")) {
           const qtyTop = Number(item.toppingQuantity);
           const matches = (variant.toppings || []).filter(t =>
             normalize(t.tenMonThem) === normalize(item.topping) && t.available);
@@ -135,7 +146,9 @@
       if (seq !== current || signal.aborted) return;
       if ((localStorage.getItem(KEY) || "[]") !== cartRaw) return;
       if (![price.tienHang, price.phiGiaoHang, price.tongCong].every(x =>
-        typeof x === "number" && Number.isFinite(x) && x >= 0))
+        typeof x === "number" && Number.isSafeInteger(x) && x >= 0) ||
+          !Number.isSafeInteger(price.tienHang + price.phiGiaoHang) ||
+          price.tongCong !== price.tienHang + price.phiGiaoHang)
         throw new Error("Báo giá từ Backend không hợp lệ.");
       base.textContent = money(price.tienHang);
       if (baseLabel) baseLabel.textContent = "Tiền món (Backend báo giá)";

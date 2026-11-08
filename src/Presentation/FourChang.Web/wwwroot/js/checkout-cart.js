@@ -33,7 +33,7 @@
     function validPrice(item) {
         const amount = Number(item.listedPrice);
         return item.listedPrice !== null && item.listedPrice !== undefined &&
-            Number.isFinite(amount) && amount >= 0;
+            Number.isSafeInteger(amount) && amount >= 0;
     }
 
     function validQuantity(item) {
@@ -75,14 +75,33 @@
             const qtyOk = validQuantity(item);
             const priceOk = validPrice(item);
             const qty = qtyOk ? Number(item.quantity) : 0;
-            const price = priceOk ? Number(item.listedPrice) : 0;
+            let price = priceOk ? Number(item.listedPrice) : 0;
             const name = typeof item.name === "string" ? item.name : "Chưa rõ món";
             const size = typeof item.size === "string" ? item.size : "?";
             const toppingName = typeof item.topping === "string" ? item.topping : "Không";
             const toppingQty = Number(item.toppingQuantity) || 0;
-            const containsTopping = toppingName !== "Không" && toppingQty > 0;
+            let containsTopping = toppingName !== "Không" && toppingQty > 0;
+            let toppingLabel = containsTopping ? ` · ${toppingName} × ${toppingQty}/ly` : "";
+            let snapshotOk = true;
+            if (item.draftVersion === 2) {
+                snapshotOk = Array.isArray(item.toppings) && item.toppings.length <= 10 &&
+                    new Set(item.toppings.map(t => t?.id)).size === item.toppings.length;
+                if (snapshotOk) {
+                    for (const top of item.toppings) {
+                        if (!top || !Number.isSafeInteger(top.id) || top.id <= 0 ||
+                            !Number.isSafeInteger(top.portions) || top.portions < 1 ||
+                            !Number.isSafeInteger(top.price) || top.price < 0 ||
+                            !Number.isSafeInteger(top.price * top.portions) ||
+                            !Number.isSafeInteger(price + top.price * top.portions)) { snapshotOk = false; break; }
+                        price += top.price * top.portions;
+                    }
+                    toppingLabel = item.toppings.map(t => ` · ${t?.name || "?"} × ${t?.portions || "?"}/ly`).join("");
+                }
+                containsTopping = false; // All V2 topping prices are included, or the row is invalid.
+            }
 
-            if (!qtyOk || !priceOk || !Number.isSafeInteger(Number(item.variantId)) ||
+            if (!qtyOk || !priceOk || !snapshotOk || !Number.isSafeInteger(qty * price) ||
+                !Number.isSafeInteger(baseSubtotal + qty * price) || !Number.isSafeInteger(Number(item.variantId)) ||
                 Number(item.variantId) <= 0) {
                 invalid = true;
             }
@@ -92,8 +111,9 @@
             baseSubtotal += qty * price;
 
             const label = `${name} · ${size} × ${qtyOk ? qty : "?"}` +
-                (containsTopping ? ` · ${toppingName} × ${toppingQty}/ly` : "");
-            appendLine(label, qtyOk && priceOk ? money(qty * price) + (containsTopping ? " + topping" : "") : "Chưa xác định");
+                toppingLabel;
+            appendLine(label, qtyOk && priceOk && snapshotOk && Number.isSafeInteger(qty * price)
+                ? money(qty * price) + (containsTopping ? " + topping" : "") : "Chưa xác định");
         });
 
         countElement.textContent = `${totalQuantity} ly · ${cart.length} dòng giỏ nháp`;
@@ -114,8 +134,7 @@
 
     tabsElement?.addEventListener("click", event => {
         if (event.target.closest("[data-tab]")) {
-            // site.js updates the selected tab and its old demo totals in this event;
-            // render after those handlers to overwrite demo prices safely.
+            // Render after site.js selects the active tab; no demo fee is used.
             queueMicrotask(render);
         }
     });

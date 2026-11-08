@@ -1,6 +1,7 @@
 
 using System.Net.Http.Json;
 using FourChang.Presentation.Shared.ApiClients;
+using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -75,12 +76,12 @@ public sealed class IndexModel(CafeApiClient api) : PageModel
             }
 
             var variants = await response.Content
-                .ReadFromJsonAsync<List<MenuVariantDto>>(
+                .ReadFromJsonAsync<List<MenuVariantItem>>(
                     cancellationToken: ct
                 );
 
             return new JsonResult(
-                variants ?? new List<MenuVariantDto>()
+                variants ?? new List<MenuVariantItem>()
             );
         }
         catch (HttpRequestException)
@@ -92,6 +93,10 @@ public sealed class IndexModel(CafeApiClient api) : PageModel
             {
                 StatusCode = 503
             };
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new ObjectResult(new { message = "Dữ liệu biến thể từ Backend không hợp lệ." }) { StatusCode = 502 };
         }
         catch (OperationCanceledException)
             when (!ct.IsCancellationRequested)
@@ -106,10 +111,3 @@ public sealed class IndexModel(CafeApiClient api) : PageModel
         }
     }
 }
-
-public sealed record MenuVariantDto(
-    long MaCauHinhMon,
-    string KichCo,
-    string NhietDo,
-    decimal GiaBan
-);

@@ -31,7 +31,9 @@
             </a>
         </div>
 
+        <p id="cart-status" role="status"></p>
         <div id="cart-lines"></div>
+        <section id="cart-editor" class="panel" aria-label="Sửa dòng giỏ" hidden></section>
 
         <p class="reference-note">
             Giỏ hàng là bản nháp.
@@ -53,30 +55,30 @@
 
         <dl class="totals">
             <div class="total">
-                <dt>Giá cơ sở tham khảo</dt>
+                <dt>Tạm tính món và topping</dt>
                 <dd id="cart-base-total">—</dd>
             </div>
         </dl>
 
         <p class="fine-print">
-            Giá trên chưa bao gồm các khoản chênh lệch
-            size, topping hoặc phí giao hàng.
-            Đây không phải số tiền thanh toán chính thức.
+            Giá nháp từ cấu hình đã chọn, chưa gồm phí giao hàng. Giỏ cũ thiếu snapshot
+            topping cần mở Sửa món để xác minh. Backend sẽ tính lại trước khi đặt.
         </p>
 
         <a href="/Checkout"
            class="button secondary full">
-            Xem màn hình đặt món (bản mẫu)
+            Kiểm tra giá và tiếp tục Checkout
         </a>
 
         <p class="fine-print">
-            Chưa thể gửi đơn thật cho đến khi
-            hoàn thiện API kiểm tra giỏ và tạo đơn.
+            Tạo đơn chịu kiểm soát của máy chủ; QR bàn và giao hàng vẫn khóa.
         </p>
     </aside>
 </div>
 
 @section Scripts {
+    <script src="~/js/cart-draft.js" asp-append-version="true"></script>
+    <script src="~/js/cart-editor.js" asp-append-version="true"></script>
     <script src="~/js/cart-page.js"
             asp-append-version="true"></script>
 }

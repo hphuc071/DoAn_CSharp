@@ -166,7 +166,9 @@
           // Another tab may have edited the draft while this request was in flight.
           status.textContent = "Đã xác nhận tạo đơn. Chưa xác minh thanh toán. Theo dõi đơn để xem trạng thái hiện tại.";
           try {
-            if ((localStorage.getItem(CART) || "[]") === intent.cartRaw) localStorage.removeItem(CART);
+            await navigator.locks.request("fourchang.cart-draft.write", () => {
+              if ((localStorage.getItem(CART) || "[]") === intent.cartRaw) localStorage.removeItem(CART);
+            });
           } catch {
             status.textContent += " Chưa dọn được giỏ nháp; kiểm tra giỏ trước khi bắt đầu đơn tiếp theo.";
           }
