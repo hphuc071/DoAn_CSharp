@@ -56,10 +56,15 @@ public sealed class FulfillmentPreviewTests
                 ["Orders:DeliveryPolicy:Approved"] = "true", ["Orders:DeliveryPolicy:Version"] = "test-proposal-v1",
                 ["Orders:DeliveryPolicy:BaseKm"] = "3", ["Orders:DeliveryPolicy:BaseFee"] = "15000",
                 ["Orders:DeliveryPolicy:PerExtraKm"] = "5000", ["Orders:DeliveryPolicy:MaxKm"] = "10",
-                ["Orders:DeliveryPolicy:FreeSubtotal"] = "300000", ["Orders:DeliveryPolicy:FreeWithinKm"] = "5"
+                ["Orders:DeliveryPolicy:FreeSubtotal"] = "300000", ["Orders:DeliveryPolicy:FreeWithinKm"] = "5",
+                ["Orders:DeliveryRoute:Provider"] = "TEST-ROAD", ["Orders:DeliveryRoute:OriginVersion"] = "test-origin-v1",
+                ["Orders:DeliveryRoute:Profile"] = "test-road-profile"
             }).Build();
             Tables.Row = new(12, "TEST-12", 4, true, Clock.Now.AddMinutes(1), SHA256.HashData(WebEncoders.Base64UrlDecode(Token)));
-            Routes.Route = new(3.001m, Clock.Now.AddMinutes(1));
+            Routes.Route = new(3.001m, Clock.Now.AddMinutes(1)) {
+                Provider = "TEST-ROAD", OriginVersion = "test-origin-v1", Profile = "test-road-profile",
+                Revision = "test-route-v1", Address = Delivery.Address, Latitude = Delivery.Latitude, Longitude = Delivery.Longitude
+            };
             Service = new(Config, Tables, Routes, Cart, Clock, new EphemeralDataProtectionProvider());
         }
         public FulfillmentPreviewRequest Qr => new("DINE_IN", Token, null, null, null, null, null, [new(1, 1, 100, 100, null, [])]);
@@ -85,7 +90,7 @@ public sealed class FulfillmentPreviewTests
         Assert.Equal("TEST-12", a.TableCode); Assert.Equal(0, a.Price.PhiGiaoHang); Assert.False(a.CreationEnabled);
         f.Clock.Now = f.Clock.Now.AddSeconds(10);
         var b = await f.Preview(f.Qr with { PreviousProof = a.Proof });
-        Assert.Equal(a.ExpiresAt, b.ExpiresAt); Assert.Equal(a.Price, b.Price); Assert.Equal(2, f.Tables.Calls);
+        Assert.Equal(a.ExpiresAt, b.ExpiresAt); Assert.Equal(a.Price, b.Price); Assert.Equal(4, f.Tables.Calls);
         var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Qr with { PreviousProof = a.Proof }, 7));
         Assert.Equal(409, ex.Status); // A proof cannot be replayed using B, even at the same table.
         Assert.NotNull(await f.Preview(f.Qr, 7)); // B may independently scan; never sees A's order.
@@ -218,5 +223,97 @@ public sealed class FulfillmentPreviewTests
         var f = new Fixture(); var results = await Task.WhenAll(f.Preview(f.Qr), f.Preview(f.Qr));
         Assert.All(results, x => Assert.False(x.CreationEnabled)); Assert.Equal(2, f.Cart.Calls);
         // No claim about SQL/Web Lock order creation is made by this read-only concurrency test.
+    }
+
+    [Theory]
+    [InlineData("rotate")] [InlineData("revoke")] [InlineData("table")] [InlineData("digest")]
+    public async Task Qr_changed_while_pricing_cannot_issue_a_stale_confirmation(string change)
+    {
+        var f = new Fixture();
+        f.Cart.OnPrice = () => f.Tables.Row = change switch {
+            "rotate" => f.Tables.Row! with { Version = 5 },
+            "revoke" => f.Tables.Row! with { Active = false },
+            "table" => f.Tables.Row! with { Id = 99, Code = "TEST-OTHER" },
+            _ => f.Tables.Row! with { Digest = new byte[32] }
+        };
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Qr));
+        Assert.Equal("FULFILLMENT_RECONFIRM_REQUIRED", ex.Code); Assert.Equal(409, ex.Status);
+        Assert.Equal(2, f.Tables.Calls);
+    }
+
+    [Theory]
+    [InlineData("provider")] [InlineData("origin")] [InlineData("profile")] [InlineData("revision")]
+    [InlineData("address")] [InlineData("latitude")] [InlineData("longitude")]
+    public async Task Route_must_bind_the_exact_configured_authority_and_requested_destination(string field)
+    {
+        var f = new Fixture(); var r = f.Routes.Route!;
+        f.Routes.Route = field switch {
+            "provider" => r with { Provider = "OTHER" }, "origin" => r with { OriginVersion = "OTHER" },
+            "profile" => r with { Profile = "OTHER" }, "revision" => r with { Revision = null },
+            "address" => r with { Address = "Another address" }, "latitude" => r with { Latitude = 11 },
+            _ => r with { Longitude = null }
+        };
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Delivery));
+        Assert.Equal("DELIVERY_ROUTE_BINDING_INVALID", ex.Code); Assert.Equal(502, ex.Status);
+        Assert.Equal(0, f.Cart.Calls);
+    }
+
+    [Theory]
+    [InlineData("Provider")] [InlineData("OriginVersion")] [InlineData("Profile")]
+    public async Task Routing_configuration_is_explicit_and_required_before_calling_a_source(string field)
+    {
+        var f = new Fixture(); f.Config["Orders:DeliveryRoute:" + field] = null;
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Delivery));
+        Assert.Equal("DELIVERY_ROUTE_CONFIGURATION_REQUIRED", ex.Code);
+        Assert.Equal(0, f.Routes.Calls + f.Cart.Calls);
+    }
+
+    [Theory]
+    [InlineData("provider")] [InlineData("origin")] [InlineData("profile")] [InlineData("revision")]
+    public async Task Same_distance_and_fee_do_not_hide_a_route_authority_or_revision_change(string field)
+    {
+        var f = new Fixture(); var first = await f.Preview(f.Delivery); var r = f.Routes.Route!;
+        switch (field) {
+            case "provider": f.Config["Orders:DeliveryRoute:Provider"] = "TEST-ROAD-v2"; f.Routes.Route = r with { Provider = "TEST-ROAD-v2" }; break;
+            case "origin": f.Config["Orders:DeliveryRoute:OriginVersion"] = "test-origin-v2"; f.Routes.Route = r with { OriginVersion = "test-origin-v2" }; break;
+            case "profile": f.Config["Orders:DeliveryRoute:Profile"] = "test-profile-v2"; f.Routes.Route = r with { Profile = "test-profile-v2" }; break;
+            default: f.Routes.Route = r with { Revision = "test-route-v2" }; break;
+        }
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Delivery with { PreviousProof = first.Proof }));
+        Assert.Equal("FULFILLMENT_RECONFIRM_REQUIRED", ex.Code); Assert.Equal(409, ex.Status);
+    }
+
+    [Theory]
+    [InlineData("policy")] [InlineData("origin")] [InlineData("profile")]
+    public async Task Configuration_changes_during_pricing_require_a_new_confirmation(string change)
+    {
+        var f = new Fixture(); f.Cart.OnPrice = () => f.Config[change switch {
+            "policy" => "Orders:DeliveryPolicy:Version", "origin" => "Orders:DeliveryRoute:OriginVersion",
+            _ => "Orders:DeliveryRoute:Profile"
+        }] = "test-changed";
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Delivery));
+        Assert.Equal("FULFILLMENT_RECONFIRM_REQUIRED", ex.Code); Assert.Equal(409, ex.Status);
+    }
+
+    [Theory]
+    [InlineData("fraction")] [InlineData("large-goods")] [InlineData("large-fee")]
+    public async Task Preview_rejects_amounts_that_cannot_be_persisted_in_the_existing_money_contract(string change)
+    {
+        var f = new Fixture();
+        if (change == "fraction") f.Cart.Subtotal = 0.5m;
+        else if (change == "large-goods") f.Cart.Subtotal = 1000000000000000000m;
+        else f.Config["Orders:DeliveryPolicy:BaseFee"] = "999999999999999999";
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Delivery));
+        Assert.Contains(ex.Code, new[] { "CART_PRICE_INVALID", "DELIVERY_POLICY_INVALID" });
+    }
+
+    [Fact]
+    public async Task Fee_arithmetic_overflow_is_controlled_instead_of_becoming_an_unhandled_error()
+    {
+        var f = new Fixture(); f.Config["Orders:DeliveryPolicy:MaxKm"] = "79228162514264337593543950335";
+        f.Config["Orders:DeliveryPolicy:PerExtraKm"] = "999999999999999999";
+        f.Routes.Route = f.Routes.Route! with { Km = decimal.MaxValue };
+        var ex = await Assert.ThrowsAsync<FulfillmentUnavailable>(() => f.Preview(f.Delivery));
+        Assert.Equal("DELIVERY_POLICY_INVALID", ex.Code); Assert.Equal(503, ex.Status);
     }
 }

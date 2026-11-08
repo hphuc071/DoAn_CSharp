@@ -37,7 +37,18 @@ public sealed class SqlTableQrLookup(CafeDbContext db) : ITableQrLookup
 
 // Implementations must use a configured store origin + road-routing source, not straight-line
 // distance or caller-supplied km/fee. No provider has been selected or registered for production.
-public sealed record DeliveryRoute(decimal Km, DateTimeOffset ExpiresAt);
+public sealed record DeliveryRoute(decimal Km, DateTimeOffset ExpiresAt)
+{
+    // Filled by a trusted server adapter, never copied from a fee/km supplied by the caller.
+    // These identify the configured origin/profile and the exact destination resolved.
+    public string? Provider { get; init; }
+    public string? OriginVersion { get; init; }
+    public string? Profile { get; init; }
+    public string? Revision { get; init; }
+    public string? Address { get; init; }
+    public decimal? Latitude { get; init; }
+    public decimal? Longitude { get; init; }
+}
 public interface IDeliveryRouteSource
 {
     Task<DeliveryRoute?> ResolveAsync(string address, decimal latitude, decimal longitude, CancellationToken ct);
@@ -62,6 +73,8 @@ public sealed class FulfillmentCartPricer(CafeDbContext db) : IFulfillmentCartPr
 public sealed record DeliveryFeePolicy(string Version, decimal BaseKm, decimal BaseFee,
     decimal PerExtraKm, decimal MaxKm, decimal FreeSubtotal, decimal FreeWithinKm)
 {
+    internal const decimal MaxMoney = 999999999999999999m; // SQL decimal(18,0), not a fee default.
+    internal static bool ValidMoney(decimal value) => value >= 0 && value <= MaxMoney && decimal.Truncate(value) == value;
     public static DeliveryFeePolicy Read(IConfiguration config)
     {
         const string prefix = "Orders:DeliveryPolicy:";
@@ -72,19 +85,23 @@ public sealed record DeliveryFeePolicy(string Version, decimal BaseKm, decimal B
             out var value) ? value : throw new FulfillmentUnavailable("DELIVERY_POLICY_INVALID");
         var policy = new DeliveryFeePolicy(config[prefix + "Version"] ?? "", Value("BaseKm"),
             Value("BaseFee"), Value("PerExtraKm"), Value("MaxKm"), Value("FreeSubtotal"), Value("FreeWithinKm"));
-        if (string.IsNullOrWhiteSpace(policy.Version) || policy.Version.Length > 80 ||
+        if (string.IsNullOrWhiteSpace(policy.Version) || policy.Version.Length > 80 || policy.Version.Any(char.IsControl) ||
             policy.BaseKm <= 0 || policy.MaxKm < policy.BaseKm || policy.BaseFee < 0 || policy.PerExtraKm < 0 ||
             policy.FreeSubtotal <= 0 || policy.FreeWithinKm <= 0 || policy.FreeWithinKm > policy.MaxKm ||
-            decimal.Truncate(policy.BaseFee) != policy.BaseFee || decimal.Truncate(policy.PerExtraKm) != policy.PerExtraKm)
+            !ValidMoney(policy.BaseFee) || !ValidMoney(policy.PerExtraKm) || !ValidMoney(policy.FreeSubtotal))
             throw new FulfillmentUnavailable("DELIVERY_POLICY_INVALID");
         return policy;
     }
     public decimal Fee(decimal km, decimal subtotal)
     {
         if (km <= 0 || km > MaxKm) throw new FulfillmentUnavailable("DELIVERY_OUT_OF_RANGE", 400);
-        if (subtotal < 0) throw new FulfillmentUnavailable("CART_PRICE_INVALID", 502);
-        return subtotal >= FreeSubtotal && km <= FreeWithinKm ? 0m
-            : checked(BaseFee + decimal.Ceiling(decimal.Max(0, km - BaseKm)) * PerExtraKm);
+        if (!ValidMoney(subtotal)) throw new FulfillmentUnavailable("CART_PRICE_INVALID", 502);
+        decimal fee;
+        try { fee = subtotal >= FreeSubtotal && km <= FreeWithinKm ? 0m
+            : checked(BaseFee + decimal.Ceiling(decimal.Max(0, km - BaseKm)) * PerExtraKm); }
+        catch (OverflowException) { throw new FulfillmentUnavailable("DELIVERY_POLICY_INVALID"); }
+        if (!ValidMoney(fee)) throw new FulfillmentUnavailable("DELIVERY_POLICY_INVALID");
+        return fee;
     }
 }
 
@@ -96,6 +113,23 @@ public sealed class FulfillmentPreviewService(IConfiguration config, ITableQrLoo
     public static bool On(IConfiguration config, string key)
         => bool.TryParse(config[key], out var enabled) && enabled;
     private static string Hash<T>(T value) => Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value)));
+    private static bool ValidTable(QrTable? table, byte[] digest, DateTimeOffset now) =>
+        table is { Id: > 0, Version: > 0, Active: true, Digest.Length: 32 } &&
+        !string.IsNullOrWhiteSpace(table.Code) &&
+        CryptographicOperations.FixedTimeEquals(table.Digest, digest) &&
+        (table.ExpiresAt is null || table.ExpiresAt > now);
+    private static string TableContext(QrTable table) => Hash(new { table.Id, table.Code, table.Version, table.ExpiresAt });
+    private (string Provider, string OriginVersion, string Profile) RouteAuthority()
+    {
+        string Required(string key)
+        {
+            var value = config["Orders:DeliveryRoute:" + key];
+            if (string.IsNullOrWhiteSpace(value) || value.Length > 120 || value.Any(char.IsControl))
+                throw new FulfillmentUnavailable("DELIVERY_ROUTE_CONFIGURATION_REQUIRED");
+            return value;
+        }
+        return (Required("Provider"), Required("OriginVersion"), Required("Profile"));
+    }
 
     public async Task<FulfillmentPreview> PreviewAsync(long owner, FulfillmentPreviewRequest input, CancellationToken ct)
     {
@@ -129,6 +163,8 @@ public sealed class FulfillmentPreviewService(IConfiguration config, ITableQrLoo
         decimal fee = 0;
         DeliveryFeePolicy? policy = null;
         DeliveryRoute? route = null;
+        byte[]? qrDigest = null;
+        (string Provider, string OriginVersion, string Profile)? authority = null;
         if (input.Method == "DINE_IN")
         {
             if (!On(config, "Orders:TableQrProtocolValidated")) throw new FulfillmentUnavailable("TABLE_QR_PROTOCOL_REQUIRED");
@@ -141,13 +177,12 @@ public sealed class FulfillmentPreviewService(IConfiguration config, ITableQrLoo
                 throw new FulfillmentUnavailable("TABLE_QR_INVALID", 400);
             var digest = SHA256.HashData(secret);
             var table = await tables.FindAsync(digest, ct);
-            if (table is null || table.Id <= 0 || string.IsNullOrWhiteSpace(table.Code) || table.Version <= 0 ||
-                !table.Active || table.Digest.Length != 32 || !CryptographicOperations.FixedTimeEquals(table.Digest, digest) ||
-                table.ExpiresAt is { } end && end <= now)
+            if (!ValidTable(table, digest, now))
                 throw new FulfillmentUnavailable("TABLE_QR_INVALID", 400);
-            if (table.ExpiresAt is { } deadline && deadline < expires) expires = deadline;
+            if (table!.ExpiresAt is { } deadline && deadline < expires) expires = deadline;
             tableCode = table.Code; // Only the server lookup determines the table.
-            contextHash = Hash(new { table.Id, table.Code, table.Version, table.ExpiresAt });
+            qrDigest = digest;
+            contextHash = TableContext(table);
         }
         else
         {
@@ -159,20 +194,39 @@ public sealed class FulfillmentPreviewService(IConfiguration config, ITableQrLoo
                 decimal.Round(input.Longitude.Value, 6) != input.Longitude.Value)
                 throw new FulfillmentUnavailable("DELIVERY_CONTACT_OR_LOCATION_INVALID", 400);
             policy = DeliveryFeePolicy.Read(config);
+            authority = RouteAuthority();
             try { route = await routes.ResolveAsync(input.Address, input.Latitude.Value, input.Longitude.Value, ct); }
             catch (Exception ex) when (ex is HttpRequestException || ex is OperationCanceledException && !ct.IsCancellationRequested)
             { throw new FulfillmentUnavailable("DELIVERY_ROUTE_UNAVAILABLE"); }
             if (route is null || route.ExpiresAt <= now) throw new FulfillmentUnavailable("DELIVERY_ROUTE_UNAVAILABLE");
+            if (route.Provider != authority.Value.Provider || route.OriginVersion != authority.Value.OriginVersion ||
+                route.Profile != authority.Value.Profile || string.IsNullOrWhiteSpace(route.Revision) ||
+                route.Revision.Length > 120 || route.Revision.Any(char.IsControl) ||
+                route.Address != input.Address || route.Latitude != input.Latitude || route.Longitude != input.Longitude)
+                throw new FulfillmentUnavailable("DELIVERY_ROUTE_BINDING_INVALID", 502);
             if (route.Km <= 0 || route.Km > policy.MaxKm)
                 throw new FulfillmentUnavailable("DELIVERY_OUT_OF_RANGE", 400);
             if (route.ExpiresAt < expires) expires = route.ExpiresAt;
-            contextHash = Hash(new { policy, route.Km });
+            contextHash = Hash(new { policy, route.Km, route.Provider, route.OriginVersion, route.Profile, route.Revision });
         }
         var goods = await cart.PriceAsync(input.Items, ct);
-        if (goods.TienHang < 0 || goods.PhiGiaoHang != 0 || goods.TongCong != goods.TienHang)
+        if (goods is null || !DeliveryFeePolicy.ValidMoney(goods.TienHang) || goods.PhiGiaoHang != 0 || goods.TongCong != goods.TienHang)
             throw new FulfillmentUnavailable("CART_PRICE_INVALID", 502);
         if (policy is not null) fee = policy.Fee(route!.Km, goods.TienHang);
         var price = new OrderPriceSummary(goods.TienHang, fee, checked(goods.TienHang + fee));
+        if (!DeliveryFeePolicy.ValidMoney(price.TongCong)) throw new FulfillmentUnavailable("CART_PRICE_INVALID", 502);
+        // Awaited pricing can outlive a rotation/revocation or configuration change. Verify again
+        // before issuing even a read-only proof. This is not an atomic SQL Create authorization.
+        if (!On(config, "Orders:FulfillmentPreviewEnabled")) throw new FulfillmentUnavailable("FULFILLMENT_PREVIEW_DISABLED");
+        if (qrDigest is not null)
+        {
+            if (!On(config, "Orders:TableQrProtocolValidated")) throw new FulfillmentUnavailable("TABLE_QR_PROTOCOL_REQUIRED");
+            var live = await tables.FindAsync(qrDigest, ct);
+            if (!ValidTable(live, qrDigest, clock.GetUtcNow()) || TableContext(live!) != contextHash)
+                throw new FulfillmentUnavailable("FULFILLMENT_RECONFIRM_REQUIRED", 409);
+        }
+        else if (policy != DeliveryFeePolicy.Read(config) || authority != RouteAuthority())
+            throw new FulfillmentUnavailable("FULFILLMENT_RECONFIRM_REQUIRED", 409);
         if (previous is not null && previous.ExpiresAt < expires) expires = previous.ExpiresAt;
         if (expires <= clock.GetUtcNow()) throw new FulfillmentUnavailable("FULFILLMENT_RECONFIRM_REQUIRED", 409);
         // Re-read the live source on every verification: rotation/revocation or changed route/policy/price
