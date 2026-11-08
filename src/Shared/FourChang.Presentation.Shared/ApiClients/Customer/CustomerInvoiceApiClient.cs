@@ -31,6 +31,8 @@ public sealed partial class CafeApiClient
                 output.Write(buffer, 0, count);
             }
             var bytes = output.ToArray();
+            if (response.Content.Headers.ContentLength is { } expectedLength && expectedLength != bytes.LongLength)
+                throw new CafeApiException("Độ dài PDF nguồn không khớp.", HttpStatusCode.BadGateway);
             if (bytes.Length < 17 || !bytes.AsSpan(0, 5).SequenceEqual("%PDF-"u8) ||
                 !System.Text.Encoding.ASCII.GetString(bytes.AsSpan(Math.Max(0, bytes.Length - 1024))).TrimEnd().EndsWith("%%EOF", StringComparison.Ordinal))
                 throw new CafeApiException("Dữ liệu PDF không hợp lệ.", HttpStatusCode.BadGateway);
@@ -38,6 +40,8 @@ public sealed partial class CafeApiClient
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException)
         { throw new CafeApiException("Không kết nối được nguồn PDF.", HttpStatusCode.ServiceUnavailable); }
+        catch (NotSupportedException)
+        { throw new CafeApiException("Nguồn PDF không hỗ trợ đọc tài liệu.", HttpStatusCode.BadGateway); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         { throw new CafeApiException("Nguồn PDF phản hồi quá lâu.", HttpStatusCode.GatewayTimeout); }
     }

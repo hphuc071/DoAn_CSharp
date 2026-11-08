@@ -11,6 +11,9 @@ public sealed class DetailsModel(CafeApiClient api) : CustomerOrderPageModel(api
         Response.Headers.CacheControl = "no-store";
         Response.Headers.Vary = "Cookie";
         Response.Headers.XContentTypeOptions = "nosniff";
+        Response.Headers.ContentSecurityPolicy = "sandbox; default-src 'none'; frame-ancestors 'none'";
+        Response.Headers.XFrameOptions = "DENY";
+        Response.Headers["Referrer-Policy"] = "no-referrer";
         var token = Request.Cookies[CustomerCookie.Name];
         if (string.IsNullOrWhiteSpace(token)) return Unauthorized();
         if (orderId <= 0 || invoiceId <= 0) return NotFound();
