@@ -32,7 +32,9 @@ public static class CustomerOrderPresentation
         value.Payments.All(x => x is not null && x.Id > 0 && x.Method == "BANK_TRANSFER" && x.Requested >= 0 &&
             x.Verified >= 0 && CustomerOrderStates.Payments.Contains(x.Status)) &&
         value.Refunds.All(x => x is not null && x.Id > 0 && x.Requested >= 0 && x.SuccessfullyDisbursed >= 0) &&
-        value.Invoices.All(x => x is not null && x.Id > 0 && x.Amount >= 0) &&
+        // SQL CK_HoaDon_2 permits signed ADJUSTMENT amounts; only ORIGINAL must be nonnegative.
+        value.Invoices.All(x => x is not null && x.Id > 0 &&
+            (x.Kind == "ORIGINAL" ? x.Amount >= 0 : x.Kind == "ADJUSTMENT")) &&
         value.Lines.Select(x => x.Id).Distinct().Count() == value.Lines.Count &&
         value.Payments.Select(x => x.Id).Distinct().Count() == value.Payments.Count &&
         value.Refunds.Select(x => x.Id).Distinct().Count() == value.Refunds.Count &&

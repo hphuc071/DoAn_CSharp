@@ -243,6 +243,22 @@ public sealed class OrderReadTests
     }
 
     [Theory]
+    [InlineData("ADJUSTMENT", -10000, true)]
+    [InlineData("ORIGINAL", -10000, false)]
+    [InlineData("UNKNOWN", 10000, false)]
+    public async Task Invoice_snapshot_follows_SQL_signed_adjustment_contract(string kind, int amount, bool valid)
+    {
+        var snapshot = Snapshot() with { Invoices = [new(11, "INV-TEST", kind, "ISSUED", amount, Now)] };
+        var stub = new Stub(_ => new(HttpStatusCode.OK) { Content = JsonContent.Create(snapshot) });
+        var page = Page(new DetailsModel(Client(stub)));
+        await page.OnGetAsync(7, default);
+        Assert.Equal(valid ? 200 : 502, page.Response.StatusCode);
+        if (valid) Assert.Equal(amount, Assert.Single(page.Detail!.Invoices).Amount);
+        else Assert.Null(page.Detail);
+        Assert.Equal(1, stub.Calls);
+    }
+
+    [Theory]
     [InlineData("PENDING_CONFIRMATION", true)] [InlineData("ACCEPTED", false)] [InlineData("PREPARING", false)]
     [InlineData("PENDING_PAYMENT", false)] [InlineData("COMPLETED", false)]
     public void Cancellation_ui_eligibility_does_not_grant_write_permission(string state, bool eligible) =>
