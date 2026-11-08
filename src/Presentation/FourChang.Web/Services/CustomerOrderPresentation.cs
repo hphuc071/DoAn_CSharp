@@ -20,7 +20,20 @@ public static class CustomerOrderPresentation
         _ => "Trạng thái thanh toán chưa được hỗ trợ; cần đối soát."
     };
 
-    public static bool Valid(CustomerOrderDetail? value, long id, bool expiryReadEnabled = false) => value is not null &&
+    public static bool Valid(CustomerOrderDetail? value, long id, bool expiryReadEnabled = false)
+    {
+        try
+        {
+            // Nonnegative individual values can still overflow when quantities/toppings, payments
+            // or refunds are aggregated. Reject before Razor or the QR boundary reads those totals.
+            return ValidSnapshot(value, id, expiryReadEnabled) && value!.OriginalTotal >= 0 &&
+                value.CurrentTotal >= 0 && value.Collected >= 0 && value.Refunded >= 0 &&
+                value.Remaining >= 0 && value.RefundObligation >= 0;
+        }
+        catch (OverflowException) { return false; }
+    }
+
+    private static bool ValidSnapshot(CustomerOrderDetail? value, long id, bool expiryReadEnabled) => value is not null &&
         value.Order is not null && value.Order.Id == id && !string.IsNullOrWhiteSpace(value.Order.Code) &&
         !string.IsNullOrWhiteSpace(value.Version) &&
         CustomerOrderStates.IsReadable(value.Order.Status, expiryReadEnabled) && value.Lines is not null &&

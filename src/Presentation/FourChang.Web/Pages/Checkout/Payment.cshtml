@@ -30,10 +30,11 @@
             </article>
         }
         @if (Model.Qr is { } qr) {
-            <img src="@qr.PngDataUri" data-payment-qr alt="VietQR từ nguồn đã kiểm tra thụ hưởng, số tiền và tham chiếu" width="260" height="260" />
+            <img src="@qr.PngDataUri" data-payment-qr data-qr-expires-utc="@qr.ExpiresUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" alt="VietQR từ nguồn đã kiểm tra thụ hưởng, số tiền và tham chiếu" width="260" height="260" />
         } else {
             <p class="notice">Chưa hỗ trợ VietQR đã được xác minh từ nhà cung cấp/cấu hình tin cậy. Không có mã QR để thanh toán trên trang này.</p>
         }
+        <p id="payment-qr-expiry" class="notice" role="status" hidden></p>
         <p class="fine-print">Snapshot UTC: @order.SnapshotUtc.ToString("u"). Tải lại chỉ đọc trạng thái; không tự xác nhận PAID, không yêu cầu chuyển lại khi chưa rõ kết quả.</p>
         <a class="button primary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
         <a class="button secondary" asp-page="/Orders/Details" asp-route-orderId="@order.Order.Id"

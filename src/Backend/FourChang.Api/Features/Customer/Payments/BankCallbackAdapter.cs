@@ -32,7 +32,8 @@ public sealed class BankCallbackAdapter(IBankCallbackProtocol protocol, BankRece
             NoiDungChuyenKhoan = bank.NoiDungChuyenKhoan, ThoiDiemNganHang = bank.ThoiDiemNganHang
         }, "VND");
     }
-    public static bool Valid(VerifiedBankTransfer? evidence, BankReceiverProfile receiver) => evidence is not null &&
+    public static bool Valid(VerifiedBankTransfer? evidence, BankReceiverProfile receiver) =>
+        !string.IsNullOrWhiteSpace(receiver.Provider) && !string.IsNullOrWhiteSpace(receiver.Account) && evidence is not null &&
         evidence.Currency == "VND" && evidence.Transaction is { } b &&
         b.TenNhaCungCap == receiver.Provider && b.TenNhaCungCap.Length is > 0 and <= 50 &&
         b.MaTaiKhoanNganHangQuan == receiver.Account && b.MaTaiKhoanNganHangQuan.Length is > 0 and <= 100 &&

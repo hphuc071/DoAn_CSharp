@@ -10,12 +10,21 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace FourChang.Tests;
 
 [Trait("Safety", "NoDatabase")]
 public sealed class Phase4IntegrationPreparationTests
 {
+    private sealed class SecurityLog : ILogger<SqlBankPaymentService>
+    {
+        public readonly List<(LogLevel Level, EventId Event, string Message, Exception? Error)> Entries = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel level) => true;
+        public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> format) =>
+            Entries.Add((level, id, format(state, error), error));
+    }
     private sealed class NoConnections : DbConnectionInterceptor
     {
         public int Attempts;
@@ -198,9 +207,15 @@ public sealed class Phase4IntegrationPreparationTests
         var monitor = new NoConnections(); await using var db = Db(monitor);
         var config = Config(("Orders:SqlIntegrationValidated", "true"), ("Orders:PaymentProcessingEnabled", "true"),
             ("Bank:Provider", "TEST-PROTOCOL"), ("Bank:ReceiverAccount", "TEST-ACCOUNT"));
-        var result = await new SqlBankPaymentService(db, config, new UnavailablePaymentVerificationSource(), new Clock())
-            .ProcessAsync(new byte[] { 1 }, new Dictionary<string, string>(), default);
+        var log = new SecurityLog();
+        var result = await new SqlBankPaymentService(db, config, new UnavailablePaymentVerificationSource(), new Clock(), log)
+            .ProcessAsync(System.Text.Encoding.UTF8.GetBytes("TEST-SENSITIVE-CALLBACK"),
+                new Dictionary<string, string> { ["Authorization"] = "Bearer TEST-SENSITIVE-HEADER" }, default);
         Assert.Equal(401, ((IStatusCodeHttpResult)result).StatusCode); Assert.Equal(0, monitor.Attempts);
+        var entry = Assert.Single(log.Entries);
+        Assert.Equal(LogLevel.Warning, entry.Level); Assert.Equal(7001, entry.Event.Id); Assert.Null(entry.Error);
+        Assert.Equal("Bank transfer evidence rejected: BANK_AUTHENTICATION_OR_RECEIVER_INVALID", entry.Message);
+        Assert.DoesNotContain("TEST-SENSITIVE", entry.Message); Assert.DoesNotContain("TEST-ACCOUNT", entry.Message);
     }
 
     [Fact]

@@ -12,7 +12,7 @@ namespace FourChang.Api.Features.Customer.Payments;
 // Not a public HTTP endpoint. Only the authenticated source feeds this transactional writer.
 // No provider calls inside a SQL transaction; no retry after ambiguous commit.
 public sealed class SqlBankPaymentService(CafeDbContext db, IConfiguration config,
-    IPaymentVerificationSource source, TimeProvider clock)
+    IPaymentVerificationSource source, TimeProvider clock, ILogger<SqlBankPaymentService>? logger = null)
 {
     public async Task<IResult> ProcessAsync(ReadOnlyMemory<byte> rawBody,
         IReadOnlyDictionary<string, string> headers, CancellationToken ct)
@@ -23,7 +23,14 @@ public sealed class SqlBankPaymentService(CafeDbContext db, IConfiguration confi
         if (string.IsNullOrWhiteSpace(receiver.Provider) || string.IsNullOrWhiteSpace(receiver.Account) || rawBody.Length is 0 or > 65536)
             return Results.BadRequest(new { code = "BANK_PROFILE_OR_BODY_INVALID" });
         var evidence = await source.AuthenticateAsync(rawBody, headers, ct);
-        if (!BankCallbackAdapter.Valid(evidence, receiver)) return Results.Unauthorized();
+        if (!BankCallbackAdapter.Valid(evidence, receiver))
+        {
+            // UC07 E2: retain a security signal without logging raw body, headers, bank identity,
+            // provider exception details or Customer data. No SQL opens on this denial path.
+            logger?.LogWarning(new EventId(7001, "BankEvidenceRejected"),
+                "Bank transfer evidence rejected: {Code}", "BANK_AUTHENTICATION_OR_RECEIVER_INVALID");
+            return Results.Unauthorized();
+        }
         // Own a frozen copy across awaits; never let a provider implementation mutate authenticated
         // fields between hashing, policy assessment and persistence.
         var input = evidence!.Transaction;

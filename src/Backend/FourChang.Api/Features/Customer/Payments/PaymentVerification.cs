@@ -27,13 +27,12 @@ public static class PaymentVerificationPolicy
         string orderStatus, string expectedProvider, string expectedAccount, DateTime nowUtc,
         IReadOnlyCollection<GiaoDichNganHang> recorded)
     {
-        if (evidence is null) return TransferAssessment.Rejected;
-        var transfer = evidence.Transaction;
-        if (string.IsNullOrWhiteSpace(expectedProvider) || string.IsNullOrWhiteSpace(expectedAccount) ||
-            transfer.TenNhaCungCap != expectedProvider || transfer.MaTaiKhoanNganHangQuan != expectedAccount ||
-            string.IsNullOrWhiteSpace(transfer.MaGiaoDichBenNgoai) || transfer.ChieuGiaoDich != "IN" ||
-            transfer.SoTien <= 0 || transfer.SoTien != decimal.Truncate(transfer.SoTien) || evidence.Currency != "VND" ||
-            transfer.ThoiDiemNganHang > nowUtc || payment.PhuongThuc != "BANK_TRANSFER")
+        // Keep the planner/policy boundary aligned with the existing SQL writer, including
+        // decimal(18,0), UTC, identity lengths/control characters and missing transaction data.
+        if (!BankCallbackAdapter.Valid(evidence, new(expectedProvider, expectedAccount)))
+            return TransferAssessment.Rejected;
+        var transfer = evidence!.Transaction;
+        if (transfer.ThoiDiemNganHang > nowUtc || payment.PhuongThuc != "BANK_TRANSFER")
             return TransferAssessment.Rejected;
         if (transfer.MaThanhToan is { } association && association != payment.MaThanhToan)
             return TransferAssessment.Reconciliation;

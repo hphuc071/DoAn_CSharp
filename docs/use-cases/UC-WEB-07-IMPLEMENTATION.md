@@ -1,5 +1,29 @@
 # UC-WEB-07 — Thanh toán chuyển khoản: phạm vi offline/mock
 
+## Kết luận audit hiện hành — 2026-11-08
+
+Nền code đã có SQL writer/payment planning và bằng chứng direct-service SQL lịch sử; không có
+provider ngân hàng/QR thật, callback công khai hoặc thanh toán production được bật. Các mô tả
+Phase bên dưới là lịch sử, không thay thế kết luận audit tại
+`artifacts/final-review/UC07-COMPLETION-AUDIT.md`.
+
+Audit bổ sung các sửa lỗi có regression: từ chối snapshot có tổng/số dư tràn decimal trước render;
+không gọi QR source cho đơn không còn đủ điều kiện thanh toán; QR read có timeout5s/cancellation
+và xử lý lỗi JSON/content-type mà không lộ thông tin nguồn; chỉ nhận deadline QR UTC explicit;
+browser ẩn QR đến hạn mà không đổi trạng thái, chuyển tiền hoặc xóa pending Checkout.
+PaymentVerificationPolicy dùng cùng validation evidence với SQL writer để tránh chấp nhận shape
+không hợp lệ ở planner. Auth/receiver denial phát security event7001 chỉ chứa code cố định,
+không raw payload/headers/account. Không thay transaction, SQL context/schema hoặc hợp đồng UC06/UC08.
+
+**Blocker cụ thể:** Create UC06 hiện tạo payment intent nhưng chưa cấp reference/QR; chưa có
+binding receiver/provider revision bất biến cho từng intent. Không tự invent reference/beneficiary
+để mở QR. Quy tắc delayed callback production, BR17 và rollout đối soát/hoàn vẫn cần quyết định.
+Hợp đồng bàn giao và điều kiện bật từng capability ở
+[`UC-WEB-07-PROVIDER-HANDOFF.md`](UC-WEB-07-PROVIDER-HANDOFF.md). Hai cờ
+`Orders:PaymentProcessingEnabled` và `Orders:SqlIntegrationValidated` không được bật bởi audit.
+
+## Hồ sơ triển khai lịch sử
+
 > Cập nhật tổng review 2026-11-07: SQL fixture V2 đã PASS 26 scenario records cho payment/cancel trực tiếp trên SQL. Các mục Phase cũ giữ lịch sử, không phải kết luận hiện hành. Chưa nghiệm thu provider, HTTP thanh toán, expiry hoặc PDF. Xem `artifacts/uc-web-07-08/SQL-INTEGRATION-RESULT.md` và `artifacts/final-review/UC-WEB-06-07-08-READINESS.md`.
 
 

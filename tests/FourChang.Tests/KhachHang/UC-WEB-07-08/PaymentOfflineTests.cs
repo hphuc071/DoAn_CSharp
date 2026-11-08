@@ -176,9 +176,12 @@ public sealed class PaymentOfflineTests
     [Fact]
     public async Task Qr_source_timeout_keeps_read_snapshot_and_never_creates_another_request()
     {
+        // Exercise QR retrieval only for a currently payable snapshot, not the expired fixed clock.
+        var detail = OrderReadTests.Snapshot(); var deadline = DateTime.UtcNow.AddMinutes(15);
+        detail = detail with { ExpiresUtc = deadline, Payments = [detail.Payments[0] with { ExpiresUtc = deadline }] };
         var stub = new OrderReadTests.Stub(request => {
             Assert.Equal(HttpMethod.Get, request.Method);
-            return new(HttpStatusCode.OK) { Content = JsonContent.Create(OrderReadTests.Snapshot()) };
+            return new(HttpStatusCode.OK) { Content = JsonContent.Create(detail) };
         });
         var page = OrderReadTests.Page(new PaymentPage(OrderReadTests.Client(stub), new FailedQrSource()));
         await page.OnGetAsync(7, default);
