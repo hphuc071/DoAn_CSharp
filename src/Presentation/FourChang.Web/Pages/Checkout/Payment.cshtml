@@ -1,6 +1,8 @@
 @page
 @model FourChang.Web.Pages.Checkout.PaymentModel
 @using FourChang.Web.Services
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostingEnvironment
 @{ ViewData["Title"] = "Thanh toán đơn hàng"; }
 <a asp-page="/Orders/Index" asp-route-PageNumber="@Model.ReturnPage" asp-route-Status="@Model.ReturnStatus"
    asp-route-FromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ReturnToUtc?.ToString("O"))">Đơn hàng của tôi</a>
@@ -31,6 +33,16 @@
         }
         @if (Model.Qr is { } qr) {
             <img src="@qr.PngDataUri" data-payment-qr data-qr-expires-utc="@qr.ExpiresUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" alt="VietQR từ nguồn đã kiểm tra thụ hưởng, số tiền và tham chiếu" width="260" height="260" />
+        } else if (PaymentDemoQrPolicy.CanShow(order,
+            Configuration["Demo:PaymentQrEnabled"], HostingEnvironment.EnvironmentName, DateTime.UtcNow)) {
+            <div class="notice" role="note">
+                <strong>CHẾ ĐỘ DEMO — KHÔNG CHUYỂN TIỀN THẬT</strong>
+                <p>Đây là mã QR mô phỏng, không chứa tài khoản thụ hưởng và không phải VietQR để thanh toán.</p>
+            </div>
+            <figure data-payment-qr data-qr-expires-utc="@PaymentDemoQrPolicy.ExpiryUtc(order).ToString("O", System.Globalization.CultureInfo.InvariantCulture)">
+                <img src="~/images/uc07-demo-only.png" alt="Mã QR mô phỏng 4CHANG, khi quét chỉ hiện DEMO ONLY - NO BANK PAYMENT" width="260" height="310" style="max-width:100%;height:auto" />
+                <figcaption>QR dùng minh họa giao diện UC07. Không chuyển khoản, không xác nhận đã thanh toán.</figcaption>
+            </figure>
         } else {
             <p class="notice">Chưa hỗ trợ VietQR đã được xác minh từ nhà cung cấp/cấu hình tin cậy. Không có mã QR để thanh toán trên trang này.</p>
         }
