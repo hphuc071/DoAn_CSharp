@@ -6,6 +6,7 @@ using Microsoft.Extensions.FileProviders;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddCustomerServices();
+builder.Services.AddSingleton<IPaymentQrSource, UnavailablePaymentQrSource>();
 var app = builder.Build();
 app.UseStaticFiles();
 var assets = Path.Combine(AppContext.BaseDirectory, "Assets");
@@ -35,11 +36,10 @@ app.MapPost("/api/customer/orders/quote", async (CreateCustomerOrderRequest req,
     catch (CafeApiException ex) { return Results.Problem(ex.Message, statusCode: (int?)ex.StatusCode ?? 500); }
 });
 
-app.MapPost("/api/customer/orders", async (CreateCustomerOrderRequest req, CafeApiClient api) =>
-{
-    try { return Results.Ok(await api.CreateCustomerOrderAsync(req)); }
-    catch (CafeApiException ex) { return Results.Json(new { message = ex.Message }, statusCode: (int?)ex.StatusCode ?? 500); }
-});
+// The legacy browser Create proxy cannot preserve the owned, CSRF-protected Checkout
+// command contract. Keep its route fail-closed; writes use the Razor Checkout handler.
+app.MapPost("/api/customer/orders", () =>
+    Results.Json(new { code = "CHECKOUT_HANDLER_REQUIRED" }, statusCode: 503));
 
 app.MapRazorPages();
 app.Run();

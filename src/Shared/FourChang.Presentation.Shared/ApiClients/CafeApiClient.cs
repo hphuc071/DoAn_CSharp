@@ -7,9 +7,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 namespace FourChang.Presentation.Shared.ApiClients;
 
-public sealed class CafeApiException(string message, System.Net.HttpStatusCode? statusCode = null) : Exception(message)
+public sealed class CafeApiException(string message, System.Net.HttpStatusCode? statusCode = null, string? code = null) : Exception(message)
 {
     public System.Net.HttpStatusCode? StatusCode { get; } = statusCode;
+    public string? Code { get; } = code;
 }
 public sealed partial class CafeApiClient(HttpClient http)
 {
@@ -17,6 +18,7 @@ public sealed partial class CafeApiClient(HttpClient http)
     public string? PosKey { get; set; }
     public string? PosMachine { get; set; }
     public static Uri BaseAddress => new(Environment.GetEnvironmentVariable("FOURCHANG_API_URL") ?? "http://localhost:5181");
+    public Task<List<MenuProduct>> GetSortedMenuAsync(string sort, CancellationToken ct = default) => SendAsync<List<MenuProduct>>(HttpMethod.Get,"/api/menu?sort="+Uri.EscapeDataString(sort),ct:ct);
     public Task<List<MenuProduct>> GetMenuAsync(CancellationToken ct = default) => SendAsync<List<MenuProduct>>(HttpMethod.Get,"/api/menu",ct:ct);
     public Task<List<Employee>> GetEmployeesAsync(bool admin = false) => SendAsync<List<Employee>>(HttpMethod.Get,admin?"/api/admin/employees":"/api/pos/employees");
     public Task<SessionResult> LoginAdminAsync(SignIn input) => SendAsync<SessionResult>(HttpMethod.Post,"/api/auth/admin/login",input);
