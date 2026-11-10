@@ -18,6 +18,24 @@
   const name = document.getElementById("takeaway-name");
   const phone = document.getElementById("takeaway-phone");
   const confirmed = document.getElementById("checkout-confirmed");
+  const when = document.getElementById("takeaway-when");
+  const pickup = document.getElementById("takeaway-schedule");
+  const pickupField = document.getElementById("takeaway-schedule-field");
+  const scheduleEnabled = when?.dataset.takeawaySchedulingEnabled === "true";
+  function pickupUtc() {
+    if (when?.value === "asap") return null;
+    if (!scheduleEnabled || when?.value !== "scheduled" || !pickup)
+      throw new Error("Hẹn giờ nhận chưa được mở.");
+    const raw = pickup.value;
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw))
+      throw new Error("Chọn ngày và giờ nhận hợp lệ.");
+    const date = new Date(raw);
+    if (!Number.isFinite(date.getTime()) ||
+        [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes()]
+          .join("-") !== raw.replace("T", "-").split(/[-:]/).map(Number).join("-"))
+      throw new Error("Ngày giờ không tồn tại trong múi giờ thiết bị.");
+    return date.toISOString(); // Explicit UTC; Backend checks the store time zone and policy.
+  }
   const status = document.getElementById("checkout-order-status");
   const receiptPanel = document.getElementById("checkout-receipt");
   const login = document.getElementById("checkout-login");
@@ -72,6 +90,8 @@
         name.disabled = phone.disabled = confirmed.disabled = true;
         name.value = phone.value = "";
         confirmed.checked = false;
+        if (when) when.disabled = true;
+        if (pickup) pickup.disabled = true;
         receiptPanel.hidden = pendingDetails.hidden = true;
         login.hidden = true;
         status.textContent = intent
@@ -83,6 +103,8 @@
         button.disabled = true;
         name.disabled = phone.disabled = confirmed.disabled = true;
         name.value = phone.value = "";
+        if (when) when.disabled = true;
+        if (pickup) pickup.disabled = true;
         receiptPanel.hidden = pendingDetails.hidden = true;
         login.hidden = false;
         status.textContent = intent
@@ -94,16 +116,25 @@
       if (intent?.receipt && !completed) throw new Error("Biên nhận lưu chưa hợp lệ. Cần kiểm tra đơn trước khi đặt tiếp.");
       const mode = document.querySelector("[data-tabs] [data-tab].selected")?.dataset.tab;
       const quote = window.fourchangCheckoutQuote;
-      const validForm = name.value.trim().length > 0 && name.value.trim().length <= 120 &&
+      let validPickup = false;
+      try { pickupUtc(); validPickup = true; } catch { /* Leave submit disabled. */ }
+      const validForm = validPickup && name.value.trim().length > 0 && name.value.trim().length <= 120 &&
         !/[\u0000-\u001f\u007f]/.test(name.value) && /^\+?[0-9]{9,15}$/.test(phone.value.trim());
       const ready = mode === "takeaway" && quote && validForm && confirmed.checked &&
         (localStorage.getItem(CART) || "[]") === quote.cartRaw;
       name.disabled = phone.disabled = confirmed.disabled = !!intent || busy;
+      if (when) when.disabled = !!intent || busy || !creationEnabled;
+      if (pickup) pickup.disabled = !!intent || busy || !creationEnabled || !scheduleEnabled || when?.value !== "scheduled";
       pendingDetails.hidden = !intent || !!completed;
       if (intent) {
+        if (when) when.value = intent.command.order.thoiDiemHenNhan ? "scheduled" : "asap";
+        if (pickupField) pickupField.hidden = when?.value !== "scheduled";
         name.value = intent.command.order.tenNguoiNhan;
         phone.value = intent.command.order.dienThoaiNguoiNhan;
         pendingDetails.textContent = "Thao tác mang đi đã gửi: " + name.value + " · " + phone.value +
+          (intent.command.order.thoiDiemHenNhan
+            ? " · Giờ nhận đã yêu cầu: " + new Date(intent.command.order.thoiDiemHenNhan).toLocaleString("vi-VN")
+            : " · Nhận sớm nhất") +
           " · Tổng đã chấp thuận " + money(intent.command.acceptedTotal) + ". Thử lại sẽ dùng nguyên thông tin này.";
       }
       button.disabled = !creationEnabled || busy || blocked || !navigator.locks || !token || !!completed || (!intent && !ready);
@@ -121,6 +152,11 @@
   function invalidate() { confirmed.checked = false; update(); }
   name.addEventListener("input", invalidate);
   phone.addEventListener("input", invalidate);
+  when?.addEventListener("change", () => {
+    if (pickupField) pickupField.hidden = when.value !== "scheduled";
+    invalidate();
+  });
+  pickup?.addEventListener("input", invalidate);
   confirmed.addEventListener("change", update);
   window.addEventListener("checkout:quote", invalidate);
   window.addEventListener("storage", event => { if (event.key === INTENT || event.key === CART || event.key === null) invalidate(); });
@@ -142,11 +178,13 @@
           if (!confirmed.checked || !quote || (localStorage.getItem(CART) || "[]") !== quote.cartRaw ||
               document.querySelector("[data-tabs] [data-tab].selected")?.dataset.tab !== "takeaway")
             throw new Error("Giỏ hoặc hình thức nhận đã đổi. Vui lòng báo giá và xác nhận lại.");
+          const scheduledUtc = pickupUtc();
           intent = {
             version: 1, ownerId, cartRaw: quote.cartRaw,
             command: {
               operation: crypto.randomUUID(), acceptedTotal: quote.price.tongCong, ownerProof,
-              order: { ...quote.payload, tenNguoiNhan: name.value.trim(), dienThoaiNguoiNhan: phone.value.trim() }
+              order: { ...quote.payload, tenNguoiNhan: name.value.trim(), dienThoaiNguoiNhan: phone.value.trim(),
+                ...(scheduledUtc ? { thoiDiemHenNhan: scheduledUtc } : {}) }
             }
           };
           // A failed durable write must prevent the network request.

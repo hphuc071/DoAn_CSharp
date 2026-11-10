@@ -32,7 +32,18 @@
             <div class="field-grid">
                 <label class="field">Người nhận <input id="takeaway-name" maxlength="120" required autocomplete="name" placeholder="Họ và tên người nhận" /></label>
                 <label class="field">Số điện thoại <input id="takeaway-phone" type="tel" maxlength="16" required autocomplete="tel" placeholder="9–15 chữ số, có thể bắt đầu bằng +" /></label>
-                <label class="field">Giờ nhận <input value="Nhận sớm nhất" readonly /></label>
+                <label class="field">Giờ nhận
+                    <select id="takeaway-when" data-takeaway-scheduling-enabled="@(Model.TakeawaySchedulingEnabled ? "true" : "false")">
+                        <option value="asap">Nhận sớm nhất</option>
+                        @if (Model.TakeawaySchedulingEnabled)
+                        {
+                            <option value="scheduled">Hẹn giờ nhận món</option>
+                        }
+                    </select>
+                </label>
+                <label class="field" id="takeaway-schedule-field" hidden>Ngày và giờ nhận (theo múi giờ thiết bị)
+                    <input id="takeaway-schedule" type="datetime-local" step="60" disabled />
+                </label>
                 <label class="field">Điểm lấy món <input value="Quầy 4CHANG LINH NGU LAM" readonly /></label>
             </div>
             <p class="success-note">Mang đi: phí giao hàng 0đ.</p>
@@ -98,7 +109,7 @@
             <p>Khi chưa rõ kết quả, không xóa dữ liệu trang, đổi mã thao tác hoặc đặt lại trên thiết bị khác. Quay lại cùng trình duyệt, cùng địa chỉ website, đăng nhập đúng tài khoản và chỉ thử lại thao tác cũ khi chức năng được mở; nếu bị khóa, liên hệ người vận hành để đối soát.</p>
             <p>Trên máy dùng chung, nên dùng hồ sơ trình duyệt riêng. Nếu còn thao tác chờ, giữ hồ sơ đó được bảo vệ cho tới khi có kết quả. Sau biên nhận hợp lệ, nút “Bắt đầu đơn tiếp theo” xóa bản thao tác đã lưu; hãy kiểm tra giỏ còn lại và đăng xuất trước khi bàn giao máy.</p>
         </details>
-        <p class="fine-print">Chỉ nhận sớm nhất; chưa hỗ trợ hẹn giờ. VietQR thật chưa được tích hợp tại bước này. Chưa xác minh tiền và chưa tiếp nhận pha chế.</p>
+        <p class="fine-print">Hẹn giờ chỉ khả dụng khi chính sách và giờ hoạt động được duyệt ở Backend; đây không phải xác nhận năng lực pha chế. VietQR thật chưa được tích hợp. Chưa xác minh tiền và chưa tiếp nhận pha chế.</p>
         <a class="text-button" href="/Cart">Quay lại chỉnh sửa giỏ hàng</a>
     </aside>
 </div>

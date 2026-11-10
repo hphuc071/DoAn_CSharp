@@ -52,6 +52,10 @@
                 @(order.CompletedUtc?.ToString("u") ?? "Chưa có")
             </p>
 
+            @if (order.PickupUtc is { } scheduledUtc)
+            {
+                <p>Giờ nhận dự kiến (UTC): @scheduledUtc.ToString("u"). Thời điểm dự kiến, chưa phải xác nhận pha chế.</p>
+            }
             <p role="status">
                 Snapshot UTC @order.SnapshotUtc.ToString("u").
                 Trang tự làm mới snapshot bằng GET mỗi 30 giây khi đang xem và chưa nhập biểu mẫu (polling, không phải realtime). Có thể tải lại ngay.

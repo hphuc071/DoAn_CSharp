@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FourChang.Presentation.Shared.Contracts.Customer;
 
 // Read snapshots only. No authentication tokens, bank credentials or write commands.
@@ -46,7 +48,8 @@ public sealed record CustomerOrderDetail(CustomerOrderSummary Order, string Vers
     DateTime? ExpiresUtc, DateTime? AcceptedUtc, DateTime? CompletedUtc,
     decimal OriginalShippingFee, decimal ShippingFee, IReadOnlyList<CustomerOrderLine> Lines,
     IReadOnlyList<CustomerPaymentSnapshot> Payments, IReadOnlyList<CustomerRefundSnapshot> Refunds,
-    IReadOnlyList<CustomerInvoiceSnapshot> Invoices, DateTime SnapshotUtc)
+    IReadOnlyList<CustomerInvoiceSnapshot> Invoices, DateTime SnapshotUtc,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTime? PickupUtc = null)
 {
     public decimal OriginalTotal => Lines.Sum(x => x.OriginalTotal) + OriginalShippingFee;
     public decimal CurrentTotal => Lines.Sum(x => x.CurrentTotal) + ShippingFee;

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace FourChang.Presentation.Shared.Contracts.Customer;
 
 // Hợp đồng dữ liệu; giữ nguyên tên trường để các phân hệ tiếp tục dùng cùng API.
@@ -34,7 +36,10 @@ public sealed record CreateCustomerOrderRequest(
     string? DiaChiGiao,
     decimal? KhoangCachKm,
     string? GhiChu,
-    List<OrderItemInput> Items);
+    List<OrderItemInput> Items,
+    // Nullable and omitted on the wire: old TAKEAWAY JSON/hashes remain byte-for-byte stable.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    DateTimeOffset? ThoiDiemHenNhan = null);
 
 public sealed record OrderPriceSummary(decimal TienHang, decimal PhiGiaoHang, decimal TongCong);
 

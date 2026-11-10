@@ -76,7 +76,8 @@ public sealed class CustomerOrderReader(CafeDbContext db, IConfiguration? config
                 x.TrangThai, x.SoTienYeuCau, x.SoTienDuocDuyet,
                 disbursements.Where(d => d.MaHoanTien == x.MaHoanTien).Sum(d => d.SoTien))).ToArray(),
             invoices.Select(x => new CustomerInvoiceSnapshot(x.MaHoaDon, x.SoHoaDon, x.LoaiHoaDon,
-                x.TrangThai, x.SoTien, Utc(x.PhatHanhLuc))).ToArray(), DateTime.UtcNow);
+                x.TrangThai, x.SoTien, Utc(x.PhatHanhLuc))).ToArray(), DateTime.UtcNow,
+            Utc(order.ThoiDiemHenNhan));
         await tx.CommitAsync(ct);
         return result;
     }

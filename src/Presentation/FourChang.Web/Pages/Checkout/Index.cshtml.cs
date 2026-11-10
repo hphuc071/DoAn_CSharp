@@ -21,6 +21,9 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
     // Explicit opt-in only. Environment name and API address never enable writes.
     public bool OrderCreationEnabled =>
         bool.TryParse(configuration["Checkout:OrderCreationEnabled"], out var enabled) && enabled;
+    // Show an option only after a separate Web rollout; Backend revalidates every create.
+    public bool TakeawaySchedulingEnabled =>
+        bool.TryParse(configuration["Checkout:TakeawaySchedulingEnabled"], out var enabled) && enabled;
 
     public async Task<IActionResult> OnGetAsync()
     {

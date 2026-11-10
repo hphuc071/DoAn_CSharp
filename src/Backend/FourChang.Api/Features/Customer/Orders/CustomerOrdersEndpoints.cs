@@ -143,6 +143,14 @@ public static class CustomerOrdersEndpoints
         }
         var now = DateTime.UtcNow;
         var expiresAt = now.AddMinutes(timeoutMinutes);
+        // Keep old idempotent receipts: optional pickup checks run only AFTER replay.
+        var pickupError = TakeawayPickupSchedule.Validate(req.ThoiDiemHenNhan, configuration,
+            new DateTimeOffset(DateTime.SpecifyKind(now, DateTimeKind.Utc)),
+            new DateTimeOffset(DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc)));
+        if (pickupError is not null)
+            return Results.Json(new { code = pickupError,
+                message = "Giờ nhận chưa hợp lệ hoặc chính sách hẹn giờ chưa được phê duyệt. Giữ nguyên mã thao tác để đối soát." },
+                statusCode: pickupError.Contains("POLICY", StringComparison.Ordinal) || pickupError.EndsWith("DISABLED", StringComparison.Ordinal) ? 503 : 409);
         var variantIds = req.Items.Select(x => x.MaCauHinhMon).Distinct().ToList();
         var variants = await (
             from v in db.CauHinhMon.AsNoTracking()
@@ -265,6 +273,7 @@ public static class CustomerOrdersEndpoints
             KhoangCachGiaoKm = req.KhoangCachKm,
             PhiGiaoHangBanDau = priceSummary.PhiGiaoHang,
             PhiGiaoHangHienTai = priceSummary.PhiGiaoHang,
+            ThoiDiemHenNhan = req.ThoiDiemHenNhan?.UtcDateTime,
             TrangThai = "PENDING_PAYMENT",
             GhiChu = req.GhiChu,
             HetHanLuc = expiresAt,
