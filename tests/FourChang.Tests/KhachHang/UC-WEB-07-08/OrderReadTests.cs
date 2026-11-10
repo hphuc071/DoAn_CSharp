@@ -217,8 +217,18 @@ public sealed class OrderReadTests
         var stub = new Stub(_ => throw new InvalidOperationException("No outbound request allowed"));
         var index = Page(new OrdersPage(Client(stub)), token);
         var detail = Page(new DetailsModel(Client(stub)), token);
-        Assert.Equal(503, Assert.IsType<ObjectResult>(await index.OnPostCancelAsync(7, "Đổi ý", default)).StatusCode);
-        Assert.Equal(503, Assert.IsType<ObjectResult>(await detail.OnPostCancelAsync(7, "Đổi ý", default)).StatusCode);
+       Assert.Equal(
+    503,
+    Assert.IsType<ObjectResult>(
+        await detail.OnPostCancelAsync(
+            7,
+            "Đổi ý",
+            Convert.ToBase64String(new byte[8]),
+            Guid.NewGuid(),
+            default
+        )
+    ).StatusCode
+);
         Assert.Equal(0, stub.Calls);
     }
 
@@ -228,9 +238,23 @@ public sealed class OrderReadTests
         var stub = new Stub(_ => throw new InvalidOperationException());
         var page = Page(new DetailsModel(Client(stub)), null);
         Assert.IsType<RedirectToPageResult>(await page.OnGetAsync(7, default));
-        Assert.IsType<UnauthorizedResult>(await page.OnPostCancelAsync(7, "Đổi ý", default));
+       Assert.IsType<UnauthorizedResult>(
+    await page.OnPostCancelAsync(
+        7,
+        "Đổi ý",
+        Convert.ToBase64String(new byte[8]),
+        Guid.NewGuid(),
+        default));
         Page(page); await page.OnGetAsync(-1, default); Assert.Equal(404, page.Response.StatusCode);
-        Assert.IsType<BadRequestObjectResult>(await page.OnPostCancelAsync(7, " ", default)); Assert.Equal(0, stub.Calls);
+        Assert.IsType<BadRequestObjectResult>(
+    await page.OnPostCancelAsync(
+        7,
+        " ",
+        Convert.ToBase64String(new byte[8]),
+        Guid.NewGuid(),
+        default));
+
+Assert.Equal(0, stub.Calls);
     }
 
     [Theory]

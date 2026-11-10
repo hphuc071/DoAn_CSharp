@@ -57,6 +57,33 @@ public sealed class CheckoutProxyTests
     }
 
     [Theory]
+    [InlineData("text/plain", "not json")]
+    [InlineData("application/json", "{")]
+    public async Task QuoteRejectsInvalidMediaOrJsonWithoutCallingBackend(string contentType, string body)
+    {
+        var stub = new Stub(_ => throw new InvalidOperationException("Must not call Backend"));
+        var page = Page(stub, Order);
+        page.Request.ContentType = contentType;
+        page.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
+        Assert.IsType<BadRequestObjectResult>(await page.OnPostQuoteAsync(default));
+        Assert.Equal(0, stub.Calls);
+    }
+
+    [Theory]
+    [InlineData("text/plain", "not json")]
+    [InlineData("application/json", "{")]
+    public async Task CreateRejectsInvalidMediaOrJsonWithoutCallingBackend(string contentType, string body)
+    {
+        var stub = new Stub(_ => throw new InvalidOperationException("Must not call Backend"));
+        var command = new Checkout.CheckoutCommand(Operation, 45000, Order);
+        var page = Page(stub, command);
+        page.Request.ContentType = contentType;
+        page.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(body));
+        Assert.IsType<BadRequestObjectResult>(await page.OnPostCreateAsync(default));
+        Assert.Equal(0, stub.Calls);
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("false")]
     [InlineData("")]

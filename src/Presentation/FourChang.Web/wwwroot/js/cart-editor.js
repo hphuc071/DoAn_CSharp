@@ -44,6 +44,8 @@
     const topsHost = element("fieldset"); topsHost.append(element("legend", "Topping — số phần trên mỗi ly")); form.append(topsHost);
     const quantity = input("Số ly", element("input"), form); quantity.type = "number"; quantity.min = "1"; quantity.max = "99"; quantity.required = true; quantity.value = old?.quantity ?? 1;
     const note = input("Ghi chú", element("textarea"), form); note.maxLength = 500; note.value = old?.note ?? "";
+    const noteHelp = element("p", "Ghi chú không thay đổi công thức/BOM hoặc giá. Muốn đổi thành phần (ví dụ không sữa) nhưng không có tùy chọn cấu trúc, hãy hỏi quán; không coi ghi chú là yêu cầu đã được xác nhận.");
+    noteHelp.className = "fine-print"; form.append(noteHelp);
     const price = element("p"); price.dataset.editorTotal = ""; form.append(price);
     const save = element("button", old ? "Lưu món và xác nhận giá" : "Thêm vào giỏ"); save.type = "submit"; save.disabled = true; save.dataset.editorSave = ""; form.append(save);
     const cancel = element("button", "Đóng / bỏ chỉnh sửa"); cancel.type = "button"; cancel.onclick = onCancel; form.append(cancel);

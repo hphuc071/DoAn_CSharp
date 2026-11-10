@@ -1,0 +1,35 @@
+@page "/Checkout/DemoQr"
+@model FourChang.Web.Pages.Checkout.DemoQrModel
+@{ ViewData["Title"] = "UC07 - Xem trước QR demo"; }
+
+<div class="breadcrumb"><a asp-page="/Orders/Index">Đơn hàng của tôi</a> / Xem trước QR demo</div>
+<section class="panel payment-panel">
+    <p class="eyebrow">UC-WEB-07 · XEM TRƯỚC GIAO DIỆN</p>
+    <h1>Thanh toán QR — bản mô phỏng</h1>
+    <div class="notice" role="note">
+        <strong>CHẾ ĐỘ DEMO — KHÔNG CHUYỂN TIỀN THẬT</strong>
+        <p>Không có đơn hàng thật, tài khoản thụ hưởng, kết nối ngân hàng hoặc xác nhận thanh toán.</p>
+    </div>
+
+    <dl class="bank-details">
+        <div><dt>Mã đơn minh họa</dt><dd>DEMO-ORDER-001</dd></div>
+        <div><dt>Giá giỏ được Backend báo (chỉ để minh họa)</dt><dd id="demo-cart-quoted-total">Chưa có báo giá cho giỏ</dd></div>
+        <div><dt>Trạng thái minh họa</dt><dd>Chờ thanh toán (giả lập)</dd></div>
+    </dl>
+
+    <figure>
+        <img src="~/images/uc07-demo-only.png" asp-append-version="true"
+             alt="QR 4CHANG demo, chỉ chứa thông điệp DEMO ONLY - NO BANK PAYMENT"
+             width="260" height="310" style="max-width:100%;height:auto" />
+        <figcaption>Quét thử chỉ hiển thị thông điệp demo; đây không phải mã VietQR nhận tiền.</figcaption>
+    </figure>
+    <p id="demo-cart-quote-status" class="fine-print" role="status">Trang chỉ kiểm tra lại báo giá mang đi qua Backend khi bạn chuyển từ Checkout. Không tạo đơn và không thu tiền.</p>
+    <p class="fine-print">Mã đơn và trạng thái chỉ để minh họa. Giá báo lại của giỏ (nếu có) không phải số tiền thanh toán theo một đơn thật. QR không chứa tài khoản ngân hàng hay số tiền.</p>
+    <a class="button secondary" href="/Checkout">Quay lại Checkout</a>
+    <a class="button secondary" asp-page="/Orders/Index">Quay lại đơn hàng của tôi</a>
+</section>
+
+<div id="demo-quote-antiforgery" hidden>@Html.AntiForgeryToken()</div>
+@section Scripts {
+    <script src="~/js/demo-qr-quote.js" asp-append-version="true"></script>
+}

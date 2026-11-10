@@ -41,6 +41,8 @@ public static class CustomerOrderPresentation
         value.OriginalShippingFee >= value.ShippingFee && value.ShippingFee >= 0 &&
         value.Lines.All(x => x is not null && x.Id > 0 && x.Toppings is not null && x.Quantity > 0 && x.Cancelled >= 0 &&
             x.Cancelled <= x.Quantity && x.BasePrice >= 0 && x.Started >= 0 && x.Prepared >= 0 &&
+            // BR-15: only unstarted cups may be cancelled; finished cups must have started.
+            x.Started <= x.Quantity - x.Cancelled && x.Prepared <= x.Started &&
             x.Toppings.All(t => t is not null && t.Portions > 0 && t.Price >= 0)) &&
         value.Payments.All(x => x is not null && x.Id > 0 && x.Method == "BANK_TRANSFER" && x.Requested >= 0 &&
             x.Verified >= 0 && CustomerOrderStates.Payments.Contains(x.Status)) &&

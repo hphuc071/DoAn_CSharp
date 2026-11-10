@@ -48,7 +48,8 @@
         }
         <p id="payment-qr-expiry" class="notice" role="status" hidden></p>
         <p class="fine-print">Snapshot UTC: @order.SnapshotUtc.ToString("u"). Tải lại chỉ đọc trạng thái; không tự xác nhận PAID, không yêu cầu chuyển lại khi chưa rõ kết quả.</p>
-        <a class="button primary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
+        <a class="button primary" href="@(Request.Path + Request.QueryString)">Tôi đã chuyển — kiểm tra trạng thái từ Backend</a>
+        <p class="fine-print">Thao tác này chỉ đọc trạng thái đã được xác minh; không tự đánh dấu đã thanh toán, không tạo khoản thu và không gửi lại tiền.</p>
         <a class="button secondary" asp-page="/Orders/Details" asp-route-orderId="@order.Order.Id"
            asp-route-ReturnPage="@Model.ReturnPage" asp-route-ReturnStatus="@Model.ReturnStatus"
            asp-route-ReturnFromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ReturnToUtc="@(Model.ReturnToUtc?.ToString("O"))">Chi tiết đơn</a>

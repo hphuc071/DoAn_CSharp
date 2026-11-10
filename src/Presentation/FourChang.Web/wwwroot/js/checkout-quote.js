@@ -23,7 +23,8 @@
   function getCart() {
     try {
       const cart = JSON.parse(localStorage.getItem(KEY) || "[]");
-      if (!Array.isArray(cart)) throw new Error("Giỏ hàng không hợp lệ.");
+      if (!Array.isArray(cart) || cart.some(row => !row || typeof row !== "object" || Array.isArray(row)))
+        throw new Error("Giỏ hàng không hợp lệ.");
       return cart;
     } catch {
       throw new Error("Không đọc được giỏ hàng nháp. Vui lòng quay lại Giỏ hàng.");
@@ -49,9 +50,17 @@
     controller = new AbortController();
     const signal = controller.signal;
     const mode = tabs.querySelector("[data-tab].selected")?.dataset.tab;
+    // Discard ALL previous server values immediately when the mode/cart changes.
+    // Keeping the last TAKEAWAY total while showing DINE_IN or DELIVERY would
+    // falsely imply that an unverified table/delivery fee has been approved.
     if (baseLabel) baseLabel.textContent = "Tạm tính giá cơ sở";
+    base.textContent = "Chưa xác nhận";
+    shipping.textContent = "Chưa báo giá";
+    total.textContent = "Chưa thể đặt đơn";
     if (mode !== "takeaway") {
-      // Checkout preview has no validated delivery distance or real table token.
+      warning.textContent = mode === "delivery"
+        ? "Chưa có địa chỉ, khoảng cách và phí giao được Backend xác minh. Không dùng báo giá mang đi."
+        : "Chưa có QR bàn được Backend xác minh. Không dùng báo giá mang đi cho đơn tại bàn.";
       return;
     }
     if (!token) {
@@ -65,7 +74,7 @@
       const cart = getCart();
       if (cart.length < 1 || cart.length > 50)
         throw new Error("Giỏ hàng trống hoặc quá nhiều dòng món.");
-      const ids = [...new Set(cart.map(i => Number(i.productId)))];
+      const ids = [...new Set(cart.map(i => i.productId))];
       if (ids.some(id => !Number.isSafeInteger(id) || id < 1))
         throw new Error("Giỏ hàng có mã món không hợp lệ.");
       const variantsByProduct = new Map(await Promise.all(ids.map(async id => {
@@ -77,12 +86,14 @@
         return [id, variants];
       })));
       const items = cart.map(item => {
-        const id = Number(item.variantId);
-        const qty = Number(item.quantity);
-        if (!Number.isSafeInteger(id) || id <= 0 || !Number.isInteger(qty) || qty < 1 || qty > 99)
+        const id = item.variantId;
+        const qty = item.quantity;
+        // The cart renderer and checkout must agree: never coerce corrupt draft IDs or quantities.
+        if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(qty) || qty < 1 || qty > 99 ||
+            !Number.isSafeInteger(item.listedPrice) || item.listedPrice < 0)
           throw new Error("Mã biến thể hoặc số lượng không hợp lệ.");
         const variant = (variantsByProduct.get(Number(item.productId)) || [])
-          .find(v => Number(v.maCauHinhMon) === id);
+          .find(v => v.maCauHinhMon === id);
         if (!variant || !variant.available)
           throw new Error(`${item.name || "Món"} không còn khả dụng. Vui lòng chỉnh giỏ.`);
         const sugar = percent(item.sugar);
@@ -93,7 +104,9 @@
         const toppings = [];
         if (item.draftVersion === 2) {
           if (!Array.isArray(item.toppings) || item.toppings.length > 10 ||
-              new Set(item.toppings.map(t => t?.id)).size !== item.toppings.length)
+              new Set(item.toppings.map(t => t?.id)).size !== item.toppings.length ||
+              item.toppings.some(t => !t || !Number.isSafeInteger(t.id) || t.id <= 0 ||
+                !Number.isSafeInteger(t.price) || t.price < 0))
             throw new Error("Snapshot topping không hợp lệ; hãy sửa dòng giỏ.");
           for (const top of item.toppings) {
             const matches = (variant.toppings || []).filter(t => t.maMonThem === top?.id && t.available === true);
@@ -113,12 +126,19 @@
             throw new Error("Số phần topping vượt giới hạn cấu hình món.");
           toppings.push({ maMonThem: matches[0].maMonThem, soPhanMoiLy: qtyTop });
         }
+        // Do not silently truncate a customer's instructions. A quote must
+        // describe the exact same draft that the customer will confirm.
+        if (item.note != null && typeof item.note !== "string")
+          throw new Error("Ghi chú trong giỏ không hợp lệ. Vui lòng sửa dòng món.");
+        const note = item.note || "";
+        if (note.length > 500)
+          throw new Error("Ghi chú vượt 500 ký tự. Vui lòng sửa dòng món trước khi báo giá.");
         return {
           maCauHinhMon: id,
           soLuong: qty,
           phanTramDuong: sugar,
           phanTramDa: ice,
-          ghiChu: String(item.note || "").slice(0, 500),
+          ghiChu: note,
           toppings
         };
       });
@@ -144,12 +164,17 @@
       });
       const price = await json(res);
       if (seq !== current || signal.aborted) return;
-      if ((localStorage.getItem(KEY) || "[]") !== cartRaw) return;
+      if ((localStorage.getItem(KEY) || "[]") !== cartRaw) {
+        fail("Giỏ hàng đã thay đổi trong lúc báo giá. Vui lòng lấy báo giá mới.");
+        return;
+      }
       if (![price.tienHang, price.phiGiaoHang, price.tongCong].every(x =>
         typeof x === "number" && Number.isSafeInteger(x) && x >= 0) ||
           !Number.isSafeInteger(price.tienHang + price.phiGiaoHang) ||
-          price.tongCong !== price.tienHang + price.phiGiaoHang)
-        throw new Error("Báo giá từ Backend không hợp lệ.");
+          price.tongCong !== price.tienHang + price.phiGiaoHang ||
+          // BR-16: TAKEAWAY is never charged a delivery fee.
+          price.phiGiaoHang !== 0)
+        throw new Error("Báo giá mang đi từ Backend không hợp lệ; không được tính phí giao.");
       base.textContent = money(price.tienHang);
       if (baseLabel) baseLabel.textContent = "Tiền món (Backend báo giá)";
       shipping.textContent = money(price.phiGiaoHang);
@@ -170,4 +195,6 @@
   window.addEventListener("storage", event => { if (event.key === KEY || event.key === null) refresh(); });
   window.addEventListener("pageshow", refresh);
   window.addEventListener("checkout:refresh", refresh);
+  // localStorage does not emit a storage event in the same tab.
+  window.addEventListener("cart:changed", refresh);
 })();

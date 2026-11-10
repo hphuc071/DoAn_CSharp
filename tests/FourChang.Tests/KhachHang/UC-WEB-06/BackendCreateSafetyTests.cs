@@ -86,6 +86,21 @@ public sealed class BackendCreateSafetyTests
         Assert.Equal(0, monitor.Attempts);
     }
 
+
+    [Fact]
+    public async Task Takeaway_pricing_rejects_delivery_distance_before_sql()
+    {
+        var monitor = new BlockSql();
+        await using var db = new CafeDbContext(new DbContextOptionsBuilder<CafeDbContext>()
+            .UseSqlServer("Server=forbidden.invalid;Database=NoDatabase;Integrated Security=true")
+            .AddInterceptors(monitor).Options);
+        var error = await Assert.ThrowsAsync<OrderQuoteValidationException>(() =>
+            OrderPricingService.CalculateOrderTotalAsync(db, "TAKEAWAY", 1.5m,
+                [new OrderItemInput(1, 1, 100, 100, null, [])]));
+        Assert.Contains("khoảng cách", error.Message);
+        Assert.Equal(0, monitor.Attempts);
+    }
+
     [Theory]
     [InlineData("DINE_IN")] [InlineData("DELIVERY")] [InlineData("dine_in")] [InlineData("delivery")]
     public async Task Fulfillment_preview_flags_never_unlock_create_or_open_sql(string method)

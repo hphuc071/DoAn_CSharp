@@ -10,7 +10,9 @@
   // releases stock, refreshes a QR, sends money or changes a payment status.
   document.querySelectorAll("[data-payment-qr]").forEach(qr => {
     const raw = qr.getAttribute("data-qr-expires-utc") || "";
-    const expiry = raw.endsWith("Z") ? Date.parse(raw) : NaN;
+    // Accept only ISO timestamps with an explicit timezone (Z or ±hh:mm).
+    // DateTime/DateTimeOffset can serialize a UTC deadline in either form.
+    const expiry = /(?:Z|[+-]\d{2}:\d{2})$/i.test(raw) ? Date.parse(raw) : NaN;
     function checkExpiry() {
       const remaining = expiry - Date.now();
       if (!Number.isFinite(remaining) || remaining <= 0) {

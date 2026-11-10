@@ -49,6 +49,10 @@
   function showReceipt(receipt) {
     document.getElementById("receipt-code").textContent = receipt.maDonHienThi;
     document.getElementById("receipt-total").textContent = money(receipt.tongCong);
+    // Read-only payment page for the exact order returned by the Backend.
+    // The link does not create a payment request or mark the order PAID.
+    document.getElementById("checkout-receipt-payment").href =
+      "/Checkout/Payment?orderId=" + encodeURIComponent(String(receipt.maDonHang));
     // SQL datetime2 may be returned without an offset; Backend stores these timestamps in UTC.
     const deadline = receipt.hetHanLuc;
     document.getElementById("receipt-deadline").textContent = deadline
@@ -59,6 +63,22 @@
   function update() {
     try {
       const intent = readIntent();
+      // Checkout creation is an operator capability, not proof of customer login.
+      // When it is off, IndexModel deliberately skips the ownership API read.
+      // Do not incorrectly tell signed-in customers that they must sign in again.
+      if (!creationEnabled) {
+        button.disabled = true;
+        button.textContent = "Tạo đơn đang tắt";
+        name.disabled = phone.disabled = confirmed.disabled = true;
+        name.value = phone.value = "";
+        confirmed.checked = false;
+        receiptPanel.hidden = pendingDetails.hidden = true;
+        login.hidden = true;
+        status.textContent = intent
+          ? "Tạo đơn đang tắt theo cấu hình. Thao tác cũ vẫn được giữ nguyên; cần người vận hành kiểm tra trước khi thử lại."
+          : "Tạo đơn đang tắt theo cấu hình. Bạn vẫn có thể xem giỏ và báo giá; đăng nhập không tự mở chức năng này.";
+        return;
+      }
       if ((intent && !owns(intent)) || (!intent && (!ownerId || !ownerProof))) {
         button.disabled = true;
         name.disabled = phone.disabled = confirmed.disabled = true;
@@ -167,7 +187,10 @@
           status.textContent = "Đã xác nhận tạo đơn. Chưa xác minh thanh toán. Theo dõi đơn để xem trạng thái hiện tại.";
           try {
             await navigator.locks.request("fourchang.cart-draft.write", () => {
-              if ((localStorage.getItem(CART) || "[]") === intent.cartRaw) localStorage.removeItem(CART);
+              if ((localStorage.getItem(CART) || "[]") === intent.cartRaw) {
+                localStorage.removeItem(CART);
+                window.dispatchEvent(new Event("cart:changed"));
+              }
             });
           } catch {
             status.textContent += " Chưa dọn được giỏ nháp; kiểm tra giỏ trước khi bắt đầu đơn tiếp theo.";

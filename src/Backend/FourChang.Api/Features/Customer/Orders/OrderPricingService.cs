@@ -23,6 +23,8 @@ public static class OrderPricingService
         if (!string.Equals(fulfillmentType, "TAKEAWAY", StringComparison.OrdinalIgnoreCase))
             throw new OrderQuoteValidationException(
                 "Hiện chỉ hỗ trợ báo giá mang đi; tại bàn và giao hàng chưa được xác minh.");
+        if (distanceKm is not null)
+            throw new OrderQuoteValidationException("Báo giá mang đi không nhận khoảng cách giao hàng.");
 
         if (items is null || items.Count is < 1 or > 50)
             throw new OrderQuoteValidationException("Giỏ hàng phải có từ 1 đến 50 dòng món.");
@@ -30,7 +32,7 @@ public static class OrderPricingService
         if (items.Any(i => i is null || i.MaCauHinhMon <= 0 ||
             i.SoLuong is < 1 or > 99 || i.PhanTramDuong is < 0 or > 100 ||
             i.PhanTramDa is < 0 or > 100 ||
-            (i.Toppings?.Count ?? 0) > 10 ||
+            (i.GhiChu?.Length ?? 0) > 500 || (i.Toppings?.Count ?? 0) > 10 ||
             (i.Toppings?.Any(t => t is null || t.MaMonThem <= 0 || t.SoPhanMoiLy < 1) ?? false)))
             throw new OrderQuoteValidationException("Mã món, số lượng hoặc cấu hình không hợp lệ.");
 
@@ -102,7 +104,11 @@ public static class OrderPricingService
             var basePrice = variants[item.MaCauHinhMon];
             if (basePrice < 0m)
                 throw new OrderQuoteValidationException("Giá món trong database không hợp lệ.");
-            subtotal += (basePrice + topPricePerCup) * item.SoLuong;
+            try { subtotal = checked(subtotal + (basePrice + topPricePerCup) * item.SoLuong); }
+            catch (OverflowException) { throw new OrderQuoteValidationException("Tổng tiền vượt giới hạn tính toán."); }
+            // A SQL decimal(18,0) total cannot represent more than 18 integral digits.
+            if (subtotal > 999999999999999999m)
+                throw new OrderQuoteValidationException("Tổng tiền vượt giới hạn lưu trữ; vui lòng giảm giỏ hàng.");
         }
 
         // Only TAKEAWAY can be priced here, so shipping is unconditionally zero.

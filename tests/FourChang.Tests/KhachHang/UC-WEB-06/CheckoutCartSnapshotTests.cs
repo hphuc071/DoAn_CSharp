@@ -28,4 +28,23 @@ public sealed partial class CheckoutBrowserTests
         await Assertions.Expect(page.Locator("#checkout-price-warning")).ToContainTextAsync("không còn hiệu lực");
         Assert.Null(await page.EvaluateAsync<object?>("window.fourchangCheckoutQuote")); Assert.Empty(bodies);
     }
+
+    [Fact]
+    public async Task Same_tab_cart_change_invalidates_checkout_quote_and_consent()
+    {
+        var page = await Open(seedCart: true);
+        await Confirm(page);
+        await page.EvaluateAsync("""
+            () => {
+                localStorage.setItem('fourchang.cart-draft.v1', '[]');
+                window.dispatchEvent(new Event('cart:changed'));
+            }
+            """);
+        await Assertions.Expect(page.Locator("#checkout-proceed")).ToBeDisabledAsync();
+        await Assertions.Expect(page.Locator("#checkout-confirmed")).Not.ToBeCheckedAsync();
+        await Assertions.Expect(page.Locator("#checkout-cart-count")).ToContainTextAsync("trống");
+        await Assertions.Expect(page.Locator("#checkout-total")).ToHaveTextAsync("Chưa thể báo giá");
+        Assert.Null(await page.EvaluateAsync<object?>("window.fourchangCheckoutQuote"));
+        Assert.Empty(bodies);
+    }
 }

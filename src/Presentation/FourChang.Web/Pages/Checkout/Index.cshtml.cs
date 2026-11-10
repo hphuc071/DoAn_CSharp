@@ -78,18 +78,26 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
         {
             return BadRequest(new { message = "Yêu cầu phải là JSON hợp lệ." });
         }
+        catch (Exception ex) when (ex is NotSupportedException or InvalidOperationException)
+        {
+            // Unsupported Content-Type or an invalid request body is a client error,
+            // not an unhandled 500 and must never reach the pricing API.
+            return BadRequest(new { message = "Yêu cầu báo giá phải có nội dung JSON hợp lệ." });
+        }
 
         if (request?.Items is null || request.Items.Count is < 1 or > 50)
             return BadRequest(new { message = "Giỏ hàng không hợp lệ." });
 
         // Do not price DELIVERY until a server-verified distance/fee exists;
         // do not price DINE_IN until a real table token is validated.
-        if (!string.Equals(request.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal))
-            return BadRequest(new { message = "Bản xem trước chỉ báo giá hình thức mang đi." });
+        if (!string.Equals(request.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
+            request.MaBanHienThi is not null || request.DiaChiGiao is not null ||
+            request.KhoangCachKm is not null || (request.GhiChu?.Length ?? 0) > 500)
+            return BadRequest(new { message = "Báo giá mang đi không nhận thông tin bàn, địa chỉ, khoảng cách hoặc ghi chú quá dài." });
 
         if (request.Items.Any(i => i is null || i.MaCauHinhMon <= 0 || i.SoLuong is < 1 or > 99 ||
             i.PhanTramDuong is < 0 or > 100 || i.PhanTramDa is < 0 or > 100 ||
-            (i.Toppings?.Count ?? 0) > 10 ||
+            (i.GhiChu?.Length ?? 0) > 500 || (i.Toppings?.Count ?? 0) > 10 ||
             (i.Toppings?.Any(t => t is null || t.MaMonThem <= 0 || t.SoPhanMoiLy < 1) ?? false)))
             return BadRequest(new { message = "Cấu hình món hoặc số lượng không hợp lệ." });
 
@@ -103,6 +111,12 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
             return StatusCode(ex.StatusCode.HasValue ? (int)ex.StatusCode.Value : 503,
                 new { message = "Backend không thể báo giá giỏ hàng. Vui lòng thử lại." });
         }
+        catch (HttpRequestException)
+        { return StatusCode(503, new { message = "Không kết nối được Backend để báo giá. Giỏ nháp được giữ nguyên." }); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        { return StatusCode(504, new { message = "Báo giá bị quá thời gian. Vui lòng kiểm tra lại." }); }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or NotSupportedException)
+        { return StatusCode(502, new { message = "Backend trả báo giá không hợp lệ. Không thể xác nhận tổng tiền." }); }
     }
 
     public sealed record CheckoutCommand(Guid Operation, decimal? AcceptedTotal, CreateCustomerOrderRequest? Order,
@@ -164,8 +178,8 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
 
         CheckoutCommand? command;
         try { command = await Request.ReadFromJsonAsync<CheckoutCommand>(cancellationToken: ct); }
-        catch (Exception ex) when (ex is JsonException or BadHttpRequestException or InvalidOperationException)
-        { return BadRequest(new { message = "Yêu cầu phải là JSON hợp lệ." }); }
+        catch (Exception ex) when (ex is JsonException or BadHttpRequestException or NotSupportedException or InvalidOperationException)
+        { return BadRequest(new { message = "Yêu cầu phải có nội dung JSON hợp lệ." }); }
 
         var order = command?.Order;
         if (command is null || command.Operation == Guid.Empty || command.AcceptedTotal is null or < 0m ||

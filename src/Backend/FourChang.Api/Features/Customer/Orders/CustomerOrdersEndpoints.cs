@@ -33,6 +33,12 @@ public static class CustomerOrdersEndpoints
 
         app.MapPost("/api/customer/orders/quote", async (CreateCustomerOrderRequest req, CafeDbContext db, CancellationToken ct) =>
         {
+            // BR-16: fail closed on a hybrid TAKEAWAY/table/delivery payload at the
+            // API boundary too; direct callers must not bypass the Web validation.
+            if (req is null || !string.Equals(req.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
+                req.MaBanHienThi is not null || req.DiaChiGiao is not null ||
+                req.KhoangCachKm is not null || (req.GhiChu?.Length ?? 0) > 500)
+                return Results.BadRequest(new { message = "Chỉ báo giá mang đi không kèm dữ liệu bàn/giao hàng." });
             try
             {
                 var summary = await OrderPricingService.CalculateOrderTotalAsync(db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
@@ -96,6 +102,12 @@ public static class CustomerOrdersEndpoints
                 !System.Text.RegularExpressions.Regex.IsMatch(req.DienThoaiNguoiNhan ?? "", @"^\+?[0-9]{9,15}\z") ||
                 req.MaBanHienThi is not null || req.DiaChiGiao is not null || req.KhoangCachKm is not null)
             return Results.BadRequest(new { message = "Thông tin nhận mang đi không hợp lệ." });
+
+        // Replays above keep their original receipt. New operations must not write
+        // an order note longer than the Web/quote contract (including direct API callers).
+        if ((req.GhiChu?.Length ?? 0) > 500)
+            return Results.BadRequest(new { code = "CHECKOUT_NOTE_TOO_LONG",
+                message = "Ghi chú đơn hàng không được vượt 500 ký tự." });
 
         if (req.Items is null || req.Items.Count == 0)
             return Results.BadRequest(new { message = "Giỏ hàng đang trống." });

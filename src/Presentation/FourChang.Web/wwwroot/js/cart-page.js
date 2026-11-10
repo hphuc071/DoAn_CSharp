@@ -12,7 +12,16 @@
     lines.replaceChildren();
     let raw, cart;
     try { raw = C.raw(); cart = C.parse(raw); }
-    catch { status.textContent = "Giỏ lưu trên máy bị lỗi. Chưa xóa hoặc ghi đè; chỉ xóa nháp khi bạn xác nhận."; return; }
+    catch {
+      status.textContent = "Giỏ lưu trên máy bị lỗi. Chưa xóa hoặc ghi đè; chỉ xóa nháp khi bạn xác nhận.";
+      // Malformed storage is NOT an empty cart. Never leave an old total/badge
+      // visible as if it reflected the current data.
+      document.getElementById("cart-empty").hidden = true;
+      document.getElementById("cart-count").textContent = "Giỏ không thể đọc; cần kiểm tra";
+      document.getElementById("cart-base-total").textContent = "Không xác định";
+      const badge = document.getElementById("cart-badge"); if (badge) badge.textContent = "!";
+      return;
+    }
     status.textContent = "Giá nháp đã gồm topping khi có snapshot; Checkout kiểm tra lại trước gửi.";
     document.getElementById("cart-empty").hidden = cart.length > 0;
     let sum = 0, valid = true, qty = 0;
@@ -55,10 +64,15 @@
       await navigator.locks.request("fourchang.cart-draft.write", () => {
         if (C.raw() !== before) throw new Error("Giỏ đã đổi ở tab khác; kiểm tra trước khi xóa.");
         localStorage.setItem(C.key, "[]");
+        // A same-tab storage write does not raise the browser's storage event.
+        // Notify other cart/checkout widgets just like FourChangCart.write().
+        window.dispatchEvent(new Event("cart:changed"));
       });
       editor.hidden = true; render();
     } catch (e) { status.textContent = e.message; }
   };
   window.addEventListener("cart:changed", render);
-  window.addEventListener("storage", e => { if (e.key === C.key || e.key === null) render(); }); render();
+  window.addEventListener("storage", e => { if (e.key === C.key || e.key === null) render(); });
+  window.addEventListener("pageshow", render); // Restore a fresh view after back/forward cache.
+  render();
 })();

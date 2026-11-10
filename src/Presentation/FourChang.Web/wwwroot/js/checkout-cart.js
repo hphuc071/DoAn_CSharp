@@ -15,30 +15,29 @@
     const warningElement = document.getElementById("checkout-price-warning");
     const tabsElement = document.querySelector("[data-tabs]");
 
-    if (!countElement || !itemsElement || !subtotalElement || !shippingElement || !totalElement) {
+    if (!countElement || !itemsElement || !subtotalElement || !shippingElement || !totalElement || !warningElement) {
         return;
     }
 
     const money = amount => new Intl.NumberFormat("vi-VN").format(amount) + "đ";
 
     function readCart() {
-        try {
-            const result = JSON.parse(localStorage.getItem(KEY) || "[]");
-            return Array.isArray(result) ? result.filter(x => x && typeof x === "object") : [];
-        } catch {
-            return [];
-        }
+        // Never silently drop malformed draft rows or pretend a broken draft is empty.
+        // UC05 requires preserving the original draft for repair before Checkout.
+        const stored = localStorage.getItem(KEY);
+        const result = stored === null ? [] : JSON.parse(stored);
+        if (!Array.isArray(result) || result.some(x => !x || typeof x !== "object" || Array.isArray(x)))
+            throw new Error("Giỏ nháp không hợp lệ.");
+        return result;
     }
 
     function validPrice(item) {
-        const amount = Number(item.listedPrice);
-        return item.listedPrice !== null && item.listedPrice !== undefined &&
-            Number.isSafeInteger(amount) && amount >= 0;
+        // Match cart-draft.js: a numeric string is not a verified price snapshot.
+        return Number.isSafeInteger(item.listedPrice) && item.listedPrice >= 0;
     }
 
     function validQuantity(item) {
-        const n = Number(item.quantity);
-        return Number.isSafeInteger(n) && n >= 1 && n <= 99;
+        return Number.isSafeInteger(item.quantity) && item.quantity >= 1 && item.quantity <= 99;
     }
 
     function appendLine(description, amount) {
@@ -52,9 +51,20 @@
     }
 
     function render() {
-        const cart = readCart();
         const activeMode = tabsElement?.querySelector("[data-tab].selected")?.dataset.tab || "delivery";
         itemsElement.replaceChildren();
+        let cart;
+        try {
+            cart = readCart();
+        } catch {
+            countElement.textContent = "Không đọc được giỏ nháp; cần kiểm tra lại.";
+            appendLine("Giỏ nháp cần sửa", "Không xác định");
+            subtotalElement.textContent = "Không xác định";
+            shippingElement.textContent = "Chưa báo giá";
+            totalElement.textContent = "Chưa thể đặt đơn";
+            warningElement.textContent = "Giỏ lưu trên máy không hợp lệ hoặc không truy cập được. Chưa xóa hay ghi đè dữ liệu; quay lại Giỏ hàng để kiểm tra trước khi đặt.";
+            return;
+        }
 
         if (!cart.length) {
             countElement.textContent = "Giỏ hàng đang trống.";
@@ -101,8 +111,8 @@
             }
 
             if (!qtyOk || !priceOk || !snapshotOk || !Number.isSafeInteger(qty * price) ||
-                !Number.isSafeInteger(baseSubtotal + qty * price) || !Number.isSafeInteger(Number(item.variantId)) ||
-                Number(item.variantId) <= 0) {
+                !Number.isSafeInteger(baseSubtotal + qty * price) || !Number.isSafeInteger(item.variantId) ||
+                item.variantId <= 0) {
                 invalid = true;
             }
 
@@ -143,5 +153,7 @@
     });
     window.addEventListener("pageshow", render);
     window.addEventListener("checkout:refresh", render);
+    // Re-render after an edit from this tab; storage fires only in other tabs.
+    window.addEventListener("cart:changed", render);
     render();
 })();

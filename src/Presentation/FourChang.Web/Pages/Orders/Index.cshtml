@@ -1,6 +1,8 @@
 @page "/Orders"
 @model FourChang.Web.Pages.Orders.IndexModel
 @using FourChang.Presentation.Shared.Contracts.Customer
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostingEnvironment
 @{ ViewData["Title"] = "Đơn hàng của tôi"; }
 <div class="page-heading"><h1>Đơn hàng của tôi</h1><a href="/" class="button secondary">Thực đơn</a></div>
 <section class="panel">
@@ -21,7 +23,14 @@
     {
         <div data-order-private>
         <p role="status">Cập nhật UTC: @snapshot.SnapshotUtc.ToString("u") · @snapshot.TotalCount đơn phù hợp</p>
-        @if (snapshot.Items.Count == 0) { <p>Chưa có đơn phù hợp với bộ lọc.</p> }
+        @if (snapshot.Items.Count == 0)
+        {
+            <p>Chưa có đơn phù hợp với bộ lọc. Bạn có thể xem thực đơn và giỏ hàng mà không cần tạo đơn mới.</p>
+            @if (FourChang.Web.Pages.Checkout.DemoQrModel.IsPreviewEnabled(Configuration["Demo:PaymentQrEnabled"], HostingEnvironment.EnvironmentName))
+            {
+                <p class="fine-print" role="note"><a id="orders-demo-preview" href="/Checkout/DemoQr">Xem QR UC07 mô phỏng — không gắn với đơn hàng hay thanh toán thật</a></p>
+            }
+        }
         @foreach (var order in snapshot.Items)
         {
             <article class="line-item"><div>
