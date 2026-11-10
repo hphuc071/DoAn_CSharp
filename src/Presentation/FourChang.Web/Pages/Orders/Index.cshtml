@@ -17,11 +17,14 @@
         <button class="button primary" type="submit">Lọc / Tải lại</button>
         <a asp-page="/Orders/Index">Bỏ lọc</a>
     </form>
-    <p class="muted">Snapshot tại thời điểm tải, không cập nhật trực tiếp. Bấm tải lại để xem trạng thái mới; mở lại trang không tạo giao dịch.</p>
+    <p class="muted">Snapshot tự tải lại từ Backend mỗi 30 giây khi đang xem, có mạng và chưa chỉnh bộ lọc (polling, không phải luồng realtime). Có thể bấm Lọc / Tải lại để kiểm tra ngay; thao tác này chỉ đọc.</p>
     @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
     @if (Model.Snapshot is { } snapshot)
     {
-        <div data-order-private>
+        <div data-order-private data-order-auto-refresh>
+        <a data-order-refresh-target asp-page="/Orders/Index" asp-route-PageNumber="@Model.PageNumber"
+           asp-route-Status="@Model.Status" asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))"
+           asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))" hidden aria-hidden="true" tabindex="-1"></a>
         <p role="status">Cập nhật UTC: @snapshot.SnapshotUtc.ToString("u") · @snapshot.TotalCount đơn phù hợp</p>
         @if (snapshot.Items.Count == 0)
         {
@@ -55,4 +58,7 @@
         </div>
     }
 </section>
-@section Scripts { <script src="~/js/order-snapshot.js" asp-append-version="true"></script> }
+@section Scripts {
+    <script src="~/js/order-snapshot.js" asp-append-version="true"></script>
+    <script src="~/js/orders-auto-refresh.js" asp-append-version="true"></script>
+}

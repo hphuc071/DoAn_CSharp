@@ -32,7 +32,12 @@
 
     @if (order is not null)
     {
-        <div data-order-private>
+        <div data-order-private data-order-auto-refresh>
+        <a data-order-refresh-target asp-page="/Orders/Details" asp-route-orderId="@order.Order.Id"
+           asp-route-ReturnPage="@Model.ReturnPage" asp-route-ReturnStatus="@Model.ReturnStatus"
+           asp-route-ReturnFromUtc="@(Model.ReturnFromUtc?.ToString("O"))"
+           asp-route-ReturnToUtc="@(Model.ReturnToUtc?.ToString("O"))"
+           hidden aria-hidden="true" tabindex="-1"></a>
             <h2>@order.Order.Code · @order.Order.Status</h2>
 
             <p>
@@ -49,7 +54,7 @@
 
             <p role="status">
                 Snapshot UTC @order.SnapshotUtc.ToString("u").
-                Dữ liệu có thể đã thay đổi; tải lại để cập nhật.
+                Trang tự làm mới snapshot bằng GET mỗi 30 giây khi đang xem và chưa nhập biểu mẫu (polling, không phải realtime). Có thể tải lại ngay.
             </p>
 
             <a class="button secondary"
@@ -271,5 +276,7 @@
 @section Scripts
 {
     <script src="~/js/order-snapshot.js"
+            asp-append-version="true"></script>
+    <script src="~/js/orders-auto-refresh.js"
             asp-append-version="true"></script>
 }
