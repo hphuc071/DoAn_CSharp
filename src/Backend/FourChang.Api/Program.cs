@@ -1,4 +1,5 @@
 using FourChang.Api.Features.Admin.Employees;
+using FourChang.Api.Features.Admin.Tables;
 using FourChang.Api.Features.Staff.Data;
 using FourChang.Api.Features.Customer.Orders;
 
@@ -65,7 +66,7 @@ try
     {
         await using var connection=new SqlConnection(DatabaseSettings.ConnectionString());await connection.OpenAsync();await DatabaseBootstrap.ValidateAsync(connection);return Results.Ok(new{status="ready",tables=db.Model.GetEntityTypes().Count()});
     });
-    app.MapAdminAccount();app.MapPosDevices();app.MapAuth();app.MapCustomerOrders();app.MapCatalog();app.MapWork();app.MapEmployees();app.MapData();app.MapStaffData();app.MapAdminCustomers();app.MapCustomerTemporaryPassword();app.MapCustomerSelf();
+    app.MapAdminAccount();app.MapTableQrAdministration();app.MapPosDevices();app.MapAuth();app.MapCustomerOrders();app.MapCatalog();app.MapWork();app.MapEmployees();app.MapData();app.MapStaffData();app.MapAdminCustomers();app.MapCustomerTemporaryPassword();app.MapCustomerSelf();
     app.Run();
 }
 catch(Exception exception)
