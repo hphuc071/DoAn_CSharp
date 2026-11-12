@@ -2,6 +2,8 @@ namespace FourChang.Domain.Entities.Orders;
 
 public sealed class DonHang
 {
+    // Trường nghiệp vụ UC-ADM-06..10 đã được chấp thuận, không tạo bảng mới.
+    public string? MaXuLyNgoaiLe { get; set; }
     public long MaDonHang { get; set; }
     public string MaDonHienThi { get; set; } = string.Empty;
     public long? MaKhachHang { get; set; }

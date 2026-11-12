@@ -88,6 +88,7 @@ public sealed class CustomersUiTests
                 Field<TextBox>(create, "CustomerUsername").Text = "uiqa" + stamp;
                 Field<TextBox>(create, "CustomerName").Text = "Khách kiểm tra giao diện";
                 Field<TextBox>(create, "CustomerEmail").Text = "uiqa" + stamp + "@example.test";
+                Field<TextBox>(create, "CustomerPhone").Text = TestData.Phone();
                 Check(Field<TextBox>(create, "CustomerTemporaryPassword").UseSystemPasswordChar, "Mật khẩu tạm được che trên biểu mẫu");
                 Capture(create, "customer-create");
                 Field<Button>(create, "CustomerSave").PerformClick();

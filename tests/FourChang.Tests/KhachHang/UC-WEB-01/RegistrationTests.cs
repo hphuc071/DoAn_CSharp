@@ -56,7 +56,7 @@ public sealed class RegistrationTests
         await using var api = await TestApi.Start("UC-WEB-01-E1");
         var stamp = Guid.NewGuid().ToString("N");
 
-        // Ngoại lệ E1: Mật khẩu ngắn hơn 10 ký tự hoặc xác nhận không khớp
+        // Ngoại lệ E1: Mật khẩu ngắn hơn 5 ký tự hoặc xác nhận không khớp
         var invalidBody = Body(
             ("MaThaoTac", NewId()),
             ("TenDangNhap", "err" + stamp[..12]),

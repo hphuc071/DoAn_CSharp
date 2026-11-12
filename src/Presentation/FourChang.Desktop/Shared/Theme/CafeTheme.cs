@@ -3,46 +3,59 @@ namespace FourChang.Desktop.Shared.Theme;
 
 public static class CafeTheme
 {
-    public static readonly Color Coffee = ColorTranslator.FromHtml("#75452D");
-    public static readonly Color Dark = ColorTranslator.FromHtml("#30261F");
-    public static readonly Color Cream = ColorTranslator.FromHtml("#F3EEE3");
-    public static readonly Color Surface = ColorTranslator.FromHtml("#FFFCF7");
-    public static readonly Color Line = ColorTranslator.FromHtml("#DDD3C3");
-    public static readonly Color Muted = ColorTranslator.FromHtml("#796E60");
-    public static readonly Color Ink = ColorTranslator.FromHtml("#302922");
-    public static readonly Color Sage = ColorTranslator.FromHtml("#EAF5E2");
-    public static readonly Color Amber = ColorTranslator.FromHtml("#FFF1D5");
-    public static readonly Color Danger = ColorTranslator.FromHtml("#AE4036");
-    public static Font Body(float size = 10) => new("Segoe UI", size);
-    public static Font Strong(float size = 10) => new("Segoe UI", size, FontStyle.Bold);
+    // Một palette cố định: không đọc theme, hệ điều hành hoặc cấu hình màu cũ.
+    public static Color Coffee => ColorTranslator.FromHtml("#805033");
+    public static Color Dark => ColorTranslator.FromHtml("#3A2E25");
+    public static Color Cream => ColorTranslator.FromHtml("#FBF8F2");
+    public static Color Surface => ColorTranslator.FromHtml("#FFFDF9");
+    public static Color Selection => ColorTranslator.FromHtml("#F0DDC7");
+    public static Color Soft => ColorTranslator.FromHtml("#F4ECE0");
+    public static Color InputBorder => ColorTranslator.FromHtml("#A28D77");
+    public static Color Line => ColorTranslator.FromHtml("#E1D5C5");
+    public static Color Muted => ColorTranslator.FromHtml("#716252");
+    public static Color Ink => ColorTranslator.FromHtml("#302922");
+    public static Color Accent => ColorTranslator.FromHtml("#805033");
+    public static Color Sage => ColorTranslator.FromHtml("#E8F1E5");
+    public static Color SuccessInk => ColorTranslator.FromHtml("#345F37");
+    public static Color Amber => ColorTranslator.FromHtml("#FFF0D5");
+    public static Color AmberInk => ColorTranslator.FromHtml("#80561E");
+    public static Color Danger => ColorTranslator.FromHtml("#A53E33");
+    /// <summary>Tạo font nội dung hỗ trợ tiếng Việt, giữ thống nhất với các control chung.</summary>
+    public static Font Body(float size = 10) => CafeTypography.Create(size);
+    /// <summary>Tạo font đậm cho tiêu đề và hành động để phân cấp nội dung mà không đổi thương hiệu.</summary>
+    public static Font Strong(float size = 10) => CafeTypography.Create(size, FontStyle.Bold);
     public const string Brand = "4CHANG LINH NGU LAM";
-    public static GraphicsPath Rounded(RectangleF rect, float radius = 7)
+    /// <summary>Dựng đường bo góc dùng chung cho panel và nút; caller giải phóng tài nguyên đồ họa sau khi vẽ.</summary>
+    public static GraphicsPath Rounded(RectangleF rect, float radius = 12)
     {
         var p = new GraphicsPath();
         // AutoSize có thể tạo kích thước 0 trong lúc sắp layout; không gửi hình học âm/rỗng vào GDI+.
         if (rect.Width <= 0 || rect.Height <= 0) return p;
         float d = Math.Min(radius * 2, Math.Min(rect.Width, rect.Height));
-        p.AddArc(rect.Left,rect.Top,d,d,180,90);p.AddArc(rect.Right-d,rect.Top,d,d,270,90);
-        p.AddArc(rect.Right-d,rect.Bottom-d,d,d,0,90);p.AddArc(rect.Left,rect.Bottom-d,d,d,90,90);p.CloseFigure();return p;
+        p.AddArc(rect.Left, rect.Top, d, d, 180, 90); p.AddArc(rect.Right - d, rect.Top, d, d, 270, 90);
+        p.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90); p.AddArc(rect.Left, rect.Bottom - d, d, d, 90, 90); p.CloseFigure(); return p;
     }
 }
 
 public sealed class SurfacePanel : Panel
 {
+    /// <summary>Tạo surface dùng chung có double buffering và khoảng đệm để giảm nhấp nháy.</summary>
     public SurfacePanel() { BackColor = CafeTheme.Surface; DoubleBuffered = true; Padding = new Padding(18); }
+    /// <summary>Vẽ nền theo màu surface của thương hiệu thay vì để màu mặc định của Windows.</summary>
     protected override void OnPaintBackground(PaintEventArgs e)
     {
-        if (Width < 2 || Height < 2) return; e.Graphics.Clear(Parent?.BackColor ?? CafeTheme.Cream);e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;
-        using var path=CafeTheme.Rounded(new RectangleF(0,0,Width-1,Height-1));using var fill=new SolidBrush(BackColor);e.Graphics.FillPath(fill,path);
+        if (Width < 2 || Height < 2) return; e.Graphics.Clear(Parent?.BackColor ?? CafeTheme.Cream); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        using var path = CafeTheme.Rounded(new RectangleF(0, 0, Width - 1, Height - 1)); using var fill = new SolidBrush(BackColor); e.Graphics.FillPath(fill, path);
     }
-    protected override void OnPaint(PaintEventArgs e) { base.OnPaint(e);if (Width < 2 || Height < 2) return;e.Graphics.SmoothingMode=SmoothingMode.AntiAlias;using var pen=new Pen(CafeTheme.Line);using var path=CafeTheme.Rounded(new RectangleF(.5f,.5f,Width-1,Height-1));e.Graphics.DrawPath(pen,path); }
+    /// <summary>Vẽ panel/ảnh theo kích thước hiện tại, giữ tỷ lệ và giải phóng tài nguyên đồ họa tạm.</summary>
+    protected override void OnPaint(PaintEventArgs e) { base.OnPaint(e); if (Width < 2 || Height < 2) return; e.Graphics.SmoothingMode = SmoothingMode.AntiAlias; using var pen = new Pen(CafeTheme.Line); using var path = CafeTheme.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1)); e.Graphics.DrawPath(pen, path); }
 }
 
 
 /// <summary>Nút dùng chung POS/Admin: chuyển màu nhẹ, giữ nguyên kích thước và sự kiện nghiệp vụ.</summary>
 public sealed class CafeButton : Button
 {
-    public float CornerRadius { get; set; } = 5;
+    public float CornerRadius { get; set; } = 10;
     private readonly System.Windows.Forms.Timer animation = new() { Interval = 16 };
     private bool hovered;
     private bool pressed;
@@ -55,7 +68,7 @@ public sealed class CafeButton : Button
         animation.Tick += (_, _) =>
         {
             var target = hovered && Enabled ? 1f : 0f;
-            hoverProgress = Math.Clamp(hoverProgress + (target > hoverProgress ? .14f : -.14f), 0f, 1f);
+            hoverProgress = Math.Clamp(hoverProgress + (target > hoverProgress ? .1f : -.1f), 0f, 1f);
             Invalidate();
             if (Math.Abs(hoverProgress - target) < .01f) animation.Stop();
         };
@@ -111,7 +124,7 @@ public sealed class CafeButton : Button
     /// <summary>Chuyển màu khoảng 120 ms; không thêm hiệu ứng khi Windows bật tương phản cao.</summary>
     private void AnimateHover()
     {
-        if (SystemInformation.HighContrast)
+        if (!CafeVisuals.MotionEnabled)
         {
             hoverProgress = hovered ? 1f : 0f;
             Invalidate();
@@ -126,7 +139,7 @@ public sealed class CafeButton : Button
         e.Graphics.Clear(Parent?.BackColor ?? CafeTheme.Surface);
         e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = CafeTheme.Rounded(new RectangleF(.5f, .5f, Width - 1, Height - 1), CornerRadius);
-        var background = Enabled ? BackColor : Color.FromArgb(240, 233, 224);
+        var background = Enabled ? BackColor : CafeTheme.Soft;
         var target = ControlPaint.Light(background, .12f);
         background = Color.FromArgb(
             (int)(background.R + (target.R - background.R) * hoverProgress),
@@ -137,14 +150,14 @@ public sealed class CafeButton : Button
         e.Graphics.FillPath(fill, path);
         if (FlatAppearance.BorderSize > 0 || Focused)
         {
-            using var pen = new Pen(Focused ? CafeTheme.Coffee : FlatAppearance.BorderColor, Focused ? 2 : 1);
+            using var pen = new Pen(!Enabled ? CafeTheme.Line : Focused ? CafeTheme.Coffee : FlatAppearance.BorderColor, Focused ? 2 : 1);
             e.Graphics.DrawPath(pen, path);
         }
         var rect = Rectangle.Inflate(ClientRectangle, -Padding.Horizontal / 2, -Padding.Vertical / 2);
         TextRenderer.DrawText(e.Graphics, Text, Font, rect, Enabled ? ForeColor : CafeTheme.Muted,
             TextFormatFlags.VerticalCenter |
             (TextAlign == ContentAlignment.MiddleLeft ? TextFormatFlags.Left : TextFormatFlags.HorizontalCenter) |
-            TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
+            TextFormatFlags.SingleLine | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 
     /// <summary>Giải phóng timer cùng control để điều hướng qua nhiều màn hình không rò rỉ tài nguyên.</summary>
@@ -158,19 +171,22 @@ public sealed class CafeButton : Button
 public sealed class ProductImage : Control
 {
     public int ImageIndex { get; set; }
-    private static readonly Lazy<Image?> Sheet = new(() => {
-        using var stream=typeof(ProductImage).Assembly.GetManifestResourceStream("FourChang.Desktop.CoffeeSheet.png");
-        if(stream is null)return null;
-        using var source=Image.FromStream(stream);return new Bitmap(source);
+    private static readonly Lazy<Image?> Sheet = new(() =>
+    {
+        using var stream = typeof(ProductImage).Assembly.GetManifestResourceStream("FourChang.Desktop.CoffeeSheet.png");
+        if (stream is null) return null;
+        using var source = Image.FromStream(stream); return new Bitmap(source);
     });
+    /// <summary>Khởi tạo control ảnh sản phẩm với double buffering, tái sử dụng tài nguyên sẵn có.</summary>
     public ProductImage() { DoubleBuffered = true; BackColor = CafeTheme.Cream; }
+    /// <summary>Vẽ panel/ảnh theo kích thước hiện tại, giữ tỷ lệ và giải phóng tài nguyên đồ họa tạm.</summary>
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e); var sheet = Sheet.Value;
-        if (sheet is null || Width<=0 || Height<=0) return;
+        if (sheet is null || Width <= 0 || Height <= 0) return;
         e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-        int w = sheet.Width / 3, h = sheet.Height / 2; int index=Math.Clamp(ImageIndex,0,5);
-        int size=Math.Min(Width,Height);
-        e.Graphics.DrawImage(sheet, new Rectangle((Width-size)/2,(Height-size)/2,size,size), new Rectangle(index % 3 * w, index / 3 * h, w, h), GraphicsUnit.Pixel);
+        int w = sheet.Width / 3, h = sheet.Height / 2; int index = Math.Clamp(ImageIndex, 0, 5);
+        int size = Math.Min(Width, Height);
+        e.Graphics.DrawImage(sheet, new Rectangle((Width - size) / 2, (Height - size) / 2, size, size), new Rectangle(index % 3 * w, index / 3 * h, w, h), GraphicsUnit.Pixel);
     }
 }

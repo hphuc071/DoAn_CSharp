@@ -31,11 +31,21 @@ public static class CustomerOrdersEndpoints
                 .ToListAsync(ct));
         }).RequireAuthorization("Customer");
 
-        app.MapPost("/api/customer/orders/quote", async (CreateCustomerOrderRequest req, CafeDbContext db, CancellationToken ct) =>
+        // Danh sách bàn mô phỏng chỉ trả thông tin hiển thị, tuyệt đối không trả hash/secret QR.
+        app.MapGet("/api/menu/tables", async (CafeDbContext db, IConfiguration configuration, CancellationToken ct) =>
+        {
+            if (!SimulatedFulfillment.Enabled(configuration)) return Results.NotFound();
+            return Results.Ok(await db.Ban.AsNoTracking().Where(b => b.DangSuDung).OrderBy(b => b.MaBanHienThi)
+                .Select(b => new { b.MaBanHienThi, b.TenBan }).Take(100).ToListAsync(ct));
+        });
+        app.MapPost("/api/customer/orders/quote", async (CreateCustomerOrderRequest req, CafeDbContext db, IConfiguration configuration, CancellationToken ct) =>
         {
             try
             {
-                var summary = await OrderPricingService.CalculateOrderTotalAsync(db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
+                var simulation = SimulatedFulfillment.Enabled(configuration);
+                var error = await SimulatedFulfillment.ValidateAsync(db, req, simulation, ct);
+                if (error is not null) return Results.BadRequest(new { message = error });
+                var summary = await OrderPricingService.CalculateOrderTotalAsync(db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct, simulation);
                 return Results.Ok(summary);
             }
             catch (OrderQuoteValidationException ex)
@@ -73,10 +83,8 @@ public static class CustomerOrdersEndpoints
             return Results.Unauthorized();
         if (!OrderIdempotency.TryReadKey(context, out var idempotencyKey))
             return Results.BadRequest(new { message = "Cần Idempotency-Key là một GUID khác rỗng cho mỗi lần xác nhận đặt hàng." });
-        // Read-only previews do not authorize writes. No flag may bypass the missing atomic
-        // QR/quote revalidation + snapshot integration. Preserve the existing TAKEAWAY protocol.
-        if (string.Equals(req.HinhThucNhanMon, "DINE_IN", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(req.HinhThucNhanMon, "DELIVERY", StringComparison.OrdinalIgnoreCase))
+        // Chỉ mở bàn từ danh sách và phí cố định trong mô phỏng Development đã được chấp thuận.
+        if (req.HinhThucNhanMon != "TAKEAWAY" && !SimulatedFulfillment.Enabled(configuration))
             return Results.Json(new { code = "FULFILLMENT_CREATION_NOT_VALIDATED" }, statusCode: 503);
         // Customer WEB always requires consent, including direct API calls and replays.
         // This is independent of POS/Admin contracts and precedes any business SQL.
@@ -90,12 +98,12 @@ public static class CustomerOrdersEndpoints
             return earlyReplay;
 
         // Historical DTO hashes/receipts are retained. Validate new operations only after replay.
-        if (!string.Equals(req.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
+        if (req.HinhThucNhanMon is not ("TAKEAWAY" or "DINE_IN" or "DELIVERY") ||
                 string.IsNullOrWhiteSpace(req.TenNguoiNhan) || req.TenNguoiNhan.Length > 120 ||
                 req.TenNguoiNhan.Any(char.IsControl) ||
                 !System.Text.RegularExpressions.Regex.IsMatch(req.DienThoaiNguoiNhan ?? "", @"^\+?[0-9]{9,15}\z") ||
-                req.MaBanHienThi is not null || req.DiaChiGiao is not null || req.KhoangCachKm is not null)
-            return Results.BadRequest(new { message = "Thông tin nhận mang đi không hợp lệ." });
+                (req.GhiChu?.Length ?? 0) > 500)
+            return Results.BadRequest(new { message = "Thông tin nhận món không hợp lệ." });
 
         if (req.Items is null || req.Items.Count == 0)
             return Results.BadRequest(new { message = "Giỏ hàng đang trống." });
@@ -105,12 +113,15 @@ public static class CustomerOrdersEndpoints
         var lockedReplay = await OrderIdempotency.LockAndReplayAsync(
             db, tx, customerId, idempotencyKey, requestFingerprint, acceptedTotal, ct);
         if (lockedReplay is not null) return lockedReplay;
+        // Cùng transaction Serializable: bàn bị ngừng đồng thời không thể được chốt vào đơn mới.
+        var fulfillmentError = await SimulatedFulfillment.ValidateAsync(db, req, SimulatedFulfillment.Enabled(configuration), ct);
+        if (fulfillmentError is not null) return Results.BadRequest(new { message = fulfillmentError });
         // Validate before stock checks or any database writes.
         OrderPriceSummary priceSummary;
         try
         {
             priceSummary = await OrderPricingService.CalculateOrderTotalAsync(
-                db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
+                db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct, SimulatedFulfillment.Enabled(configuration));
         }
         catch (OrderQuoteValidationException ex)
         {
@@ -251,6 +262,8 @@ public static class CustomerOrdersEndpoints
             DienThoaiNguoiNhan = req.DienThoaiNguoiNhan,
             DiaChiGiaoDaChot = req.DiaChiGiao,
             KhoangCachGiaoKm = req.KhoangCachKm,
+            ChinhSachGiaoHangDaChotJson = req.HinhThucNhanMon == "TAKEAWAY" ? null :
+                System.Text.Json.JsonSerializer.Serialize(new { mode = "SIMULATION", version = "FLAT-15000-V1", fee = priceSummary.PhiGiaoHang }),
             PhiGiaoHangBanDau = priceSummary.PhiGiaoHang,
             PhiGiaoHangHienTai = priceSummary.PhiGiaoHang,
             TrangThai = "PENDING_PAYMENT",

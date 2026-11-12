@@ -6,11 +6,14 @@ namespace FourChang.Infrastructure.Database.Configurations.Accounts;
 
 public sealed class DiaChiKhachHangConfiguration : IEntityTypeConfiguration<DiaChiKhachHang>
 {
+    /// <summary>Ánh xạ thuộc tính, khóa và ràng buộc SQL của DiaChiKhachHang; giữ quan hệ dữ liệu nhất quán.</summary>
     public void Configure(EntityTypeBuilder<DiaChiKhachHang> b)
     {
         b.ToTable("DiaChiKhachHang", "dbo", table =>
         {
             table.UseSqlOutputClause(false);
+            // Cùng CHECK với script nâng cấp SQL: nhập trực tiếp SQL cũng không được lưu số sai.
+            table.HasCheckConstraint("CK_DiaChiKhachHang_DienThoai10", "DATALENGTH(DienThoaiNguoiNhan)=10 AND DienThoaiNguoiNhan COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^0-9]%'");
             table.HasCheckConstraint("CK_DiaChiKhachHang_1", "ViDo IS NULL OR ViDo BETWEEN -90 AND 90");
             table.HasCheckConstraint("CK_DiaChiKhachHang_2", "KinhDo IS NULL OR KinhDo BETWEEN -180 AND 180");
             table.HasCheckConstraint("CK_DiaChiKhachHang_3", "(ViDo IS NULL AND KinhDo IS NULL) OR (ViDo IS NOT NULL AND KinhDo IS NOT NULL)");

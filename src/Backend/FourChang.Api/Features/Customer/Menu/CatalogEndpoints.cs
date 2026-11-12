@@ -1,206 +1,61 @@
 using System.Globalization;
 using System.Text;
+using FourChang.Api.Features.Admin.Menu;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Customer.Menu;
 
+/// <summary>Giữ hợp đồng menu hiện có của nhóm; dùng chung bộ tính giá/khả dụng với ADM-02 và POS.</summary>
 public static class CatalogEndpoints
 {
+    /// <summary>Đăng ký tìm kiếm và cấu hình món, không khai báo bảng giá hay khả dụng topping riêng.</summary>
     public static void MapCatalog(this WebApplication app)
     {
-        app.MapGet("/api/menu", async (
-            string? q,
-            string? category,
-            decimal? minPrice,
-            decimal? maxPrice,
-            bool? availableOnly,
-            string? sort,
-            CafeDbContext db) =>
+        app.MapGet("/api/menu", async (string? q, string? category, decimal? minPrice, decimal? maxPrice,
+            bool? availableOnly, string? sort, CafeDbContext db, CatalogReadService catalog) =>
         {
-            if ((minPrice.HasValue && minPrice.Value < 0) ||
-                (maxPrice.HasValue && maxPrice.Value < 0) ||
-                (minPrice.HasValue && maxPrice.HasValue && minPrice.Value > maxPrice.Value))
+            if (minPrice < 0 || maxPrice < 0 || minPrice > maxPrice) return Results.Problem(statusCode: 400, detail: "Khoảng giá lọc không hợp lệ.");
+            var snapshot = await catalog.Read();
+            var sold = await db.ChiTietDonHang.AsNoTracking().Join(db.DonHang.Where(x => x.TrangThai == "COMPLETED"), l => l.MaDonHang, o => o.MaDonHang,
+                (l, o) => new { l.MaCauHinhMon, Quantity = l.SoLuongDat - l.SoLuongDaHuy }).ToListAsync();
+            var items = snapshot.Mon.Where(x => x.CauHinh.Count > 0).Select(m =>
             {
-                return Results.Problem(detail: "Khoảng giá lọc không hợp lệ.", statusCode: 400);
-            }
-
-            var variants = await (
-                from v in db.CauHinhMon.AsNoTracking()
-                join m in db.Mon.AsNoTracking() on v.MaMon equals m.MaMon
-                join c in db.DanhMucMon.AsNoTracking() on m.MaDanhMuc equals c.MaDanhMuc
-                where m.DaCongBo && c.DaCongBo && c.DangSuDung
-                select new
-                {
-                    v.MaCauHinhMon,
-                    v.MaMon,
-                    m.TenMon,
-                    c.TenDanhMuc,
-                    v.GiaBan,
-                    v.KichCo,
-                    v.NhietDo,
-                    m.DuongDanAnh,
-                    m.ThuTuHienThi,
-                    Enabled = v.DangBan && m.DangBan
-                }).ToListAsync();
-
-            var now = DateTime.UtcNow;
-            var recipes = await db.CongThuc.AsNoTracking()
-                .Where(x => x.TrangThai == "ACTIVE" && x.MaCauHinhMon != null && x.HieuLucTu <= now && (x.HieuLucDen == null || x.HieuLucDen > now))
-                .ToListAsync();
-            var requirements = await db.ChiTietCongThuc.AsNoTracking().ToListAsync();
-            var stocks = await (
-                from n in db.NguyenLieu.AsNoTracking()
-                join t in db.TonKho.AsNoTracking() on n.MaNguyenLieu equals t.MaNguyenLieu
-                select new { n.MaNguyenLieu, n.DangSuDung, Available = t.TonThucTe - t.TongGiuCho - n.TonAnToan }
-            ).ToDictionaryAsync(x => x.MaNguyenLieu);
-            var choices = await db.TuyChonPhaCheHopLe.AsNoTracking().Where(x => x.DangSuDung).ToListAsync();
-
-            bool Available(long variant)
+                var v = m.CauHinh.FirstOrDefault(x => x.LaMacDinh) ?? m.CauHinh.First();
+                var image = int.TryParse(m.DuongDanAnh?.Replace("sprite:", "", StringComparison.Ordinal), out var index) ? index : 0;
+                return new MenuProduct(v.MaCauHinhMon, m.MaMon, m.TenMon, m.TenDanhMuc, v.GiaBan, image, m.CauHinh.Any(x => x.ConHang), m.CauHinh.Any(x => x.ConHang) ? "" : "Tạm hết");
+            }).Where(x => string.IsNullOrWhiteSpace(category) || Normalize(x.Category) == Normalize(category))
+              .Where(x => string.IsNullOrWhiteSpace(q) || Normalize(x.Name).Contains(Normalize(q), StringComparison.Ordinal) || Normalize(x.Category).Contains(Normalize(q), StringComparison.Ordinal))
+              .Where(x => minPrice is null || x.Price >= minPrice).Where(x => maxPrice is null || x.Price <= maxPrice)
+              .Where(x => availableOnly != true || x.Available);
+            items = sort?.ToLowerInvariant() switch
             {
-                var recipe = recipes.FirstOrDefault(x => x.MaCauHinhMon == variant);
-                if (recipe is null) return false;
-                var lines = requirements.Where(x => x.MaCongThuc == recipe.MaCongThuc).ToList();
-                return lines.Count > 0 && choices.Where(x => x.MaCauHinhMon == variant).Any(choice =>
-                    lines.GroupBy(x => x.MaNguyenLieu).All(g =>
-                    {
-                        var required = decimal.Ceiling(g.Sum(l => l.DinhMucCoSo *
-                            (l.LoaiDinhMuc == "SUGAR" ? choice.PhanTramDuong / 100m :
-                             l.LoaiDinhMuc == "ICE" ? choice.PhanTramDa / 100m : 1m) / (1m - l.TyLeHaoHut)) * 10000m) / 10000m;
-                        return required == 0 || (stocks.TryGetValue(g.Key, out var stock) && stock.DangSuDung && stock.Available >= required);
-                    }));
-            }
-
-            var completedCounts = await (
-                from d in db.ChiTietDonHang.AsNoTracking()
-                join o in db.DonHang.AsNoTracking() on d.MaDonHang equals o.MaDonHang
-                join v in db.CauHinhMon.AsNoTracking() on d.MaCauHinhMon equals v.MaCauHinhMon
-                where o.TrangThai == "COMPLETED"
-                group d by v.MaMon into g
-                select new { MaMon = g.Key, SoldQty = g.Sum(x => x.SoLuongDat) }
-            ).ToDictionaryAsync(x => x.MaMon, x => x.SoldQty);
-
-            var products = variants.GroupBy(x => x.MaMon).OrderBy(g => g.First().ThuTuHienThi).Select(g =>
-            {
-                var item = g.OrderBy(x => x.KichCo == "M" ? 0 : 1).ThenBy(x => x.NhietDo == "ICED" ? 0 : 1).First();
-                var available = g.Any(v => v.Enabled && Available(v.MaCauHinhMon));
-                var image = int.TryParse(item.DuongDanAnh?.Replace("sprite:", "", StringComparison.Ordinal), out var index) ? index : 0;
-                return new MenuProduct(item.MaCauHinhMon, item.MaMon, item.TenMon, item.TenDanhMuc, item.GiaBan, image, available, available ? "" : "Tạm hết");
-            }).ToList();
-
-            if (!string.IsNullOrWhiteSpace(category))
-            {
-                var normCat = NormalizeVietnamese(category);
-                products = products.Where(p => NormalizeVietnamese(p.Category) == normCat).ToList();
-            }
-
-            if (!string.IsNullOrWhiteSpace(q))
-            {
-                var normQuery = NormalizeVietnamese(q);
-                products = products.Where(p =>
-                    NormalizeVietnamese(p.Name).Contains(normQuery, StringComparison.Ordinal) ||
-                    NormalizeVietnamese(p.Category).Contains(normQuery, StringComparison.Ordinal)).ToList();
-            }
-
-            if (minPrice.HasValue) products = products.Where(p => p.Price >= minPrice.Value).ToList();
-            if (maxPrice.HasValue) products = products.Where(p => p.Price <= maxPrice.Value).ToList();
-            if (availableOnly == true) products = products.Where(p => p.Available).ToList();
-
-            products = (sort?.ToLowerInvariant()) switch
-            {
-                "price_asc" => products.OrderBy(p => p.Price).ToList(),
-                "price_desc" => products.OrderByDescending(p => p.Price).ToList(),
-                "bestseller" => products.OrderByDescending(p => completedCounts.GetValueOrDefault(p.MaMon, 0)).ThenBy(p => p.MaMon).ToList(),
-                "newest" => products.OrderByDescending(p => p.MaMon).ToList(),
-                _ => products
+                "price_asc" => items.OrderBy(x => x.Price),
+                "price_desc" => items.OrderByDescending(x => x.Price),
+                "newest" => items.OrderByDescending(x => x.MaMon),
+                "bestseller" => items.OrderByDescending(x => sold.Where(l => snapshot.Mon.Single(m => m.MaMon == x.MaMon).CauHinh.Any(v => v.MaCauHinhMon == l.MaCauHinhMon)).Sum(l => l.Quantity)).ThenBy(x => x.MaMon),
+                _ => items
             };
-
-            return Results.Ok(products);
+            return Results.Ok(items.ToList());
         });
-
-        app.MapGet("/api/menu/{product:long}/variants", async (long product, CafeDbContext db) =>
+        app.MapGet("/api/menu/{product:long}/variants", async (long product, CatalogReadService catalog) =>
         {
-            var mon = await db.Mon.AsNoTracking().FirstOrDefaultAsync(m => m.MaMon == product);
-            if (mon is null || !mon.DaCongBo || !mon.DangBan)
-                return Results.Problem(detail: "Món hiện ngừng phục vụ.", statusCode: 404);
-
-            var now = DateTime.UtcNow;
-            var variants = await db.CauHinhMon.AsNoTracking()
-                .Where(x => x.MaMon == product && x.DangBan)
-                .ToListAsync();
-
-            var variantIds = variants.Select(v => v.MaCauHinhMon).ToList();
-
-            var choices = await db.TuyChonPhaCheHopLe.AsNoTracking()
-                .Where(x => variantIds.Contains(x.MaCauHinhMon) && x.DangSuDung)
-                .ToListAsync();
-
-            var toppings = await (
-                from ct in db.CauHinhMonThem.AsNoTracking()
-                join mt in db.MonThem.AsNoTracking() on ct.MaMonThem equals mt.MaMonThem
-                where variantIds.Contains(ct.MaCauHinhMon) && ct.DangSuDung && mt.DangSuDung
-                select new
-                {
-                    ct.MaCauHinhMon,
-                    mt.MaMonThem,
-                    mt.TenMonThem,
-                    mt.GiaMoiPhan,
-                    GioiHanMoiLy = ct.GioiHanMoiLy > 0 ? ct.GioiHanMoiLy : mt.GioiHanMacDinhMoiLy
-                }).ToListAsync();
-
-            var recipes = await db.CongThuc.AsNoTracking()
-                .Where(x => x.TrangThai == "ACTIVE" && x.HieuLucTu <= now && (x.HieuLucDen == null || x.HieuLucDen > now))
-                .ToListAsync();
-            var requirements = await db.ChiTietCongThuc.AsNoTracking().ToListAsync();
-            var stocks = await (
-                from n in db.NguyenLieu.AsNoTracking()
-                join t in db.TonKho.AsNoTracking() on n.MaNguyenLieu equals t.MaNguyenLieu
-                select new { n.MaNguyenLieu, n.DangSuDung, Available = t.TonThucTe - t.TongGiuCho - n.TonAnToan }
-            ).ToDictionaryAsync(x => x.MaNguyenLieu);
-
-            bool IsVariantAvailable(long variantId)
-            {
-                var recipe = recipes.FirstOrDefault(x => x.MaCauHinhMon == variantId);
-                if (recipe is null) return false;
-                var lines = requirements.Where(x => x.MaCongThuc == recipe.MaCongThuc).ToList();
-                return lines.Count > 0 && choices.Where(x => x.MaCauHinhMon == variantId).Any(choice =>
-                    lines.GroupBy(x => x.MaNguyenLieu).All(g =>
-                    {
-                        var required = decimal.Ceiling(g.Sum(l => l.DinhMucCoSo *
-                            (l.LoaiDinhMuc == "SUGAR" ? choice.PhanTramDuong / 100m :
-                             l.LoaiDinhMuc == "ICE" ? choice.PhanTramDa / 100m : 1m) / (1m - l.TyLeHaoHut)) * 10000m) / 10000m;
-                        return required == 0 || (stocks.TryGetValue(g.Key, out var stock) && stock.DangSuDung && stock.Available >= required);
-                    }));
-            }
-
-            return Results.Ok(variants.Select(v => new MenuVariantItem(
-                v.MaCauHinhMon,
-                v.KichCo,
-                v.NhietDo,
-                v.GiaBan,
-                IsVariantAvailable(v.MaCauHinhMon),
-                choices.Where(c => c.MaCauHinhMon == v.MaCauHinhMon)
-                       .Where(c => !string.Equals(v.NhietDo, "HOT", StringComparison.OrdinalIgnoreCase) || c.PhanTramDa == 0)
-                       .Select(c => new MenuBrewOption(c.PhanTramDuong, c.PhanTramDa))
-                       .ToList(),
-                toppings.Where(t => t.MaCauHinhMon == v.MaCauHinhMon)
-                        .Select(t => new MenuToppingItem(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMoiLy, true))
-                        .ToList()
-            )).ToList());
+            var snapshot = await catalog.Read();
+            var dish = snapshot.Mon.SingleOrDefault(x => x.MaMon == product);
+            if (dish is null || !dish.DangBan) return Results.Problem(statusCode: 404, detail: "Món chưa công bố hoặc ngừng phục vụ.");
+            return Results.Ok(dish.CauHinh.Select(v => new MenuVariantItem(v.MaCauHinhMon, v.KichCo, v.NhietDo, v.GiaBan, v.ConHang,
+                v.TuyChon.Select(c => new MenuBrewOption(c.PhanTramDuong, c.PhanTramDa)).ToList(),
+                v.MonThem.Select(t => new MenuToppingItem(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMoiLy, t.ConHang)).ToList())).ToList());
         });
     }
 
-    private static string NormalizeVietnamese(string? input)
+    /// <summary>Chuẩn hóa tiếng Việt cho tìm kiếm; không thay đổi tên được lưu hoặc snapshot.</summary>
+    private static string Normalize(string? value)
     {
-        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
-        var normalized = input.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
-        var sb = new StringBuilder(normalized.Length);
-        foreach (var c in normalized)
-        {
-            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
-                sb.Append(c is 'đ' or 'Đ' ? 'd' : c);
-        }
-        return sb.ToString().Normalize(NormalizationForm.FormC);
+        var result = new StringBuilder();
+        foreach (var c in (value ?? "").Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD))
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark) result.Append(c == 'đ' ? 'd' : c);
+        return result.ToString().Normalize(NormalizationForm.FormC);
     }
 }

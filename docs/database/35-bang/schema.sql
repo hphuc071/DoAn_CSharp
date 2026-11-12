@@ -102,6 +102,7 @@ CREATE TABLE dbo.[NhanVien] (
     [MaNhanVien] bigint IDENTITY(1,1) NOT NULL,
     [HoTen] nvarchar(120) NOT NULL,
     [SoDienThoai] varchar(20) NULL,
+    [DiaChiLienHe] nvarchar(500) NULL,
     [NgayVaoLam] datetime2(3) NOT NULL,
     [TrangThai] varchar(15) NOT NULL,
     [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),

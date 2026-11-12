@@ -4,6 +4,8 @@ using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
+    // EXPIRED đã được chốt và migration hỗ trợ; chỉ bật đọc, không tự bật worker hay xác minh ngân hàng.
+    builder.Configuration["Orders:ExpiryStatusReadEnabled"] ??= "true";
 builder.Services.AddRazorPages();
 builder.Services.AddCustomerServices();
 builder.Services.AddSingleton<IPaymentQrSource, UnavailablePaymentQrSource>();
@@ -41,5 +43,6 @@ app.MapPost("/api/customer/orders/quote", async (CreateCustomerOrderRequest req,
 app.MapPost("/api/customer/orders", () =>
     Results.Json(new { code = "CHECKOUT_HANDLER_REQUIRED" }, statusCode: 503));
 
+app.MapCatalogUpdates();
 app.MapRazorPages();
 app.Run();

@@ -5,6 +5,9 @@ namespace FourChang.Tests.Shared;
 // Tiện ích dùng chung, không chứa kịch bản UC. Mọi kiểm tra HTTP/SQL đều chạy bằng C#.
 public static class TestData
 {
+    private static int phoneSequence = Random.Shared.Next(10_000_000, 80_000_000);
+    /// <summary>Tạo số giả lập 10 chữ số khác nhau trong cùng tiến trình để kiểm tra ràng buộc bắt buộc/duy nhất.</summary>
+    public static string Phone() => "09" + Interlocked.Increment(ref phoneSequence).ToString("D8");
 
     /// <summary>
     /// Tạo mã thao tác mới cho một yêu cầu độc lập; khi kiểm tra gửi lặp phải giữ lại mã đã tạo.

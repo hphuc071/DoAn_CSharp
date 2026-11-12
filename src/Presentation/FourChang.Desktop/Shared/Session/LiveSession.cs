@@ -6,6 +6,8 @@ public static class LiveSession
 {
     public static bool Preview { get; set; }
     public static SessionResult? Current { get; set; }
+    /// <summary>Trạng thái UI lấy từ API; ca khóa/phiên chỉ đối chiếu không mở màn hình bán.</summary>
+    public static bool ShiftLocked { get; set; }
     public static CafeApiClient Api { get; } = Create();
     private static CafeApiClient Create()
     {
@@ -19,7 +21,7 @@ public static class LiveSession
             var split=line.IndexOf('=');if(split<=0)continue;var key=line[..split].Trim();
             if(key is "FOURCHANG_API_URL")settings[key]=line[(split+1)..].Trim().Trim('"','\'');
         }
-        var url=Environment.GetEnvironmentVariable("FOURCHANG_API_URL")??settings.GetValueOrDefault("FOURCHANG_API_URL")??"http://127.0.0.1:5181";
+        var url=Environment.GetEnvironmentVariable("FOURCHANG_API_URL")??settings.GetValueOrDefault("FOURCHANG_API_URL")??"http://127.0.0.1:15881";
         var credential=FourChang.Desktop.Shared.Security.PosDeviceCredentials.Load();
         return new CafeApiClient(new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(20)}){PosKey=credential?.KhoaThietBi,PosMachine=credential?.MaMay??Environment.MachineName.ToUpperInvariant()};
     }

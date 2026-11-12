@@ -33,7 +33,7 @@
     const intent = JSON.parse(raw);
     if (intent?.version !== 1 || !intent.command ||
         !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(intent.command.operation) ||
-        typeof intent.cartRaw !== "string" || intent.command.order?.hinhThucNhanMon !== "TAKEAWAY" ||
+        typeof intent.cartRaw !== "string" || !["TAKEAWAY","DINE_IN","DELIVERY"].includes(intent.command.order?.hinhThucNhanMon) ||
         !Number.isFinite(intent.command.acceptedTotal) || intent.command.acceptedTotal < 0)
       throw new Error("Dữ liệu thao tác đang lưu không hợp lệ. Cần kiểm tra đơn trước khi đặt tiếp; không tự tạo mã mới.");
     return intent;
@@ -42,11 +42,15 @@
     return receipt && Number.isSafeInteger(receipt.maDonHang) && receipt.maDonHang > 0 &&
       typeof receipt.maDonHienThi === "string" && receipt.maDonHienThi.trim().length > 0 &&
       receipt.trangThai === "PENDING_PAYMENT" &&
-      Number.isFinite(receipt.tienHang) && receipt.tienHang >= 0 && receipt.phiGiaoHang === 0 &&
-      receipt.tongCong === receipt.tienHang && receipt.tongCong === intent.command.acceptedTotal &&
+      Number.isFinite(receipt.tienHang) && receipt.tienHang >= 0 && Number.isFinite(receipt.phiGiaoHang) && receipt.phiGiaoHang >= 0 &&
+      (intent.command.order.hinhThucNhanMon === "DELIVERY" || receipt.phiGiaoHang === 0) &&
+      receipt.tongCong === receipt.tienHang + receipt.phiGiaoHang && receipt.tongCong === intent.command.acceptedTotal &&
       (receipt.hetHanLuc == null || (typeof receipt.hetHanLuc === "string" && Number.isFinite(Date.parse(receipt.hetHanLuc))));
   }
   function showReceipt(receipt) {
+    // Link dùng ID server đã trả; không tạo đơn hoặc yêu cầu thanh toán thứ hai.
+    const paymentLink = document.getElementById("receipt-payment");
+    if (paymentLink) paymentLink.href = `/Checkout/Payment?orderId=${receipt.maDonHang}`;
     document.getElementById("receipt-code").textContent = receipt.maDonHienThi;
     document.getElementById("receipt-total").textContent = money(receipt.tongCong);
     // SQL datetime2 may be returned without an offset; Backend stores these timestamps in UTC.
@@ -76,18 +80,20 @@
       const quote = window.fourchangCheckoutQuote;
       const validForm = name.value.trim().length > 0 && name.value.trim().length <= 120 &&
         !/[\u0000-\u001f\u007f]/.test(name.value) && /^\+?[0-9]{9,15}$/.test(phone.value.trim());
-      const ready = mode === "takeaway" && quote && validForm && confirmed.checked &&
+      const modeEnabled = mode === "takeaway" || (button.dataset.fulfillmentSimulation === "true" && ["dinein","delivery"].includes(mode));
+      const ready = modeEnabled && quote && (!quote.fulfillmentContext || quote.fulfillmentContext === window.fourchangFulfillmentContext?.()) && validForm && confirmed.checked &&
         (localStorage.getItem(CART) || "[]") === quote.cartRaw;
       name.disabled = phone.disabled = confirmed.disabled = !!intent || busy;
+      for (const id of ["checkout-table","checkout-address","checkout-delivery-note"]) { const field = document.getElementById(id); if (field) field.disabled = !!intent || busy; }
       pendingDetails.hidden = !intent || !!completed;
       if (intent) {
         name.value = intent.command.order.tenNguoiNhan;
         phone.value = intent.command.order.dienThoaiNguoiNhan;
-        pendingDetails.textContent = "Thao tác mang đi đã gửi: " + name.value + " · " + phone.value +
+        pendingDetails.textContent = "Thông tin nhận món đã gửi: " + name.value + " · " + phone.value +
           " · Tổng đã chấp thuận " + money(intent.command.acceptedTotal) + ". Thử lại sẽ dùng nguyên thông tin này.";
       }
       button.disabled = !creationEnabled || busy || blocked || !navigator.locks || !token || !!completed || (!intent && !ready);
-      button.textContent = !creationEnabled ? "Tạo đơn đang tắt" : busy ? "Đang gửi…" : intent && !completed ? "Thử lại thao tác đang chờ kết quả" : "Đặt mang đi";
+      button.textContent = !creationEnabled ? "Tạo đơn đang tắt" : busy ? "Đang gửi…" : intent && !completed ? "Thử lại thao tác đang chờ kết quả" : ({takeaway:"Đặt mang đi",dinein:"Đặt tại bàn",delivery:"Đặt giao hàng"}[mode] || "Đặt món");
       receiptPanel.hidden = !completed;
       if (completed) showReceipt(intent.receipt);
       else if (intent && !busy && !status.textContent) status.textContent = "Có thao tác chưa xác định kết quả. Chỉ thử lại với cùng mã và thông tin đã gửi; không tạo đơn mới.";
@@ -120,7 +126,7 @@
         if (!intent) {
           const quote = window.fourchangCheckoutQuote;
           if (!confirmed.checked || !quote || (localStorage.getItem(CART) || "[]") !== quote.cartRaw ||
-              document.querySelector("[data-tabs] [data-tab].selected")?.dataset.tab !== "takeaway")
+              (quote.fulfillmentContext && quote.fulfillmentContext !== window.fourchangFulfillmentContext?.()))
             throw new Error("Giỏ hoặc hình thức nhận đã đổi. Vui lòng báo giá và xác nhận lại.");
           intent = {
             version: 1, ownerId, cartRaw: quote.cartRaw,
@@ -182,18 +188,15 @@
     } finally { busy = false; update(); }
   });
 
-  document.getElementById("checkout-new-order").addEventListener("click", async () => {
-    if (busy || blocked || !navigator.locks) return;
-    try {
-      await navigator.locks.request(LOCK, () => {
-        const intent = readIntent();
-        if (!intent?.receipt || !owns(intent) || !validReceipt(intent.receipt, intent)) return;
-        localStorage.removeItem(INTENT);
-        status.textContent = "Kiểm tra giỏ và xác nhận lại trước khi tạo đơn tiếp theo.";
-        invalidate();
-        window.dispatchEvent(new Event("checkout:refresh"));
-      });
-    } catch (error) { status.textContent = error.message; }
+  // Sau khi máy chủ xác nhận đã thu đủ: mở lại form, không đụng tới giỏ mới của khách.
+  window.addEventListener("checkout:session-reset", () => {
+    if (busy) return;
+    name.value = phone.value = "";
+    confirmed.checked = false;
+    status.textContent = "Thanh toán trước đã hoàn tất. Bạn có thể đặt đơn mới.";
+    receiptPanel.hidden = pendingDetails.hidden = true;
+    update();
+    window.dispatchEvent(new Event("checkout:refresh"));
   });
   update();
 })();

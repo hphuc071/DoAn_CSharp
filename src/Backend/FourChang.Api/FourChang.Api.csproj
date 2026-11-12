@@ -6,4 +6,5 @@
     <ProjectReference Include="../FourChang.Infrastructure/FourChang.Infrastructure.csproj" />
     <ProjectReference Include="../../Shared/FourChang.Presentation.Shared/FourChang.Presentation.Shared.csproj" />
   </ItemGroup>
+  <ItemGroup><PackageReference Include="PDFsharp" Version="6.2.4" /><PackageReference Include="QRCoder" Version="1.6.0" /></ItemGroup>
 </Project>

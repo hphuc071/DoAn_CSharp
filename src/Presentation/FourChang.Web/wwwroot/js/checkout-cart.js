@@ -1,4 +1,4 @@
-﻿/*
+/*
  * UC-WEB-05 -> UC-WEB-06: read-only synchronization of the local cart draft.
  * This renderer never submits orders; checkout-order.js owns order creation.
  * The Backend remains authoritative for variant, topping, stock, fees and totals.
@@ -119,16 +119,16 @@
         countElement.textContent = `${totalQuantity} ly · ${cart.length} dòng giỏ nháp`;
         subtotalElement.textContent = invalid ? "Chưa xác định" : money(baseSubtotal);
         shippingElement.textContent = activeMode === "delivery" ? "Chưa báo giá" : "0đ";
-        totalElement.textContent = "Chờ Backend xác nhận";
+        totalElement.textContent = "Đang kiểm tra tổng tiền";
 
         if (invalid) {
             warningElement.textContent = "Giỏ có số lượng, biến thể hoặc giá tham khảo không hợp lệ. Quay lại Giỏ hàng để kiểm tra.";
         } else if (hasTopping) {
             warningElement.textContent = "Tạm tính chưa gồm topping. Cần tra cứu mã topping và xác nhận giá với Backend trước khi tạo đơn.";
         } else if (activeMode === "delivery") {
-            warningElement.textContent = "Tạm tính chưa gồm phí giao. Chưa có bước tính khoảng cách và báo phí từ Backend.";
+            warningElement.textContent = "Phí giao hàng sẽ được xác nhận trong báo giá.";
         } else {
-            warningElement.textContent = "Đây là giá cơ sở lúc chọn món; giá chính thức, tồn kho và cấu hình vẫn cần Backend xác nhận.";
+            warningElement.textContent = "Đang kiểm tra giá và tình trạng món hiện tại.";
         }
     }
 

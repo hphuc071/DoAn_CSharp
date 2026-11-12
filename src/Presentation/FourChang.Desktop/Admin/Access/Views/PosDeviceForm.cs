@@ -22,6 +22,7 @@ public sealed class PosDeviceForm : Form
     private Func<Task<PosDeviceOperation>>? pending;private Guid operation;private bool busy;private bool uncertain;private bool saved;
     public PosDeviceForm(PosDeviceInfo? device=null,bool revoke=false)
     {
+        AutoScaleMode = AutoScaleMode.Dpi;
         this.device=device;this.revoke=revoke;Text=revoke?"Thu hồi thiết bị POS":device is null?"Đăng ký thiết bị POS":"Cấp lại cấu hình POS";
         Name="PosDeviceForm";ClientSize=new Size(540,690);Font=CafeTheme.Body();BackColor=CafeTheme.Cream;StartPosition=FormStartPosition.CenterParent;AutoScroll=true;
         machine.Name="PosDeviceMachine";name.Name="PosDeviceName";key.Name="PosDeviceKey";reason.Name="PosDeviceReason";

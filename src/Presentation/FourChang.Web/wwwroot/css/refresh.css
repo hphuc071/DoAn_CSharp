@@ -145,3 +145,173 @@ button:disabled { transform:none!important; box-shadow:none!important; }
     *,*::before,*::after { transition:none!important; animation:none!important; scroll-behavior:auto!important; }
     .product-card:hover,.button:active,.round-add:active { transform:none; }
 }
+
+/* Vietnamese typography refinement: shared across existing pages. */
+:root { --cream:#f8f4ed; --surface:#fffdf9; --line:#e4d9cc; --muted:#716252; }
+html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body { font-family:var(--font); font-size:15px; line-height:1.6; }
+button,input,select,textarea { font-family:var(--font); line-height:1.5; }
+h1,h2,h3,.auth-title,.page-title { letter-spacing:normal; line-height:1.35; text-wrap:pretty; }
+.button,.pills button,.segmented button { min-height:44px; display:inline-flex; align-items:center; justify-content:center; gap:8px; line-height:1.4; padding:10px 16px; }
+.button svg,.button img { flex-shrink:0; }
+.icon-button,.round-add { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+.field input,.field select,.field textarea { font-size:16px; min-height:44px; padding:10px 12px; }
+.search-box input { font-size:15px; min-width:0; }
+.field label { margin-bottom:8px; line-height:1.5; }
+.field { min-width:0; }
+.field-hint,.field-error,.validation-message,.service-note,.status { font-size:12px; line-height:1.6; }
+.product-card h3 { line-height:1.5; }
+.product-card .price { line-height:1.5; }
+.hero { height:auto; min-height:142px; }
+.hero h1 { line-height:1.4; letter-spacing:normal; }
+.hero p { font-size:13px; line-height:1.6; }
+.auth-form h1 { letter-spacing:normal; line-height:1.35; }
+.auth-form p,.auth-form label { line-height:1.6; }
+.auth-form .button { width:100%; }
+input,select,textarea { transition:border-color 180ms ease,box-shadow 180ms ease; }
+input:focus-visible,select:focus-visible,textarea:focus-visible { outline:2px solid var(--coffee); outline-offset:2px; }
+.site-footer { background:#f1e9dd; line-height:1.6; }
+@media(max-width:550px) {
+    .site-header { column-gap:12px; row-gap:12px; }
+    .header-actions { gap:12px; }
+    .brand-name { font-size:16px; }
+    .brand-name em { font-size:10px; letter-spacing:.04em; }
+    .hero { height:auto; min-height:142px; }
+    .hero h1 { font-size:22px; }
+    .hero p { font-size:12px; }
+    .auth-form { padding:24px 20px; }
+    .button { max-width:100%; }
+}
+@media(prefers-reduced-motion:reduce) {
+    *,*::before,*::after { transition:none!important; animation:none!important; scroll-behavior:auto!important; }
+}
+
+/* Giữ truy cập tài khoản trên mobile; không ẩn hành động đăng nhập khi thu hẹp header. */
+@media(max-width:550px) {
+    .header-actions { gap:8px; }
+    .header-actions>.profile-link,.header-actions>a:nth-child(2) { display:flex; }
+    .header-actions>a { min-height:44px; justify-content:center; }
+    .header-actions>.profile-link,.header-actions>.cart-link { min-width:32px; }
+    .header-actions>.profile-link { padding:0 4px; }
+}
+
+/* Refinement 11/11: cùng thương hiệu nâu-kem, khoảng cách 8/16/24 và layout theo nội dung. */
+body { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; }
+.site-header,.site-footer { width:100%; flex-shrink:0; }
+.page-wrap { width:100%; flex:1; padding:24px 24px 32px; }
+.site-header { gap:32px; min-height:76px; height:auto; padding-top:12px; padding-bottom:12px; }
+.site-header nav a { min-height:44px; font-size:14px; }
+.site-header nav a.active::after { bottom:0; }
+.header-actions { font-size:13px; gap:16px; }
+.site-footer { margin-top:0; padding:24px; gap:16px; flex-wrap:wrap; font-size:13px; }
+.menu-layout { gap:24px; }
+.hero { border-radius:12px; min-height:168px; padding:28px; }
+.hero h1 { font-size:28px; max-width:580px; }
+.section-heading { margin:24px 0 16px; gap:16px; }
+.section-heading h2 { font-size:23px; }
+.search-box { min-height:48px; border-radius:10px; }
+.search-box input { min-height:46px; font-size:16px; }
+.search-box select { min-height:40px; font-size:13px; }
+.menu-filters { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:12px; margin:16px 0; }
+.menu-filters>select { min-height:44px; font-size:13px; border-radius:10px; }
+.pills { gap:8px; }
+.pills button { padding:10px 16px; border-radius:24px; font-size:14px; }
+.product-grid { gap:16px; }
+.product-card { border-radius:12px; box-shadow:none; }
+.product-card .drink-photo { height:180px; }
+.product-info { padding:16px; gap:12px; min-height:88px; }
+.product-info h3 { margin:0 0 6px; font-size:15px; }
+.product-info strong { font-size:15px; font-variant-numeric:tabular-nums; }
+.round-add { width:44px; height:44px; font-size:24px; }
+.order-sidebar { gap:16px; top:24px; }
+.order-sidebar .panel { padding:22px; border-radius:12px; }
+.customizer h2 { font-size:21px; margin:0 0 12px; }
+.customizer>p { font-size:14px; line-height:1.7; color:var(--muted); margin:0; }
+.fulfillment-summary h3 { font-size:17px; margin:0 0 12px; }
+.fulfillment-summary>p { font-size:14px; margin:0 0 16px; }
+.fulfillment-summary .fine-print { margin:12px 0 0; font-size:12px; }
+.fulfillment-summary .button { padding:12px 16px; }
+.quiet-link { min-height:44px; display:flex; justify-content:center; align-items:center; font-size:13px; }
+.orders-heading { align-items:center; gap:24px; margin:4px 0 24px; }
+.orders-heading h1 { font-size:30px; margin:8px 0; }
+.orders-intro { color:var(--muted); margin:0; font-size:15px; }
+.orders-workspace { border-radius:14px; padding:24px; }
+.orders-filters { display:grid; grid-template-columns:minmax(180px,1fr) minmax(210px,1fr) minmax(210px,1fr) auto; align-items:end; gap:16px; }
+.orders-filters .field { margin:0; display:flex; flex-direction:column; min-width:0; }
+.orders-filters label { font-weight:600; font-size:14px; margin-bottom:8px; }
+.orders-filters input,.orders-filters select { width:100%; min-width:0; height:48px; border-radius:10px; font-size:15px; }
+.label-note { font-size:11px; font-weight:400; color:var(--muted); margin-left:4px; }
+.orders-filter-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.orders-filter-actions .button { min-height:48px; white-space:nowrap; }
+.orders-refresh-note { font-size:13px; color:var(--muted); margin:16px 0 24px; }
+.orders-results-heading { border-top:1px solid var(--line); padding-top:24px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.orders-results-heading h2 { font-size:18px; margin:0; display:flex; align-items:center; gap:10px; }
+.orders-count { font-size:12px; background:var(--cream); color:var(--coffee); border:1px solid var(--line); border-radius:20px; padding:3px 10px; }
+.orders-results-heading p { font-size:12px; color:var(--muted); margin:0; }
+.orders-empty { padding:40px 24px; text-align:center; max-width:560px; margin:auto; }
+.orders-empty svg { width:52px; height:52px; fill:none; stroke:var(--coffee); stroke-width:1.5; margin-bottom:16px; }
+.orders-empty h3 { font-size:20px; margin:0 0 10px; }
+.orders-empty p { color:var(--muted); margin:0 0 24px; font-size:15px; }
+.orders-list { display:grid; gap:12px; margin-top:20px; }
+.order-summary-card { display:flex; justify-content:space-between; align-items:center; gap:24px; border:1px solid var(--line); border-radius:12px; padding:20px; }
+.order-summary-main { min-width:0; }
+.order-summary-main h2 { margin:6px 0; font-size:18px; overflow-wrap:anywhere; }
+.order-summary-main p,.order-summary-state>span:last-child { color:var(--muted); font-size:13px; margin:0; }
+.order-summary-state { display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+.order-state-badge { padding:6px 12px; background:var(--cream); border:1px solid var(--line); border-radius:20px; font-size:13px; font-weight:600; color:var(--coffee); }
+.orders-pagination { display:flex; gap:16px; justify-content:center; padding-top:20px; margin-top:20px; border-top:1px solid var(--line); font-size:13px; height:auto; }
+.orders-error { color:var(--danger); background:var(--danger-soft); padding:12px 16px; border-radius:10px; }
+@media(max-width:1150px) {
+    .orders-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .orders-filter-actions { justify-content:flex-start; }
+    .menu-filters .pills { grid-column:1/-1; }
+    .menu-filters { grid-template-columns:1fr 1fr; }
+    .menu-filters>select { max-width:none; width:100%; }
+}
+@media(max-width:850px) {
+    .menu-layout { grid-template-columns:1fr; gap:24px; }
+    .order-sidebar { position:static; grid-template-columns:1fr; }
+    .orders-workspace { padding:20px; }
+    .orders-results-heading { align-items:flex-start; flex-direction:column; gap:8px; }
+}
+@media(max-width:550px) {
+    .page-wrap { padding:20px 16px 24px; }
+    .site-header { padding:12px 16px; column-gap:16px; row-gap:8px; }
+    .site-header nav { gap:24px; }
+    .header-actions { gap:10px; font-size:12px; }
+    .hero { min-height:160px; padding:24px; }
+    .hero h1 { font-size:24px; }
+    .product-grid { gap:12px; }
+    .product-card .drink-photo { height:150px; }
+    .product-info { padding:12px; align-items:flex-start; gap:8px; }
+    .product-info h3 { font-size:14px; }
+    .product-info strong { font-size:14px; }
+    .round-add { width:44px; height:44px; flex-shrink:0; }
+    .orders-heading { align-items:flex-start; flex-wrap:wrap; gap:16px; }
+    .orders-heading h1 { font-size:26px; }
+    .orders-filters { grid-template-columns:1fr; }
+    .orders-filter-actions .button { flex:1; }
+    .orders-workspace { padding:16px; }
+    .orders-empty { padding:32px 0; }
+    .order-summary-card { align-items:flex-start; flex-direction:column; gap:16px; padding:16px; }
+    .order-summary-state { align-items:flex-start; }
+}
+@media(prefers-reduced-motion:reduce) {
+    *,*::before,*::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; }
+}
+
+/* Giữ form cấu hình thật và các nút nghiệp vụ; chỉ chuẩn hóa cách trình bày. */
+#product-editor h3 { font-size:17px; margin:20px 0 12px; }
+#product-editor .field { display:flex; flex-direction:column; gap:8px; font-size:14px; margin:0 0 16px; }
+#product-editor .field select,#product-editor .field input { width:100%; }
+#product-editor input[type=checkbox] { width:18px; min-height:18px; height:18px; }
+#product-editor form>button { width:100%; min-height:44px; padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--surface); margin-top:8px; font-size:14px; }
+#product-editor form>[data-editor-save] { background:var(--coffee); color:var(--surface); border-color:var(--coffee); }
+.product-info>div { min-width:0; }
+
+#product-editor fieldset { min-width:0; margin:0 0 16px; padding:16px 12px 0; border:1px solid var(--line); border-radius:10px; background:var(--cream); }
+#product-editor legend { padding:0 6px; font-size:13px; font-weight:600; }
+#product-editor textarea { width:100%; min-height:80px; font:inherit; }
+#product-editor p { font-size:13px; line-height:1.6; }
+/* Focus cấu hình không bị header che khi chuyển từ thẻ món. */
+.customizer, #menu { scroll-margin-top: 96px; }

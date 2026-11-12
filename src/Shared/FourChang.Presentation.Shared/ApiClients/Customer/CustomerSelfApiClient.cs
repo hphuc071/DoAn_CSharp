@@ -19,6 +19,8 @@ public sealed partial class CafeApiClient
     public async Task<RegistrationReceipt?> GetRegistrationAsync(Guid operation)
     { try { return await SendAsync<RegistrationReceipt>(HttpMethod.Get, $"/api/auth/customer/registrations/{operation}"); } catch (CafeApiException ex) when (ex.StatusCode == HttpStatusCode.NotFound) { return null; } }
 
+    /// <summary>Lấy danh sách bàn mô phỏng từ API chung để Web không tự khai báo mã bàn.</summary>
+    public Task<List<CustomerTableOption>> GetCustomerTablesAsync() => SendAsync<List<CustomerTableOption>>(HttpMethod.Get, "/api/menu/tables");
     public Task<List<MenuVariantItem>> GetMenuVariantsAsync(long productId) =>
         SendAsync<List<MenuVariantItem>>(HttpMethod.Get, $"/api/menu/{productId}/variants");
 

@@ -73,11 +73,11 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
         await page.Locator("[data-product]").ClickAsync();
         await Assertions.Expect(page.Locator("[data-editor-variant] option")).ToHaveCountAsync(extraVariant ? 3 : 2);
         if (available) {
-            await page.Locator("[data-editor-variant]").SelectOptionAsync("1");
-            await page.Locator("[data-editor-brew]").SelectOptionAsync("[50,50]");
+            await CartEditorActions.Variant(page, "1");
+            await CartEditorActions.Brew(page, "[50,50]");
         }
     }
-    private async Task AddAsync() { await SelectAsync(); await page.Locator("[data-editor-save]").ClickAsync(); await Assertions.Expect(page.GetByRole(AriaRole.Status)).ToContainTextAsync("Đã lưu"); }
+    private async Task AddAsync() { await SelectAsync(); await page.Locator("[data-editor-save]").ClickAsync(); await Assertions.Expect(page.GetByRole(AriaRole.Status)).ToContainTextAsync("Đã thêm"); }
     private async Task EditAsync()
     {
         await OpenAsync("/Cart"); await page.GetByRole(AriaRole.Button, new() { Name = "Sửa món", Exact = true }).First.ClickAsync();
@@ -90,7 +90,7 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
     [Fact]
     public async Task Same_configuration_merges_only_with_the_same_price_context()
     {
-        await AddAsync(); price = 46000; await AddAsync();
+        await AddAsync(); price = 46000; await AddAsync(); await SelectAsync();
         await page.Locator("[data-editor-save]").ClickAsync();
         await page.WaitForFunctionAsync("JSON.parse(localStorage.getItem('fourchang.cart-draft.v1'))[1].quantity === 2");
         var cart = await CartAsync(); Assert.Equal(2, cart.Length);
@@ -129,7 +129,7 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
         await page.GetByLabel("Số ly", new() { Exact = true }).FillAsync("2");
         await page.GetByLabel("Ghi chú", new() { Exact = true }).FillAsync("Keep this note");
         await page.Locator("[data-topping-id='2']").FillAsync("1"); await page.Locator("[data-topping-id='3']").FillAsync("2");
-        await page.Locator("[data-editor-brew]").SelectOptionAsync("[100,0]");
+        await CartEditorActions.Brew(page, "[100,0]");
         await Assertions.Expect(page.Locator("[data-editor-total]")).ToContainTextAsync("112.000");
         await page.Locator("[data-editor-save]").ClickAsync(); await Assertions.Expect(page.Locator("#cart-editor")).ToBeHiddenAsync();
         var item = Assert.Single(await CartAsync()); Assert.Equal("Keep this note", item.GetProperty("note").GetString());
@@ -200,6 +200,7 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
         await AddAsync(); await SelectAsync(); await page.Locator("[data-topping-id='2']").FillAsync("1");
         await page.Locator("[data-editor-save]").ClickAsync();
         await page.WaitForFunctionAsync("JSON.parse(localStorage.getItem('fourchang.cart-draft.v1')).length === 2");
+        await SelectAsync(); await page.Locator("[data-topping-id='2']").FillAsync("1");
         await page.GetByLabel("Ghi chú", new() { Exact = true }).FillAsync("different");
         await page.Locator("[data-editor-save]").ClickAsync();
         await page.WaitForFunctionAsync("JSON.parse(localStorage.getItem('fourchang.cart-draft.v1')).length === 3");
@@ -214,9 +215,9 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
         extraVariant = true; await SelectAsync();
         await page.GetByLabel("Ghi chú", new() { Exact = true }).FillAsync("same note");
         await page.GetByLabel("Số ly", new() { Exact = true }).FillAsync("2");
-        await page.Locator("[data-editor-variant]").SelectOptionAsync("4");
+        await CartEditorActions.Variant(page, "4");
         await Assertions.Expect(page.Locator("[data-editor-save]")).ToBeDisabledAsync();
-        await page.Locator("[data-editor-brew]").SelectOptionAsync("[100,0]");
+        await CartEditorActions.Brew(page, "[100,0]");
         await page.Locator("[data-editor-save]").ClickAsync();
         await page.WaitForFunctionAsync("!!localStorage.getItem('fourchang.cart-draft.v1')");
         var row = Assert.Single(await CartAsync()); Assert.Equal(4, row.GetProperty("variantId").GetInt32());

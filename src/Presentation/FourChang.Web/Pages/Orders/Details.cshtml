@@ -1,69 +1,72 @@
 @page "/Orders/{orderId:long}"
 @model FourChang.Web.Pages.Orders.DetailsModel
-@{ ViewData["Title"] = "Chi tiết đơn hàng"; }
-<a asp-page="/Orders/Index" asp-route-PageNumber="@Model.ReturnPage" asp-route-Status="@Model.ReturnStatus"
+@using FourChang.Web.Services
+@{ ViewData["CommerceClass"] = "commerce-page order-detail-screen"; ViewData["Title"] = "Chi tiết đơn hàng"; }
+<div class="breadcrumb"><a asp-page="/Orders/Index" asp-route-PageNumber="@Model.ReturnPage" asp-route-Status="@Model.ReturnStatus"
    asp-route-FromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ReturnToUtc?.ToString("O"))">Đơn hàng của tôi</a>
-<section class="panel">
-    <p id="order-snapshot-connection" role="status" hidden></p>
-    <h1>Chi tiết đơn hàng</h1>
-    @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
-    @if (Model.Detail is { } order)
-    {
-        <div data-order-private>
-        <h2>@order.Order.Code · @order.Order.Status</h2>
-        <p>@order.Order.Fulfilment · Tạo UTC: @order.Order.CreatedUtc.ToString("u")</p>
-        <p>Tiếp nhận UTC: @(order.AcceptedUtc?.ToString("u") ?? "Chưa có") · Hoàn tất UTC: @(order.CompletedUtc?.ToString("u") ?? "Chưa có")</p>
-        <p role="status">Snapshot UTC @order.SnapshotUtc.ToString("u"). Dữ liệu có thể đã thay đổi; tải lại để cập nhật.</p>
-        <a class="button secondary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
+ / Chi tiết đơn</div>
+<p id="order-snapshot-connection" role="status" hidden></p>
+@if(Model.Error is not null) { <p role="alert" class="notice">@Model.Error</p> }
+@if(Model.Detail is { } order)
+{
+<div data-order-private>
+    <div class="page-heading"><div><span class="eyebrow">ĐƠN HÀNG CỦA BẠN</span><h1>ĐƠN HÀNG &amp; HÓA ĐƠN</h1><p class="muted">@order.Order.Code · @CommerceLabels.Fulfillment(order.Order.Fulfilment)</p></div><span class="order-state-badge" data-state="@order.Order.Status">@CommerceLabels.State(order.Order.Status)</span></div>
+    <div class="commerce-action-row">        <a class="button secondary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
         <a class="button primary" asp-page="/Checkout/Payment" asp-route-orderId="@order.Order.Id"
            asp-route-ReturnPage="@Model.ReturnPage" asp-route-ReturnStatus="@Model.ReturnStatus"
            asp-route-ReturnFromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ReturnToUtc="@(Model.ReturnToUtc?.ToString("O"))">Xem thanh toán</a>
-        @foreach (var line in order.Lines)
-        {
-            <article class="line-item"><div>
-                <h3>@line.Name · @line.Size · @line.Temperature</h3>
-                <p>Đường @line.Sugar% · Đá @line.Ice% · @line.Note</p>
-                <p>Đặt: @line.Quantity · Đã hủy: @line.Cancelled · Bắt đầu pha: @line.Started · Pha xong: @line.Prepared</p>
-                @foreach (var topping in line.Toppings) { <p>@topping.Name: @topping.Portions phần/ly × @topping.Price.ToString("N0") đ</p> }
-                <p>Đơn giá đã chốt: @line.UnitPrice.ToString("N0") đ · Thành tiền còn lại: @line.CurrentTotal.ToString("N0") đ</p>
-            </div></article>
-        }
-        <dl>
-            <dt>Phí giao đã chốt ban đầu / hiện tại</dt><dd>@order.OriginalShippingFee.ToString("N0") / @order.ShippingFee.ToString("N0") đ</dd>
-            <dt>Tổng ban đầu / hiện tại</dt><dd>@order.OriginalTotal.ToString("N0") / @order.CurrentTotal.ToString("N0") đ</dd>
-            <dt>Đã xác minh thu / Đã chi hoàn thành công</dt><dd>@order.Collected.ToString("N0") / @order.Refunded.ToString("N0") đ</dd>
-            @if (order.Order.Status == "EXPIRED") {
-                <dt>Đơn hết hạn</dt><dd>Không chuyển khoản. Cần đối soát nghĩa vụ theo thu/hoàn thực tế; không dùng tổng snapshot làm khoản cần chuyển.</dd>
-            } else { <dt>Còn thu / Nghĩa vụ hoàn theo số dư</dt><dd>@order.Remaining.ToString("N0") / @order.RefundObligation.ToString("N0") đ</dd> }
-        </dl>
-        <h2>Thanh toán</h2>
-        @foreach (var payment in order.Payments) { <p>@payment.Code · @payment.Status · Đã xác minh @payment.Verified.ToString("N0") đ</p> }
-        <h2>Hoàn tiền</h2>
-        @if (order.Refunds.Count == 0) { <p>Chưa có hồ sơ hoàn.</p> }
-        @foreach (var refund in order.Refunds) {
-            <p>@refund.Code · @refund.Status · Yêu cầu @refund.Requested.ToString("N0") đ · Duyệt @(refund.Approved?.ToString("N0") ?? "Chưa có") đ · Đã chi thành công @refund.SuccessfullyDisbursed.ToString("N0") đ</p>
-        }
-        <h2>Hóa đơn</h2>
-        @if (order.Invoices.Count == 0) { <p>Chưa có hóa đơn.</p> }
-        @foreach (var invoice in order.Invoices) {
-            <p>@invoice.Number · @invoice.Kind · @invoice.Status · @invoice.Amount.ToString("N0") đ · Phát hành UTC: @(invoice.IssuedUtc?.ToString("u") ?? "Chưa phát hành")</p>
-            @if (invoice.Status == "ISSUED" && invoice.IssuedUtc is not null) {
-                <a asp-page-handler="Invoice" asp-route-orderId="@order.Order.Id" asp-route-invoiceId="@invoice.Id" data-online-only>Tải PDF đã lưu (nếu có)</a>
+</div>
+    <ol class="order-timeline" aria-label="Các mốc xử lý đã ghi nhận"><li class="recorded"><span>Đã đặt</span><strong>@order.Order.CreatedUtc.ToString("dd/MM/yyyy HH:mm") UTC</strong></li>
+        <li class="@(order.AcceptedUtc is not null ? "recorded" : "")"><span>Tiếp nhận</span><strong>@(order.AcceptedUtc?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa tiếp nhận")</strong></li>
+        <li class="@(order.CompletedUtc is not null ? "recorded" : "")"><span>Hoàn tất</span><strong>@(order.CompletedUtc?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa hoàn tất")</strong></li></ol>
+    <div class="two-columns commerce-columns">
+        <div class="order-detail-main">
+            <section class="panel"><div class="commerce-section-heading"><h2>Món đã đặt</h2><span class="muted">@order.Lines.Count dòng món</span></div>
+            @foreach(var line in order.Lines) {
+                <article class="order-product-card"><div><h3>@line.Name <span class="commerce-tag">× @line.Quantity</span></h3><p class="muted">@line.Size · @CommerceLabels.Temperature(line.Temperature) · Đường @line.Sugar% · Đá @line.Ice%</p>
+                    @if(!string.IsNullOrWhiteSpace(line.Note)) { <p class="order-line-note">Ghi chú: @line.Note</p> }
+                    @foreach(var topping in line.Toppings) { <p class="fine-print">+ @topping.Name · @topping.Portions phần/ly × @topping.Price.ToString("N0") đ</p> }
+                    <details class="order-preparation-info"><summary>Tiến độ món</summary><p class="fine-print">Đã đặt @line.Quantity · Đã hủy @line.Cancelled · Bắt đầu pha @line.Started · Pha xong @line.Prepared</p></details></div>
+                    <div class="order-line-amount"><strong>@line.CurrentTotal.ToString("N0") đ</strong><span>@line.UnitPrice.ToString("N0") đ / món</span></div>
+                </article>
             }
-        }
-        <p>Nguồn lưu PDF hiện chưa tích hợp; không có tệp thì không tạo hoặc phát hành hóa đơn mới. Trạng thái duyệt hoàn không có nghĩa đã chi tiền.</p>
-        @if (order.CancellationEligible)
+            </section>
+            <section class="panel" id="order-invoices"><div class="commerce-section-heading"><h2>Hóa đơn</h2><span class="muted">Chứng từ đã ghi nhận</span></div>
+            @if(order.Invoices.Count == 0) { <div class="commerce-empty"><h3>Chưa có hóa đơn</h3><p>Hóa đơn được hiển thị khi đã phát hành.</p></div> }
+            @foreach(var invoice in order.Invoices) {
+                <article class="invoice-card"><div class="invoice-brandline"><strong>4CHANG LINH NGU LAM</strong><span>HÓA ĐƠN CỦA BẠN</span></div><div><span class="eyebrow">@CommerceLabels.State(invoice.Kind)</span><h3>@invoice.Number</h3><p class="fine-print">Phát hành UTC: @(invoice.IssuedUtc?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa phát hành")</p></div>
+                    <div class="invoice-card-value"><strong>@invoice.Amount.ToString("N0") đ</strong><span class="order-state-badge" data-state="@invoice.Status">@CommerceLabels.State(invoice.Status)</span></div>
+                    @if(invoice.Status == "ISSUED" && invoice.IssuedUtc is not null) { <a class="button secondary" asp-page-handler="Invoice" asp-route-orderId="@order.Order.Id" asp-route-invoiceId="@invoice.Id" data-online-only>Tải hóa đơn PDF</a> }
+                </article>
+            }
+            <p class="fine-print">PDF chỉ tải được khi có tệp đã lưu; thao tác xem không phát hành hóa đơn mới.</p></section>
+            <details class="panel order-refund-details"><summary>Thông tin hoàn tiền <span class="muted">(@order.Refunds.Count hồ sơ)</span></summary>
+            @if(order.Refunds.Count == 0) { <p class="muted">Chưa có hồ sơ hoàn tiền.</p> }
+            @foreach(var refund in order.Refunds) { <article class="payment-record"><strong>@refund.Code</strong><span class="order-state-badge" data-state="@refund.Status">@CommerceLabels.State(refund.Status)</span><p>Yêu cầu @refund.Requested.ToString("N0") đ · Được duyệt @(refund.Approved?.ToString("N0") ?? "Chưa có") đ · Đã hoàn @refund.SuccessfullyDisbursed.ToString("N0") đ</p></article> }
+            <p class="fine-print">Hồ sơ được duyệt chưa có nghĩa tiền đã được chi hoàn.</p></details>
+        </div>
+        <aside class="panel commerce-summary"><span class="eyebrow">TỔNG KẾT ĐƠN HÀNG</span><h2>Chi tiết số tiền</h2>
+            <dl class="totals"><div><dt>Phí giao hiện tại</dt><dd>@order.ShippingFee.ToString("N0") đ</dd></div><div class="total"><dt>Tổng hiện tại</dt><dd>@order.CurrentTotal.ToString("N0") đ</dd></div><div><dt>Đã thu</dt><dd>@order.Collected.ToString("N0") đ</dd></div>
+                @if(order.Order.Status != "EXPIRED") { <div><dt>Còn thanh toán</dt><dd>@order.Remaining.ToString("N0") đ</dd></div> }</dl>
+            @if(order.Order.Status == "EXPIRED") { <p class="notice">Đơn hết hạn. Không chuyển khoản; cần đối soát theo thu/hoàn thực tế.</p> }
+            <details class="commerce-help"><summary>Thông tin đối soát</summary><p>Tổng ban đầu: @order.OriginalTotal.ToString("N0") đ</p><p>Đã hoàn thành công: @order.Refunded.ToString("N0") đ</p><p>Nghĩa vụ hoàn theo số dư: @order.RefundObligation.ToString("N0") đ</p><p>Phí giao ban đầu: @order.OriginalShippingFee.ToString("N0") đ</p>
+                @foreach(var payment in order.Payments) { <p>@payment.Code · @CommerceLabels.State(payment.Status) · Đã xác nhận @payment.Verified.ToString("N0") đ</p> }
+                <p>Mốc dữ liệu UTC: @order.SnapshotUtc.ToString("dd/MM/yyyy HH:mm:ss"). Tải lại để xem thay đổi mới nhất.</p>
+            </details>
+        </aside>
+    </div>
+    @if (order.CancellationEligible) { <details class="commerce-cancellation"><summary>Hỗ trợ hủy đơn</summary>        @if (order.CancellationEligible)
         {
-            <h2>Yêu cầu hủy toàn đơn</h2>
+            
             <p>Số đã thu chưa hoàn để đối soát khi hủy: @Math.Max(0, order.Collected - order.Refunded).ToString("N0") đ. Chưa phải cam kết chi hoàn.</p>
             <form method="post" asp-page-handler="Cancel">
                 <input type="hidden" name="orderId" value="@order.Order.Id" />
                 <label>Lý do (bắt buộc, 3–400 ký tự)<textarea name="reason" required minlength="3" maxlength="400"></textarea></label>
                 <button type="submit" class="button secondary" disabled>Yêu cầu hủy đang khóa</button>
             </form>
-            <p role="status">Chưa xác minh đầy đủ giao dịch hủy, giữ kho, idempotency và nghĩa vụ hoàn tiền. Liên hệ hỗ trợ; máy chủ cũng từ chối POST thủ công.</p>
+            <p role="status">Hủy trực tuyến hiện chưa khả dụng. Vui lòng liên hệ quán để được hỗ trợ kiểm tra đơn và khoản hoàn nếu có.</p>
         }
-        </div>
-    }
-</section>
+</details> }
+</div>
+}
 @section Scripts { <script src="~/js/order-snapshot.js" asp-append-version="true"></script> }

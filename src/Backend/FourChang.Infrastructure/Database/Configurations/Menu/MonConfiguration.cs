@@ -6,12 +6,14 @@ namespace FourChang.Infrastructure.Database.Configurations.Menu;
 
 public sealed class MonConfiguration : IEntityTypeConfiguration<Mon>
 {
+    /// <summary>Ánh xạ thuộc tính, khóa và ràng buộc SQL của Mon; giữ quan hệ dữ liệu nhất quán.</summary>
     public void Configure(EntityTypeBuilder<Mon> b)
     {
         b.ToTable("Mon", "dbo", table =>
         {
             table.UseSqlOutputClause(false);
         });
+        b.Property(x => x.CongBoTuLuc).HasColumnType("datetime2(3)");
         b.HasKey("MaMon");
         b.Property(x => x.MaMon).UseIdentityColumn();
         b.Property(x => x.MaMon).HasColumnType("bigint").IsRequired();

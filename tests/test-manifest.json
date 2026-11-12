@@ -1,14 +1,17 @@
 {
-  "code": "UC-WEB-01",
-  "actor": "KhachHang",
-  "name": "Đăng ký tài khoản",
-  "status": "DaCoTest",
-  "project": "FourChang.Tests/FourChang.Tests.csproj",
-  "sources": [
-    "FourChang.Tests/KhachHang/UC-WEB-01/RegistrationTests.cs"
-  ],
-  "filter": "UseCase=UC-WEB-01"
-},
+  "description": "Danh mục theo dac-25-Uc.docx. Có test không đồng nghĩa đã triển khai đầy đủ mọi luồng.",
+  "useCases": [
+    {
+      "code": "UC-WEB-01",
+      "actor": "KhachHang",
+      "name": "Đăng ký tài khoản",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-01/RegistrationTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-01"
+    },
     {
       "code": "UC-WEB-02",
       "actor": "KhachHang",
@@ -16,7 +19,7 @@
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
-        "FourChang.Tests/KhachHang/UC-WEB-02/LoginAndSessionTests.cs"
+        "FourChang.Tests/KhachHang/UC-WEB-02/SessionTests.cs"
       ],
       "filter": "UseCase=UC-WEB-02"
     },
@@ -27,7 +30,7 @@
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
-        "FourChang.Tests/KhachHang/UC-WEB-03/CustomerProfileTests.cs"
+        "FourChang.Tests/KhachHang/UC-WEB-03/ProfileTests.cs"
       ],
       "filter": "UseCase=UC-WEB-03"
     },
@@ -41,7 +44,7 @@
         "FourChang.Tests/KhachHang/UC-WEB-04/MenuCatalogTests.cs"
       ],
       "filter": "UseCase=UC-WEB-04"
-    }
+    },
     {
       "code": "UC-WEB-05",
       "actor": "KhachHang",
@@ -49,7 +52,8 @@
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
-        "FourChang.Tests/KhachHang/UC-WEB-05/MenuCustomizationTests.cs"
+        "FourChang.Tests/KhachHang/UC-WEB-05/MenuCustomizationTests.cs",
+        "FourChang.Tests/KhachHang/UC-WEB-05/ChooseNextProductBrowserTests.cs"
       ],
       "filter": "UseCase=UC-WEB-05"
     },
@@ -68,16 +72,19 @@
       "code": "UC-WEB-07",
       "actor": "KhachHang",
       "name": "Thanh toán chuyển khoản VietQR",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/KhachHang/UC-WEB-07-08/SimulationPaymentBrowserTests.cs",
+        "FourChang.Tests/KhachHang/UC-WEB-07-08/SimulationSafetyTests.cs"
+      ],
+      "filter": "UseCase=UC-WEB-07"
     },
     {
       "code": "UC-WEB-08",
       "actor": "KhachHang",
       "name": "Quản lý đơn hàng cá nhân",
-      "status": "ChuaTrienKhai",
+      "status": "ChuaCoTest",
       "project": null,
       "sources": [],
       "filter": null
@@ -98,16 +105,19 @@
       "code": "UC-POS-02",
       "actor": "NhanVien",
       "name": "Tạo đơn tại quầy",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/NhanVien/UC-POS-02/PosCheckoutTests.cs",
+        "FourChang.Tests/NhanVien/UC-POS-02/PosSalesUiTests.cs"
+      ],
+      "filter": "UseCase=UC-POS-02"
     },
     {
       "code": "UC-POS-03",
       "actor": "NhanVien",
       "name": "Tiếp nhận và xử lý đơn hàng",
-      "status": "ChuaTrienKhai",
+      "status": "ChuaCoTest",
       "project": null,
       "sources": [],
       "filter": null
@@ -116,7 +126,7 @@
       "code": "UC-POS-04",
       "actor": "NhanVien",
       "name": "Hủy món trước pha chế",
-      "status": "ChuaTrienKhai",
+      "status": "ChuaCoTest",
       "project": null,
       "sources": [],
       "filter": null
@@ -125,10 +135,12 @@
       "code": "UC-POS-05",
       "actor": "NhanVien",
       "name": "Thanh toán và phát hành hóa đơn",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/NhanVien/UC-POS-02/PosCheckoutTests.cs"
+      ],
+      "filter": "UseCase=UC-POS-05"
     },
     {
       "code": "UC-ADM-01",
@@ -137,122 +149,141 @@
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-01/CustomerAddressAdministrationTests.cs",
         "FourChang.Tests/QuanLy/UC-ADM-01/CustomerAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/CustomerPhoneTests.cs",
         "FourChang.Tests/QuanLy/UC-ADM-01/Web/TemporaryPasswordBrowserTests.cs",
-        "FourChang.Tests/QuanLy/UC-ADM-01/WinForms/CustomersUiTests.cs"
+        "FourChang.Tests/QuanLy/UC-ADM-01/WinForms/CustomersUiTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-01/CustomerPasswordResetUiTests.cs"
       ],
       "filter": "UseCase=UC-ADM-01"
     },
     {
       "code": "UC-ADM-02",
       "actor": "QuanLy",
-      "name": "Quản lý quyền truy cập hệ thống",
+      "name": "Quản lý thực đơn",
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
-        "FourChang.Tests/QuanLy/UC-ADM-02/AccessAdministrationTests.cs",
-        "FourChang.Tests/QuanLy/UC-ADM-02/WinForms/AccessUiTests.cs"
+        "FourChang.Tests/QuanLy/UC-ADM-02/MenuAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-02/MenuSynchronizationBrowserTests.cs"
       ],
       "filter": "UseCase=UC-ADM-02"
     },
     {
       "code": "UC-ADM-03",
       "actor": "QuanLy",
-      "name": "Quản lý thực đơn",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Quản lý nguyên liệu",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-03/IngredientAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-03"
     },
     {
       "code": "UC-ADM-04",
       "actor": "QuanLy",
-      "name": "Quản lý nguyên liệu",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Quản lý công thức pha chế BOM",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-04/RecipeAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-04"
     },
     {
       "code": "UC-ADM-05",
       "actor": "QuanLy",
-      "name": "Quản lý công thức pha chế BOM",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Theo dõi tồn kho và cảnh báo",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-05/InventoryAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-05"
     },
     {
       "code": "UC-ADM-06",
       "actor": "QuanLy",
-      "name": "Theo dõi tồn kho và cảnh báo",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Quản lý chứng từ kho",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-06/StockDocumentAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-06"
     },
     {
       "code": "UC-ADM-07",
       "actor": "QuanLy",
-      "name": "Quản lý chứng từ kho",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Giám sát và xử lý đơn hàng",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-07/OrderAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-07"
     },
     {
       "code": "UC-ADM-08",
       "actor": "QuanLy",
-      "name": "Giám sát và xử lý đơn hàng",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Tra cứu và quản lý hóa đơn",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-08/InvoiceAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-08"
     },
     {
       "code": "UC-ADM-09",
       "actor": "QuanLy",
-      "name": "Tra cứu và quản lý hóa đơn",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Xử lý và xác nhận hoàn tiền",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-09/IncomingReconciliationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-09/RefundAdministrationTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-09"
     },
     {
       "code": "UC-ADM-10",
       "actor": "QuanLy",
-      "name": "Xử lý và xác nhận hoàn tiền",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Thống kê, báo cáo và tra cứu nhật ký hệ thống",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-10/ReportAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-10/ReportNavigationUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-10"
     },
     {
       "code": "UC-ADM-11",
       "actor": "QuanLy",
-      "name": "Thống kê, báo cáo và tra cứu nhật ký hệ thống",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "name": "Quản lý danh sách nhân viên",
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-11/EmployeeAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-11/EmployeeUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-11"
     },
     {
       "code": "UC-ADM-12",
       "actor": "QuanLy",
-      "name": "Quản lý danh sách nhân viên",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
-    },
-    {
-      "code": "UC-ADM-13",
-      "actor": "QuanLy",
       "name": "Quản lý ca làm việc",
-      "status": "ChuaTrienKhai",
-      "project": null,
-      "sources": [],
-      "filter": null
+      "status": "DaCoTest",
+      "project": "FourChang.Tests/FourChang.Tests.csproj",
+      "sources": [
+        "FourChang.Tests/QuanLy/UC-ADM-12/WorkSessionAdministrationTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-12/WorkSessionConcurrencyTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-12/WorkSessionUiTests.cs"
+      ],
+      "filter": "UseCase=UC-ADM-12"
     }
   ]
 }

@@ -20,6 +20,7 @@ public sealed class AdminPasswordForm : Form
     private AdminPasswordInput? pending;private bool busy;private bool unknown;public bool Saved{get;private set;}
     public AdminPasswordForm(AdminAccessProfile profile,string oldPassword="")
     {
+        AutoScaleMode = AutoScaleMode.Dpi;
         this.profile=profile;Text=profile.BatBuocDoiMatKhau?"Đổi mật khẩu tạm của Quản lý":"Đổi mật khẩu Quản lý";
         Name="AdminPasswordForm";ClientSize=new Size(530,590);StartPosition=FormStartPosition.CenterParent;
         BackColor=CafeTheme.Cream;Font=CafeTheme.Body();AutoScroll=true;
@@ -29,7 +30,7 @@ public sealed class AdminPasswordForm : Form
         var cancel=new AdminActionButton("Hủy",AdminIcon.Previous);cancel.Click+=(_,_)=>Close();
         var card=new AdminSurface{Dock=DockStyle.Top,AutoSize=true};
         card.Controls.Add(Ui.Stack(Ui.Label(Text,16,true),Ui.Label(profile.TenDangNhap,10,true,AdminColors.Accent),
-            Ui.Field("Mật khẩu hiện tại",current),Ui.Field("Mật khẩu mới (10–128 ký tự)",password),Ui.Field("Xác nhận mật khẩu mới",confirm),
+            Ui.Field("Mật khẩu hiện tại",current),Ui.Field("Mật khẩu mới (5–128 ký tự)",password),Ui.Field("Xác nhận mật khẩu mới",confirm),
             Ui.Label("Đổi thành công sẽ đăng xuất các phiên Quản lý. Ca POS vẫn được giữ.",9,false,AdminColors.Muted),feedback,Ui.Row(save,reload,cancel)));
         Controls.Add(card);save.Click+=async(_,_)=>await Submit();reload.Click+=async(_,_)=>await RefreshVersion();
         FormClosing+=(_,e)=>{if(Saved)return;if(busy||unknown){e.Cancel=true;Error("Kết quả chưa rõ. Hãy Kiểm tra / thử lại trước khi đóng.");}};

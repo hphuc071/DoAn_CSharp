@@ -9,10 +9,25 @@ namespace FourChang.Web.Pages.Checkout;
 public sealed class PaymentModel(CafeApiClient api, IPaymentQrSource qrSource) : CustomerOrderPageModel(api)
 {
     public ValidatedPaymentQr? Qr { get; private set; }
+    public FourChang.Presentation.Shared.Contracts.Staff.SimulationQr? Simulation { get; private set; }
+
+    /// <summary>Polling chỉ đọc snapshot thuộc khách đã đăng nhập; không tự xác nhận thanh toán.</summary>
+    public async Task<IActionResult> OnGetStateAsync(long orderId, CancellationToken ct)
+    {
+        var result = await ReadAsync(() => LoadDetailAsync(orderId, ct));
+        return Detail is null ? result : new JsonResult(new { status = Detail.Order.Status, orderId = Detail.Order.Id, paid = Detail.Remaining == 0 && Detail.Collected > 0 && Detail.Payments.Any(p => p.Status == "VERIFIED") });
+    }
     public Task<IActionResult> OnGetAsync(long orderId, CancellationToken ct) => ReadAsync(async () =>
     {
         if (!ModelState.IsValid || orderId <= 0) { Response.StatusCode = 404; Error = "Chọn một đơn của bạn từ Đơn hàng của tôi."; return; }
         await LoadDetailAsync(orderId, ct);
+        // QR thử nghiệm là capability riêng; GET này chỉ cấp link đã ký, tuyệt đối không xác nhận tiền.
+        if (HttpContext.Features.Get<Microsoft.AspNetCore.Http.Features.IServiceProvidersFeature>()?.RequestServices?.GetService<IConfiguration>()?.GetValue<bool>("Payments:SimulationEnabled") == true
+            && Detail!.Order.Status == "PENDING_PAYMENT")
+        {
+            try { Simulation = await Api.GetCustomerSimulationQrAsync(orderId); }
+            catch (CafeApiException ex) { if (ex.StatusCode is not (System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Conflict)) Error = "Chưa tải được QR mô phỏng. Có thể tải lại; đơn cũ vẫn được giữ."; }
+        }
         // Page load/reload never creates a payment request.
         if (!CanRequestQr(Detail!, DateTime.UtcNow)) return;
         try
@@ -23,6 +38,7 @@ public sealed class PaymentModel(CafeApiClient api, IPaymentQrSource qrSource) :
             // not a payment deadline, and never authorizes a retry or another payment request.
             var candidate = await qrSource.GetAsync(Detail!, timeout.Token).WaitAsync(timeout.Token);
             if (CanDisplay(candidate, Detail!, DateTime.UtcNow)) Qr = candidate;
+
         }
         catch (Exception ex) when (ex is HttpRequestException or TimeoutException ||
             ex is JsonException or NotSupportedException or FormatException or CafeApiException ||

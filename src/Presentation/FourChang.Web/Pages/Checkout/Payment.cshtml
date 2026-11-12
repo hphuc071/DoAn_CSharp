@@ -3,36 +3,42 @@
 @using FourChang.Web.Services
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @inject Microsoft.AspNetCore.Hosting.IWebHostEnvironment HostingEnvironment
-@{ ViewData["Title"] = "Thanh toán đơn hàng"; }
-<a asp-page="/Orders/Index" asp-route-PageNumber="@Model.ReturnPage" asp-route-Status="@Model.ReturnStatus"
+@{ ViewData["CommerceClass"] = "commerce-page payment-screen"; ViewData["Title"] = "Thanh toán đơn hàng"; }
+<div class="breadcrumb"><a asp-page="/Orders/Index" asp-route-PageNumber="@Model.ReturnPage" asp-route-Status="@Model.ReturnStatus"
    asp-route-FromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ReturnToUtc?.ToString("O"))">Đơn hàng của tôi</a>
-<section class="panel payment-panel">
-    <p id="order-snapshot-connection" role="status" hidden></p>
-    <h1>Thanh toán đơn hàng</h1>
-    @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
-    @if (Model.Detail is { } order)
-    {
-        <div data-order-private>
-        <h2>@order.Order.Code</h2>
-        <p>Trạng thái đơn: <strong>@order.Order.Status</strong></p>
-        <p>Tổng hiện tại: @order.CurrentTotal.ToString("N0") đ · Đã xác minh thu: @order.Collected.ToString("N0") đ · Đã chi hoàn: @order.Refunded.ToString("N0") đ</p>
-        @if (order.Order.Status == "EXPIRED") {
-            <p role="status">Đơn đã hết hạn. Không chuyển khoản; nghĩa vụ thu/hoàn cần đối soát riêng với giao dịch thực nhận.</p>
-        } else { <p>Còn thu theo số dư: <strong>@order.Remaining.ToString("N0") đ</strong></p> }
-        <p>Hạn đơn UTC: @(order.ExpiresUtc?.ToString("u") ?? "Backend chưa cung cấp")</p>
-        @if (order.Payments.Count == 0) { <p>Chưa có yêu cầu thanh toán. Trang này không tự tạo yêu cầu mới.</p> }
-        @foreach (var payment in order.Payments)
-        {
-            <article>
-                <h3>@payment.Code · @payment.Status</h3>
-                <p>Yêu cầu: @payment.Requested.ToString("N0") đ · Đã xác minh: @payment.Verified.ToString("N0") đ</p>
-                <p>Tham chiếu: @(payment.Reference ?? "Chưa có tham chiếu từ Backend")</p>
-                <p>Hạn UTC: @(payment.ExpiresUtc?.ToString("u") ?? "Chưa có") · Xác minh UTC: @(payment.VerifiedUtc?.ToString("u") ?? "Chưa có")</p>
-                <p role="status">@CustomerOrderPresentation.PaymentMessage(payment, DateTime.UtcNow)</p>
-            </article>
+ / Thanh toán</div>
+<div class="page-heading"><div><span class="eyebrow">HOÀN TẤT TRẢI NGHIỆM CỦA BẠN</span><h1>Thanh toán đơn hàng</h1><p class="muted">Kiểm tra số tiền và trạng thái trước khi xác nhận.</p></div></div>
+<partial name="_CheckoutSteps"/>
+<p id="order-snapshot-connection" role="status" hidden></p>
+@if (Model.Error is not null) { <p class="notice" role="alert">@Model.Error</p> }
+@if (Model.Detail is { } order)
+{
+<div data-order-private>
+    <div class="commerce-order-heading"><div><span class="eyebrow">MÃ ĐƠN HÀNG</span><h2>@order.Order.Code</h2></div><span class="order-state-badge" data-state="@order.Order.Status">@CommerceLabels.State(order.Order.Status)</span></div>
+    <div class="commerce-columns two-columns payment-columns">
+        <section class="panel payment-primary" aria-label="Phương thức và mã thanh toán">
+            <div class="commerce-section-heading"><h2>Thanh toán chuyển khoản</h2><span class="commerce-tag">Chuyển khoản trước</span></div>
+        @if (order.Remaining > 0 && order.Order.Status != "EXPIRED") {
+            <div class="payment-due"><span>Số tiền còn thanh toán</span><strong>@order.Remaining.ToString("N0") đ</strong></div>
         }
-        @if (Model.Qr is { } qr) {
+        @if (order.Remaining == 0 && order.Collected > 0 && order.Payments.Any(p => p.Status == "VERIFIED")) {
+            <section class="success-note" role="status">
+                <h2>Thanh toán thành công</h2>
+                <p>Đơn đã được cập nhật. Theo dõi tiến trình xử lý tại Đơn hàng của tôi.</p>
+                @if (Configuration["Payments:SimulationEnabled"] == "true" && HostingEnvironment.EnvironmentName == "Development") {
+                    <p>Chế độ trình diễn đang bật. Xác nhận QR mô phỏng không chuyển tiền thật.</p>
+                }
+            </section>
+        } else if (Model.Qr is { } qr) {
             <img src="@qr.PngDataUri" data-payment-qr data-qr-expires-utc="@qr.ExpiresUtc.ToString("O", System.Globalization.CultureInfo.InvariantCulture)" alt="VietQR từ nguồn đã kiểm tra thụ hưởng, số tiền và tham chiếu" width="260" height="260" />
+        } else if (Model.Simulation is { } simulation) {
+            <section class="panel" data-simulation-payment data-order-id="@order.Order.Id">
+                <h3>THANH TOÁN MÔ PHỎNG</h3>
+                <p>Không chuyển tiền thật. Quét QR rồi xác nhận trên trang thử nghiệm; đơn sẽ tự cập nhật.</p>
+                <img src="@simulation.PngDataUri" alt="QR mở trang xác nhận thanh toán mô phỏng" width="280" height="280" />
+                <p><a class="button primary" href="@simulation.Url" target="_blank" rel="noopener noreferrer">Mở trang xác nhận mô phỏng</a></p>
+                <p role="status" id="simulation-status">Đang chờ xác nhận mô phỏng…</p>
+            </section>
         } else if (PaymentDemoQrPolicy.CanShow(order,
             Configuration["Demo:PaymentQrEnabled"], HostingEnvironment.EnvironmentName, DateTime.UtcNow)) {
             <div class="notice" role="note">
@@ -46,13 +52,31 @@
         } else {
             <p class="notice">Chưa hỗ trợ VietQR đã được xác minh từ nhà cung cấp/cấu hình tin cậy. Không có mã QR để thanh toán trên trang này.</p>
         }
-        <p id="payment-qr-expiry" class="notice" role="status" hidden></p>
-        <p class="fine-print">Snapshot UTC: @order.SnapshotUtc.ToString("u"). Tải lại chỉ đọc trạng thái; không tự xác nhận PAID, không yêu cầu chuyển lại khi chưa rõ kết quả.</p>
-        <a class="button primary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
+
+            <p id="payment-qr-expiry" class="notice" role="status" hidden></p>
+            <div class="commerce-action-row">        <a class="button primary" href="@(Request.Path + Request.QueryString)">Tải lại trạng thái</a>
         <a class="button secondary" asp-page="/Orders/Details" asp-route-orderId="@order.Order.Id"
            asp-route-ReturnPage="@Model.ReturnPage" asp-route-ReturnStatus="@Model.ReturnStatus"
            asp-route-ReturnFromUtc="@(Model.ReturnFromUtc?.ToString("O"))" asp-route-ReturnToUtc="@(Model.ReturnToUtc?.ToString("O"))">Chi tiết đơn</a>
-        </div>
-    }
-</section>
-@section Scripts { <script src="~/js/order-snapshot.js" asp-append-version="true"></script> }
+</div>
+        </section>
+        <aside class="panel commerce-summary"><span class="eyebrow">CHI TIẾT THANH TOÁN</span><h2>Tóm tắt đơn hàng</h2>
+            <dl class="totals"><div><dt>Tổng hiện tại</dt><dd>@order.CurrentTotal.ToString("N0") đ</dd></div><div><dt>Đã xác nhận thu</dt><dd>@order.Collected.ToString("N0") đ</dd></div><div><dt>Đã hoàn thành công</dt><dd>@order.Refunded.ToString("N0") đ</dd></div>
+            @if(order.Order.Status != "EXPIRED") { <div class="total"><dt>Còn thanh toán</dt><dd>@order.Remaining.ToString("N0") đ</dd></div> }</dl>
+            @if(order.Order.Status == "EXPIRED") { <p class="notice" role="status">Đơn đã hết hạn. Không chuyển khoản; liên hệ quán để đối soát khoản thu/hoàn nếu có.</p> }
+            <p class="fine-print">Hạn thanh toán UTC: @(order.ExpiresUtc?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa có")</p>
+            <details class="commerce-help"><summary>Lịch sử và thông tin đối soát</summary>
+                @if(order.Payments.Count == 0) { <p>Chưa có yêu cầu thanh toán.</p> }
+                @foreach(var payment in order.Payments) {
+                    <article class="payment-record"><div class="commerce-section-heading"><strong>@payment.Code</strong><span class="order-state-badge" data-state="@payment.Status">@CommerceLabels.State(payment.Status)</span></div>
+                        <p>Yêu cầu @payment.Requested.ToString("N0") đ · Đã xác nhận @payment.Verified.ToString("N0") đ</p><p>Tham chiếu: @(payment.Reference ?? "Chưa có")</p>
+                        <p>Xác nhận UTC: @(payment.VerifiedUtc?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa có")</p><p>@CustomerOrderPresentation.PaymentMessage(payment,DateTime.UtcNow)</p>
+                    </article>
+                }
+                <p class="fine-print">Mốc dữ liệu UTC: @order.SnapshotUtc.ToString("dd/MM/yyyy HH:mm:ss"). Tải lại chỉ đọc trạng thái, không tạo yêu cầu thanh toán khác.</p>
+            </details>
+        </aside>
+    </div>
+</div>
+}
+@section Scripts { <script src="~/js/order-snapshot.js" asp-append-version="true"></script><script src="~/js/payment-simulation.js" asp-append-version="true"></script> }

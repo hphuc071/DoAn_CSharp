@@ -23,7 +23,7 @@ src/
 │       └── DesktopLauncher.cs
 ├── Backend/
 │   ├── FourChang.Api/                    Endpoint và nghiệp vụ theo actor
-│   ├── FourChang.Domain/                 35 thực thể đã chốt
+│   ├── FourChang.Domain/                 37 thực thể đã chốt (gồm Banner và SuKienDongBo)
 │   └── FourChang.Infrastructure/         EF Core, khởi tạo và kiểm tra database
 └── Shared/
     └── FourChang.Presentation.Shared/
@@ -62,3 +62,7 @@ dotnet run --project src/Presentation/FourChang.Pos
 ```
 
 Các lệnh chạy từng ứng dụng ở terminal riêng; các file Chay-*.cmd cũng đã cập nhật đường dẫn. Kiểm tra: dotnet build FourChang.sln và dotnet test FourChang.sln. Không thay 26 UC hoặc schema 35 bảng khi di chuyển mã nguồn.
+
+## ADM-01 đến ADM-05
+
+Các page Admin được đặt trong Customers/Views, Menu, Ingredients, Recipes và Inventory. API tương ứng ở Features/Admin; DTO/HTTP client ở project Shared. Điều kiện quyền/version/audit nằm phía server, UI chỉ giữ nháp và hiển thị kết quả. Xem `docs/ADM01-05-IMPLEMENTATION.md` và `tests/FourChang.Tests/QuanLy/UC-ADM-01..05/TestCases.md` để đối chiếu yêu cầu, kiểm thử và tích hợp.

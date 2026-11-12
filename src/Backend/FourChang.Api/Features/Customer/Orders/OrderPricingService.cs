@@ -16,11 +16,10 @@ public static class OrderPricingService
         string fulfillmentType,
         decimal? distanceKm,
         IReadOnlyCollection<OrderItemInput> items,
-        CancellationToken ct = default)
+        CancellationToken ct = default, bool simulateFulfillment = false)
     {
-        // DINE_IN needs an authenticated table; DELIVERY needs a server-verified
-        // distance and fee. Neither is ready in this preview. Fail closed.
-        if (!string.Equals(fulfillmentType, "TAKEAWAY", StringComparison.OrdinalIgnoreCase))
+        // Phí mô phỏng chỉ được tính khi caller đã kiểm tra cờ Development; TAKEAWAY giữ nguyên.
+        if (fulfillmentType != "TAKEAWAY" && !(simulateFulfillment && fulfillmentType is "DINE_IN" or "DELIVERY"))
             throw new OrderQuoteValidationException(
                 "Hiện chỉ hỗ trợ báo giá mang đi; tại bàn và giao hàng chưa được xác minh.");
 
@@ -106,6 +105,7 @@ public static class OrderPricingService
         }
 
         // Only TAKEAWAY can be priced here, so shipping is unconditionally zero.
-        return new OrderPriceSummary(subtotal, 0m, subtotal);
+        var shipping = fulfillmentType == "DELIVERY" ? SimulatedFulfillment.DeliveryFee : 0m;
+        return new OrderPriceSummary(subtotal, shipping, subtotal + shipping);
     }
 }

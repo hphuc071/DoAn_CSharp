@@ -94,6 +94,7 @@ public sealed class CustomersPage : UserControl
         };
     }
 
+    /// <summary>Thiết lập cột và chế độ chỉ đọc cho danh sách khách, thao tác ghi đi qua API có kiểm tra quyền.</summary>
     private void ConfigureGrid()
     {
         grid.Name = "CustomersGrid"; grid.AutoGenerateColumns = false;
@@ -122,7 +123,7 @@ public sealed class CustomersPage : UserControl
         {
             if (e.RowIndex < 0) return;
             if (e.RowIndex == hoveredRow && !grid.Rows[e.RowIndex].Selected)
-                e.CellStyle!.BackColor = Color.FromArgb(255, 241, 222);
+                e.CellStyle!.BackColor = CafeTheme.Soft;
             if (e.ColumnIndex == 5 && e.Value is string value)
                 e.Value = StatusText(value);
         };
@@ -137,16 +138,18 @@ public sealed class CustomersPage : UserControl
         };
     }
 
+    /// <summary>Chuyển mã trạng thái tài khoản sang nhãn tiếng Việt để dễ nhận biết.</summary>
     private static string StatusText(string status) => status switch { "ACTIVE" => "Hoạt động", "LOCKED" => "Đã khóa", "INACTIVE" => "Đã ngừng", _ => status };
+    /// <summary>Hiển thị trạng thái tài khoản bằng nhãn/màu, không dùng màu thay cho kiểm tra quyền.</summary>
     private void PaintStatus(object? sender, DataGridViewCellPaintingEventArgs e)
     {
         if (e.RowIndex < 0 || e.ColumnIndex != 5 || grid.Rows[e.RowIndex].DataBoundItem is not CustomerAccount account) return;
         e.PaintBackground(e.ClipBounds, true);
         var (background, ink) = account.TrangThai switch
         {
-            "ACTIVE" => (Color.FromArgb(234, 245, 225), Color.FromArgb(76, 119, 53)),
-            "LOCKED" => (Color.FromArgb(255, 237, 207), Color.FromArgb(162, 101, 33)),
-            _ => (Color.FromArgb(239, 235, 229), Color.FromArgb(129, 116, 103))
+            "ACTIVE" => (CafeTheme.Sage, CafeTheme.SuccessInk),
+            "LOCKED" => (CafeTheme.Amber, CafeTheme.AmberInk),
+            _ => (CafeTheme.Soft, CafeTheme.Muted)
         };
         var text = StatusText(account.TrangThai); var width = Math.Min(e.CellBounds.Width - 12, TextRenderer.MeasureText(text, grid.Font).Width + 24);
         var box = new Rectangle(e.CellBounds.Left + 8, e.CellBounds.Top + (e.CellBounds.Height - 28) / 2, width, 28);
@@ -156,9 +159,11 @@ public sealed class CustomersPage : UserControl
         e.Handled = true;
     }
 
+    /// <summary>Thêm cột liên kết đúng thuộc tính DTO, giữ mã khách làm định danh khi chọn dòng.</summary>
     private void AddColumn(string property, string title, int minimumWidth, float weight) => grid.Columns.Add(new DataGridViewTextBoxColumn
     { DataPropertyName = property, Name = property, HeaderText = title, MinimumWidth = minimumWidth, FillWeight = weight, SortMode = DataGridViewColumnSortMode.NotSortable });
 
+    /// <summary>Tạo nút gọi tác vụ bất đồng bộ và bắt lỗi API để không làm treo message loop.</summary>
     private Button Command(string caption, AdminIcon icon, Func<Task> action, bool primary = false, bool danger = false)
     {
         var button = new AdminActionButton(caption, icon, primary, danger); commands.Add(button);
@@ -169,14 +174,17 @@ public sealed class CustomersPage : UserControl
         };
         return button;
     }
+    /// <summary>Chỉ chạy thao tác hồ sơ khi có dòng khách được chọn hợp lệ.</summary>
     private Button SelectionCommand(string caption, AdminIcon icon, Func<Task> action, bool danger = false)
     { var button = Command(caption, icon, action, danger: danger); selectionCommands.Add(button); return button; }
 
+    /// <summary>Áp dụng từ khóa mới và quay về trang đầu để số lượng/kết quả phân trang nhất quán.</summary>
     private async Task ApplySearch()
     {
         // Sửa lỗi tải lại: từ khóa nguồn phải là ô hiện tại, đồng thời bỏ trang cũ của bộ lọc trước.
         controller.ApplySearch(Search.Text); await LoadPage();
     }
+    /// <summary>Tải phân trang khách từ API; giữ thông báo lỗi, không thay bằng dữ liệu mẫu khi mất mạng.</summary>
     private async Task LoadPage()
     {
         if (IsDisposed || loading) return;
@@ -195,41 +203,49 @@ public sealed class CustomersPage : UserControl
         catch (CafeApiException ex) { if (!IsDisposed) ShowError(ex.Message + " Danh sách hiện tại chưa được xác nhận cập nhật."); }
         finally { if (!IsDisposed) { loading = false; progress.Running = false; SetCommands(true); } }
     }
+    /// <summary>Đồng bộ trạng thái bật/tắt nút trong lúc chờ request, tránh gửi lệnh lặp bằng click liên tiếp.</summary>
     private void SetCommands(bool enabled)
     {
         foreach (var button in commands) button.Enabled = enabled;
         foreach (var button in selectionCommands) button.Enabled = enabled && grid.CurrentRow?.DataBoundItem is CustomerAccount;
         previous.Enabled = enabled && controller.Page > 1; next.Enabled = enabled && controller.Page * 20 < controller.Total;
     }
+    /// <summary>Cập nhật khả năng thao tác theo khách đang chọn và trạng thái tải dữ liệu.</summary>
     private void UpdateSelection()
     {
         var customer = grid.CurrentRow?.DataBoundItem as CustomerAccount;
         selection.Text = customer is null ? "Chưa có khách hàng được chọn" : $"Đã chọn: {customer.HoTen}";
         foreach (var button in selectionCommands) button.Enabled = !loading && customer is not null;
     }
+    /// <summary>Lấy hồ sơ từ dòng đang chọn, không suy mã khách từ số thứ tự trên bảng.</summary>
     private CustomerAccount? Selected()
     {
         var selected = grid.CurrentRow?.DataBoundItem as CustomerAccount;
         if (selected is null) ShowError("Chọn một khách hàng trong danh sách."); return selected;
     }
+    /// <summary>Mở chi tiết khách theo mã của bản ghi đã chọn.</summary>
     private async Task OpenSelected(string action)
     {
         var selected = Selected(); if (selected is null) return;
         var detail = await controller.GetDetailsAsync(selected.MaKhachHang);
         if (!IsDisposed) await OpenEditor(detail, action);
     }
+    /// <summary>Mở form tạo/sửa với rowversion, chỉ tải lại danh sách sau khi API xác nhận lưu.</summary>
     private async Task OpenEditor(CustomerDetails? detail, string action)
     {
         using var editor = new CustomerEditorForm(detail, action);
         if (editor.ShowDialog(FindForm()) == DialogResult.OK) await LoadPage();
     }
+    /// <summary>Đọc hồ sơ và tham chiếu qua API có quyền Admin trước khi hiển thị dialog.</summary>
     private async Task ShowDetails()
     {
         var selected = Selected(); if (selected is null) return;
         var detail = await controller.GetDetailsAsync(selected.MaKhachHang); if (IsDisposed) return;
         using var form = new CustomerDetailsForm(detail); form.ShowDialog(FindForm());
     }
+    /// <summary>Căn vùng danh sách theo kích thước cửa sổ để tránh cắt control khi thay đổi kích thước.</summary>
     private void ResizeList(object? sender, EventArgs e) => list.Height = Math.Clamp((host?.ClientSize.Height ?? 920) - 500, 260, 420);
+    /// <summary>Hiển thị lỗi có thể hiểu được và giữ trạng thái chưa xác nhận thành công.</summary>
     private void ShowError(string message) { feedback.Text = message; feedback.Visible = true; }
     protected override void Dispose(bool disposing)
     { if (disposing && host is not null) host.Resize -= ResizeList; base.Dispose(disposing); }

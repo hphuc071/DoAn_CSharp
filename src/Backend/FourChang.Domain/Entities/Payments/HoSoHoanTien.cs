@@ -2,6 +2,9 @@ namespace FourChang.Domain.Entities.Payments;
 
 public sealed class HoSoHoanTien
 {
+    // Trường nghiệp vụ UC-ADM-06..10 đã được chấp thuận, không tạo bảng mới.
+    public string LoaiNguon { get; set; } = "LEGACY";
+    public string? ChungCuYeuCau { get; set; }
     public long MaHoanTien { get; set; }
     public string MaHoanTienHienThi { get; set; } = string.Empty;
     public long MaDonHang { get; set; }

@@ -5,13 +5,21 @@ namespace FourChang.Desktop;
 // Shared presentation host. POS and Admin have independent executable entry points.
 public static class DesktopLauncher
 {
-    [STAThread]
-    public static void Run(string role, string[] args)
+    /// <summary>Thiết lập một renderer/font cho Admin và POS trước khi tạo control đầu tiên.</summary>
+    public static void ConfigureUi()
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetDefaultFont(CafeTheme.Body());
+        CafeVisuals.Initialize();
+    }
+
+    /// <summary>Mở ứng dụng theo vai trò; phần trình bày không thay xác thực hoặc phiên nghiệp vụ.</summary>
+    [STAThread]
+    public static void Run(string role, string[] args)
+    {
+        ConfigureUi();
         FourChang.Desktop.Shared.Session.LiveSession.Preview = args.Contains("--preview") || args.Contains("--render-previews");
         if(args.Length>1 && args[0] is "--render-previews" or "--render-connected")
         {

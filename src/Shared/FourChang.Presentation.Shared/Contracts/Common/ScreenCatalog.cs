@@ -18,17 +18,19 @@ public static class ScreenCatalog
         new("UC-POS-04", "Hủy món", "cancel", "Staff", "Chọn số ly chưa pha, lý do bắt buộc và khoản hoàn dự kiến."),
         new("UC-POS-05", "Thu tiền và hóa đơn", "payment", "Staff", "Tiền mặt/VietQR, tiền thừa, hóa đơn, in lại/xuất; Web không thu lại."),
         new("UC-ADM-01", "Khách hàng", "customers", "Admin", "Hồ sơ Customer, khóa/mở, mật khẩu tạm, lịch sử và xóa có điều kiện."),
-        new("UC-ADM-12", "Nhân viên", "employees", "Admin", "Hồ sơ nhân viên và trạng thái làm việc; không có tài khoản nhân viên."),
-        new("UC-ADM-02", "Quyền truy cập", "access", "Admin", "Một tài khoản Quản lý, đổi mật khẩu, quyền và thiết bị POS."),
-        new("UC-ADM-03", "Thực đơn", "menu", "Admin", "Danh mục, món/size/giá, tùy chọn, topping, banner và bật/tắt bán."),
-        new("UC-ADM-04", "Nguyên liệu", "ingredients", "Admin", "Đơn vị cơ sở, quy đổi, ngưỡng cảnh báo và ngừng sử dụng."),
-        new("UC-ADM-05", "Công thức BOM", "recipes", "Admin", "Định mức theo biến thể/topping, phiên bản, hiệu lực và mô phỏng."),
-        new("UC-ADM-06", "Tồn kho", "inventory", "Admin", "Thực tế, giữ chỗ, an toàn, khả dụng, sổ kho và món bị ảnh hưởng."),
-        new("UC-ADM-07", "Chứng từ kho", "stock", "Admin", "Nhập, xuất, kiểm kê/điều chỉnh, nháp, ghi sổ và đảo chứng từ."),
-        new("UC-ADM-08", "Đơn hàng", "manage-orders", "Admin", "Đơn đa kênh, địa chỉ, truy vết ca và sự cố sau pha/giao thất bại."),
-        new("UC-ADM-09", "Hóa đơn", "invoices", "Admin", "Tra cứu, đối chiếu, điều chỉnh liên kết, in lại và xuất."),
-        new("UC-ADM-10", "Hoàn tiền", "refunds", "Admin", "Duyệt, thông tin nhận, chứng cứ chi và đối soát; chưa xác minh không ghi đã hoàn."),
-        new("UC-ADM-11", "Báo cáo và nhật ký", "reports", "Admin", "Doanh thu TM/CK, tỷ lệ đơn, top món, cảnh báo kho và audit theo quyền riêng.")
+        new("UC-ADM-12", "Ca làm việc", "work-sessions", "Admin", "Đối chiếu ca, chốt, bàn giao và khôi phục theo phiên; không quản trị thiết bị."),
+        new("UC-ADM-11", "Nhân viên", "employees", "Admin", "Hồ sơ nhân viên và trạng thái làm việc; không có tài khoản nhân viên."),
+
+        new("UC-ADM-02", "Thực đơn", "menu", "Admin", "Danh mục, món/size/giá, tùy chọn, topping, banner và bật/tắt bán."),
+        new("UC-ADM-03", "Nguyên liệu", "ingredients", "Admin", "Đơn vị cơ sở, quy đổi, ngưỡng cảnh báo và ngừng sử dụng."),
+        new("UC-ADM-04", "Công thức BOM", "recipes", "Admin", "Định mức theo biến thể/topping, phiên bản, hiệu lực và mô phỏng."),
+        new("UC-ADM-05", "Tồn kho", "inventory", "Admin", "Thực tế, giữ chỗ, an toàn, khả dụng, sổ kho và món bị ảnh hưởng."),
+        new("UC-ADM-06", "Chứng từ kho", "stock", "Admin", "Nhập, xuất, kiểm kê/điều chỉnh, nháp, ghi sổ và đảo chứng từ."),
+        new("UC-ADM-07", "Đơn hàng", "manage-orders", "Admin", "Đơn đa kênh, địa chỉ, truy vết ca và sự cố sau pha/giao thất bại."),
+        new("UC-ADM-08", "Hóa đơn", "invoices", "Admin", "Tra cứu, đối chiếu, điều chỉnh liên kết, in lại và xuất."),
+        new("UC-ADM-09", "Hoàn tiền", "refunds", "Admin", "Duyệt, thông tin nhận, chứng cứ chi và đối soát; chưa xác minh không ghi đã hoàn."),
+        new("UC-ADM-10", "Báo cáo và nhật ký", "reports", "Admin", "Doanh thu TM/CK, tỷ lệ đơn, top món, cảnh báo kho và audit theo quyền riêng.")
     ];
-    public static ScreenDefinition Find(string role, string route) => All.First(s => s.Role == role && s.Route == route);
+    /// <summary>Tra định nghĩa màn hình theo vai trò/route; tài khoản Admin dùng chung không chiếm số UC nghiệp vụ.</summary>
+    public static ScreenDefinition Find(string role, string route) => route == "access" && role == "Admin" ? new("COMMON-ADMIN-AUTH", "Tài khoản quản lý", "access", "Admin", "Đăng nhập, đăng xuất và đổi mật khẩu Quản lý.") : All.First(s => s.Role == role && s.Route == route);
 }

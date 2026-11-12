@@ -15,6 +15,15 @@ namespace FourChang.Web.Pages.Checkout;
 // UC-WEB-06: same-origin, antiforgery-protected checkout. Bank verification belongs to UC-WEB-07.
 public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, IDataProtectionProvider protection) : PageModel
 {
+    public bool SimulationEnabled => configuration.GetValue<bool>("Orders:FulfillmentSimulationEnabled") &&
+        (configuration["ASPNETCORE_ENVIRONMENT"] ?? configuration["DOTNET_ENVIRONMENT"]) == "Development";
+    /// <summary>Proxy danh sách bàn đang dùng, không cho trình duyệt đọc bí mật QR hoặc SQL.</summary>
+    public async Task<IActionResult> OnGetTablesAsync()
+    {
+        if (!SimulationEnabled) return NotFound();
+        try { return new JsonResult(await api.GetCustomerTablesAsync()); }
+        catch (Exception ex) when (ex is CafeApiException or HttpRequestException) { return StatusCode(503, new { message = "Chưa tải được danh sách bàn." }); }
+    }
     public long? CustomerId { get; private set; }
     public string? OwnerProof { get; private set; }
     private IDataProtector OwnerProtector => protection.CreateProtector("FourChang.Checkout.Owner.v1");
@@ -84,7 +93,7 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
 
         // Do not price DELIVERY until a server-verified distance/fee exists;
         // do not price DINE_IN until a real table token is validated.
-        if (!string.Equals(request.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal))
+        if (request.HinhThucNhanMon != "TAKEAWAY" && !SimulationEnabled)
             return BadRequest(new { message = "Bản xem trước chỉ báo giá hình thức mang đi." });
 
         if (request.Items.Any(i => i is null || i.MaCauHinhMon <= 0 || i.SoLuong is < 1 or > 99 ||
@@ -169,8 +178,8 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
 
         var order = command?.Order;
         if (command is null || command.Operation == Guid.Empty || command.AcceptedTotal is null or < 0m ||
-            order is null || order.HinhThucNhanMon != "TAKEAWAY" ||
-            order.MaBanHienThi is not null || order.DiaChiGiao is not null || order.KhoangCachKm is not null ||
+            order is null || order.HinhThucNhanMon is not ("TAKEAWAY" or "DINE_IN" or "DELIVERY") ||
+            (order.HinhThucNhanMon != "TAKEAWAY" && !SimulationEnabled) || order.KhoangCachKm is not null ||
             string.IsNullOrWhiteSpace(order.TenNguoiNhan) || order.TenNguoiNhan.Length > 120 ||
             order.TenNguoiNhan.Any(char.IsControl) ||
             !Regex.IsMatch(order.DienThoaiNguoiNhan ?? "", @"^\+?[0-9]{9,15}\z") ||
@@ -200,7 +209,8 @@ public sealed class IndexModel(CafeApiClient api, IConfiguration configuration, 
                 return StatusCode(409, new { code = "CHECKOUT_OWNER_MISMATCH", message = "Thao tác thuộc tài khoản khác. Không gửi lại; đăng nhập đúng tài khoản hoặc liên hệ đối soát." });
             var (receipt, status) = await api.CreateCustomerOrderAsync(order, command.Operation, command.AcceptedTotal.Value, ct);
             if (receipt.MaDonHang <= 0 || string.IsNullOrWhiteSpace(receipt.MaDonHienThi) ||
-                receipt.TrangThai != "PENDING_PAYMENT" || receipt.TienHang < 0 || receipt.PhiGiaoHang != 0 ||
+                receipt.TrangThai != "PENDING_PAYMENT" || receipt.TienHang < 0 || receipt.PhiGiaoHang < 0 ||
+                (order.HinhThucNhanMon != "DELIVERY" && receipt.PhiGiaoHang != 0) ||
                 receipt.TongCong != receipt.TienHang + receipt.PhiGiaoHang || receipt.TongCong != command.AcceptedTotal.Value)
                 return StatusCode(502, new { message = "Biên nhận chưa hợp lệ. Chưa xác định kết quả; thử lại với cùng mã thao tác." });
             return StatusCode(status, receipt);

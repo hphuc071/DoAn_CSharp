@@ -6,6 +6,7 @@ namespace FourChang.Tests.Customer;
 
 public sealed class MenuCustomizationTests
 {
+    /// <summary>Giá lấy từ menu chung; mang đi thành công, giao hàng chưa xác minh bị chặn theo logic main.</summary>
     [Fact, Trait("Actor", "KhachHang"), Trait("UseCase", "UC-WEB-05"), Trait("Layer", "API")]
     public async Task TuyChonMonVaBaoGia_ChinhXac()
     {
@@ -24,8 +25,8 @@ public sealed class MenuCustomizationTests
             variantRes.Expect(200, "Lấy biến thể và tùy chỉnh món thành công");
 
             var quoteBody = Body(
-                ("hinhThucNhanMon", "DELIVERY"),
-                ("khoangCachKm", 2.5m),
+                ("hinhThucNhanMon", "TAKEAWAY"),
+                ("khoangCachKm", (object?)null),
                 ("items", new JsonArray(
                     Body(
                         ("maCauHinhMon", variantId),
@@ -40,6 +41,13 @@ public sealed class MenuCustomizationTests
             var quoteRes = await api.Send("POST", "/api/customer/orders/quote", quoteBody);
             quoteRes.Expect(200, "Báo giá giỏ hàng thành công");
             Assert.True(quoteRes.Json.Number("tongCong") > 0, "Tổng cộng phải lớn hơn 0");
+
+            // Chủ dự án xác nhận giữ nguyên fail-closed của main: không tin khoảng cách tự khai báo.
+            // Không sửa thuật toán phí giao hoặc mở nghiệp vụ giao hàng trong ADM-01..05.
+            quoteBody["hinhThucNhanMon"] = "DELIVERY";
+            quoteBody["khoangCachKm"] = 2.5m;
+            var delivery = await api.Send("POST", "/api/customer/orders/quote", quoteBody);
+            delivery.Expect(400, "Chặn giao hàng khi chưa xác minh tuyến/phí phía máy chủ");
         }
     }
 }

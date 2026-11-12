@@ -46,10 +46,10 @@ public sealed record CustomerOrderDetail(CustomerOrderSummary Order, string Vers
     DateTime? ExpiresUtc, DateTime? AcceptedUtc, DateTime? CompletedUtc,
     decimal OriginalShippingFee, decimal ShippingFee, IReadOnlyList<CustomerOrderLine> Lines,
     IReadOnlyList<CustomerPaymentSnapshot> Payments, IReadOnlyList<CustomerRefundSnapshot> Refunds,
-    IReadOnlyList<CustomerInvoiceSnapshot> Invoices, DateTime SnapshotUtc)
+    IReadOnlyList<CustomerInvoiceSnapshot> Invoices, DateTime SnapshotUtc, decimal ApprovedServiceAdjustment = 0)
 {
     public decimal OriginalTotal => Lines.Sum(x => x.OriginalTotal) + OriginalShippingFee;
-    public decimal CurrentTotal => Lines.Sum(x => x.CurrentTotal) + ShippingFee;
+    public decimal CurrentTotal => Order.Status == "EXPIRED" ? 0 : Math.Max(0, Lines.Sum(x => x.CurrentTotal) + ShippingFee - ApprovedServiceAdjustment);
     public decimal Collected => Payments.Sum(x => x.Verified);
     public decimal Refunded => Refunds.Sum(x => x.SuccessfullyDisbursed);
     public decimal Remaining => Math.Max(0, CurrentTotal - Collected + Refunded);

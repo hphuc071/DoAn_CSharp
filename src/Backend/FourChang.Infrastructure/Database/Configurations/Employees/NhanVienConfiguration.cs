@@ -6,6 +6,7 @@ namespace FourChang.Infrastructure.Database.Configurations.Employees;
 
 public sealed class NhanVienConfiguration : IEntityTypeConfiguration<NhanVien>
 {
+    /// <summary>Ánh xạ thuộc tính, khóa và ràng buộc SQL của NhanVien; giữ quan hệ dữ liệu nhất quán.</summary>
     public void Configure(EntityTypeBuilder<NhanVien> b)
     {
         b.ToTable("NhanVien", "dbo", table =>
@@ -19,6 +20,7 @@ public sealed class NhanVienConfiguration : IEntityTypeConfiguration<NhanVien>
         b.Property(x => x.MaNhanVien).HasColumnType("bigint").IsRequired();
         b.Property(x => x.HoTen).HasColumnType("nvarchar(120)").IsRequired();
         b.Property(x => x.SoDienThoai).HasColumnType("varchar(20)");
+        b.Property(x => x.DiaChiLienHe).HasColumnType("nvarchar(500)");
         b.Property(x => x.NgayVaoLam).HasColumnType("datetime2(3)").IsRequired();
         b.Property(x => x.TrangThai).HasColumnType("varchar(15)").IsRequired();
         b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");

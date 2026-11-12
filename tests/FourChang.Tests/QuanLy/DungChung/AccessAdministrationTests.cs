@@ -10,7 +10,7 @@ public sealed class AccessAdministrationTests
     /// <summary>
     /// Kiểm tra Admin duy nhất, đổi mật khẩu, phiên hạn chế, thu hồi phiên, receipt nguồn, rollback audit và khóa tạm.
     /// </summary>
-    [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-02"), Trait("Layer", "API")]
+    [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "COMMON-ADMIN-AUTH"), Trait("Layer", "API")]
     public async Task MatKhauQuanLy_ThuHoiPhien_Receipt_Audit_VaKhoaTam()
     {
         await using var api = await TestApi.Start("UC-ADM-02-Password");
@@ -35,7 +35,7 @@ public sealed class AccessAdministrationTests
 
         var next = Password();
         (await api.Send("POST", "/api/auth/admin/password", await PasswordBody("Khong-dung-mat-khau", next), admin)).Expect(400, "Mật khẩu hiện tại sai");
-        (await api.Send("POST", "/api/auth/admin/password", await PasswordBody(original, "short"), admin)).Expect(400, "Mật khẩu mới ngắn");
+        (await api.Send("POST", "/api/auth/admin/password", await PasswordBody(original, "1234"), admin)).Expect(400, "Mật khẩu mới ngắn");
         var bad = await PasswordBody(original, next);
         bad["XacNhanMatKhau"] = next + "khac";
         (await api.Send("POST", "/api/auth/admin/password", bad, admin)).Expect(400, "Xác nhận không khớp");
@@ -98,7 +98,7 @@ public sealed class AccessAdministrationTests
     /// <summary>
     /// Kiểm tra vòng đời thiết bị POS, chốt ca máy thu hồi, khóa cũ không sống lại, rowversion và audit nguyên tử.
     /// </summary>
-    [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-02"), Trait("Layer", "API")]
+    [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "COMMON-ADMIN-AUTH"), Trait("Layer", "API")]
     public async Task CapThuHoiCapLaiMay_ChotCa_Version_VaAuditNguyenTu()
     {
         await using var api = await TestApi.Start("UC-ADM-02-Device");

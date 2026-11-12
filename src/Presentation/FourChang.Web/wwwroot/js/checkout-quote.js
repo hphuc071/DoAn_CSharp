@@ -37,7 +37,7 @@
     return n;
   }
   async function json(response) {
-    if (!response.ok) throw new Error(`Backend không báo giá được (HTTP ${response.status}).`);
+    if (!response.ok) throw new Error(`Chưa kiểm tra được giá (HTTP ${response.status}).`);
     return response.json();
   }
 
@@ -50,7 +50,7 @@
     const signal = controller.signal;
     const mode = tabs.querySelector("[data-tab].selected")?.dataset.tab;
     if (baseLabel) baseLabel.textContent = "Tạm tính giá cơ sở";
-    if (mode !== "takeaway") {
+    if (mode !== "takeaway" && document.getElementById("checkout-proceed")?.dataset.fulfillmentSimulation !== "true") {
       // Checkout preview has no validated delivery distance or real table token.
       return;
     }
@@ -59,7 +59,7 @@
       return;
     }
     total.textContent = "Đang báo giá...";
-    warning.textContent = "Đang kiểm tra biến thể, đường/đá và topping theo Backend.";
+    warning.textContent = "Đang kiểm tra giá món và các tùy chọn bạn đã chọn.";
     try {
       const cartRaw = localStorage.getItem(KEY) || "[]";
       const cart = getCart();
@@ -123,15 +123,17 @@
         };
       });
       const payload = {
-        hinhThucNhanMon: "TAKEAWAY",
-        maBanHienThi: null,
+        hinhThucNhanMon: mode === "delivery" ? "DELIVERY" : mode === "dinein" ? "DINE_IN" : "TAKEAWAY",
+        maBanHienThi: mode === "dinein" ? document.getElementById("checkout-table")?.value || null : null,
         tenNguoiNhan: null,
         dienThoaiNguoiNhan: null,
-        diaChiGiao: null,
+        diaChiGiao: mode === "delivery" ? document.getElementById("checkout-address")?.value.trim() || null : null,
         khoangCachKm: null,
-        ghiChu: "",
+        ghiChu: mode === "delivery" ? document.getElementById("checkout-delivery-note")?.value.trim() || "" : "",
         items
       };
+      if (mode === "dinein" && !payload.maBanHienThi) throw new Error("Vui lòng chọn bàn.");
+      if (mode === "delivery" && (!payload.diaChiGiao || payload.diaChiGiao.length < 5)) throw new Error("Nhập địa chỉ giao hàng từ 5 ký tự.");
       const res = await fetch("/Checkout?handler=Quote", {
         method: "POST",
         credentials: "same-origin",
@@ -149,13 +151,13 @@
         typeof x === "number" && Number.isSafeInteger(x) && x >= 0) ||
           !Number.isSafeInteger(price.tienHang + price.phiGiaoHang) ||
           price.tongCong !== price.tienHang + price.phiGiaoHang)
-        throw new Error("Báo giá từ Backend không hợp lệ.");
+        throw new Error("Chưa nhận được giá hợp lệ. Vui lòng thử lại.");
       base.textContent = money(price.tienHang);
-      if (baseLabel) baseLabel.textContent = "Tiền món (Backend báo giá)";
+      if (baseLabel) baseLabel.textContent = "Tiền món và topping";
       shipping.textContent = money(price.phiGiaoHang);
       total.textContent = money(price.tongCong);
-      warning.textContent = "Giá Backend đã gồm topping; phí mang đi 0đ. Xác nhận tổng tiền trước khi đặt. Tồn kho sẽ được kiểm tra lúc tạo đơn.";
-      window.fourchangCheckoutQuote = { payload, price, cartRaw };
+      warning.textContent = mode === "delivery" ? "Đã gồm topping và phí giao hàng mô phỏng. Kiểm tra tổng tiền trước khi đặt." : "Đã gồm topping; phí giao hàng 0đ.";
+      window.fourchangCheckoutQuote = { payload, price, cartRaw, fulfillmentContext: fulfillmentContext() };
       window.dispatchEvent(new Event("checkout:quote"));
     } catch (error) {
       if (seq !== current || signal.aborted) return;
@@ -163,6 +165,25 @@
     }
   }
 
+  /** Ràng buộc báo giá với đúng hình thức/bàn/địa chỉ, không dùng lại báo giá khi khách đổi thông tin. */
+  function fulfillmentContext() {
+    const mode = tabs.querySelector("[data-tab].selected")?.dataset.tab;
+    return JSON.stringify([mode, mode === "dinein" ? document.getElementById("checkout-table")?.value : null,
+      mode === "delivery" ? document.getElementById("checkout-address")?.value.trim() : null,
+      mode === "delivery" ? document.getElementById("checkout-delivery-note")?.value.trim() : null]);
+  }
+  window.fourchangFulfillmentContext = fulfillmentContext;
+  for (const id of ["checkout-table", "checkout-address", "checkout-delivery-note"]) document.getElementById(id)?.addEventListener("input", refresh);
+  /** Đọc bàn từ API qua proxy Web; chỉ đưa dữ liệu dạng text vào option. */
+  async function loadTables() {
+    const select = document.getElementById("checkout-table"); if (!select) return;
+    try {
+      const rows = await json(await fetch("/Checkout?handler=Tables", { cache:"no-store", credentials:"same-origin" }));
+      select.replaceChildren(new Option("Chọn bàn", ""));
+      for (const row of rows) select.append(new Option(row.tenBan + " · " + row.maBanHienThi, row.maBanHienThi));
+    } catch { select.replaceChildren(new Option("Không tải được bàn, hãy tải lại trang", "")); }
+  }
+  loadTables();
   tabs.addEventListener("click", event => {
     if (!event.target.closest("[data-tab]")) return;
     queueMicrotask(refresh);

@@ -4,14 +4,15 @@ cd /d "%~dp0"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\Start-LocalBackend.ps1"
 if errorlevel 1 goto backendfailed
 set "APP=%~dp0src\Presentation\FourChang.Pos\bin\Debug\net8.0-windows\FourChang.Pos.exe"
-if exist "%APP%" goto launch
 where dotnet >nul 2>nul
-if errorlevel 1 goto missing
+if errorlevel 1 goto useexisting
  dotnet build "%~dp0src\Presentation\FourChang.Pos\FourChang.Pos.csproj" --nologo
 if errorlevel 1 goto failed
 :launch
 start "" "%APP%"
 exit /b 0
+:useexisting
+if exist "%APP%" goto launch
 :missing
 echo Khong tim thay .NET SDK. Can cai .NET 8 SDK de build lan dau.
 goto failed

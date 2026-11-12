@@ -1,48 +1,62 @@
 @page "/Orders"
 @model FourChang.Web.Pages.Orders.IndexModel
 @using FourChang.Presentation.Shared.Contracts.Customer
-@{ ViewData["Title"] = "Đơn hàng của tôi"; }
-<div class="page-heading"><h1>Đơn hàng của tôi</h1><a href="/" class="button secondary">Thực đơn</a></div>
-<section class="panel">
+@{ ViewData["CommerceClass"] = "commerce-page orders-screen"; ViewData["Title"] = "Đơn hàng của tôi"; }
+@functions {
+    // Chỉ đổi nhãn trình bày; mã trạng thái dùng trong request/API không thay đổi.
+    private static string StateLabel(string state) => state switch
+    {
+        "DRAFT" => "Đơn nháp", "PENDING_PAYMENT" => "Chờ thanh toán", "PENDING_CONFIRMATION" => "Chờ xác nhận",
+        "ACCEPTED" => "Đã xác nhận", "PREPARING" => "Đang pha chế", "READY" => "Sẵn sàng nhận",
+        "DELIVERING" => "Đang giao", "COMPLETED" => "Hoàn tất", "CANCELLED" => "Đã hủy",
+        "REJECTED" => "Không được tiếp nhận", "DELIVERY_FAILED" => "Giao không thành công", "EXPIRED" => "Hết hạn thanh toán", _ => state
+    };
+    // Hình thức nhận vẫn lấy từ snapshot đã trả về, không tự đổi kênh đặt hàng.
+    private static string FulfilmentLabel(string value) => value switch
+    { "TAKEAWAY" => "Mang đi", "DINE_IN" => "Tại bàn", "DELIVERY" => "Giao tận nơi", _ => value };
+}
+<div class="page-heading orders-heading">
+    <div><span class="eyebrow">ĐỒNG HÀNH CÙNG BẠN</span><h1>Đơn hàng của tôi</h1><p class="orders-intro">Theo dõi trạng thái và xem lại những lần ghé quán.</p></div>
+    <a href="/" class="button secondary">Xem thực đơn</a>
+</div>
+<section class="panel orders-workspace" aria-label="Tra cứu đơn hàng">
     <p id="order-snapshot-connection" role="status" hidden></p>
-    <form method="get" asp-page="/Orders/Index">
-        <label>Trạng thái <select asp-for="Status"><option value="">Tất cả</option>
-            @foreach (var state in CustomerOrderStates.Orders) { <option value="@state">@state</option> }
-            @if (Model.ExpiryReadEnabled) { <option value="EXPIRED">EXPIRED</option> }
-        </select></label>
-        <label>Từ thời điểm (UTC) <input asp-for="FromUtc" type="datetime-local" /></label>
-        <label>Đến trước thời điểm (UTC) <input asp-for="ToUtc" type="datetime-local" /></label>
-        <button class="button primary" type="submit">Lọc / Tải lại</button>
-        <a asp-page="/Orders/Index">Bỏ lọc</a>
+    <form method="get" asp-page="/Orders/Index" class="orders-filters">
+        <div class="field"><label for="Status">Trạng thái đơn</label><select asp-for="Status"><option value="">Tất cả trạng thái</option>
+            @foreach (var state in CustomerOrderStates.Orders) { <option value="@state">@StateLabel(state)</option> }
+            @if (Model.ExpiryReadEnabled) { <option value="EXPIRED">Hết hạn thanh toán</option> }
+        </select></div>
+        <div class="field"><label for="FromUtc">Từ thời điểm <span class="label-note">UTC</span></label><input asp-for="FromUtc" type="datetime-local" /></div>
+        <div class="field"><label for="ToUtc">Đến trước thời điểm <span class="label-note">UTC</span></label><input asp-for="ToUtc" type="datetime-local" /></div>
+        <div class="orders-filter-actions"><button class="button primary" type="submit">Lọc đơn hàng</button><a asp-page="/Orders/Index" class="button secondary">Bỏ lọc</a></div>
     </form>
-    <p class="muted">Snapshot tại thời điểm tải, không cập nhật trực tiếp. Bấm tải lại để xem trạng thái mới; mở lại trang không tạo giao dịch.</p>
-    @if (Model.Error is not null) { <p role="alert">@Model.Error</p> }
+    <p class="orders-refresh-note">Trạng thái được cập nhật khi tải lại trang. Thời gian lọc sử dụng UTC.</p>
+    @if (Model.Error is not null) { <p role="alert" class="orders-error">@Model.Error</p> }
     @if (Model.Snapshot is { } snapshot)
     {
         <div data-order-private>
-        <p role="status">Cập nhật UTC: @snapshot.SnapshotUtc.ToString("u") · @snapshot.TotalCount đơn phù hợp</p>
-        @if (snapshot.Items.Count == 0) { <p>Chưa có đơn phù hợp với bộ lọc.</p> }
-        @foreach (var order in snapshot.Items)
-        {
-            <article class="line-item"><div>
-                <h2><a asp-page="/Orders/Details" asp-route-orderId="@order.Id" asp-route-ReturnPage="@Model.PageNumber"
-                       asp-route-ReturnStatus="@Model.Status" asp-route-ReturnFromUtc="@(Model.FromUtc?.ToString("O"))"
-                       asp-route-ReturnToUtc="@(Model.ToUtc?.ToString("O"))">@order.Code</a></h2>
-                <p>@order.Status · @order.Fulfilment</p>
-                <p>Tạo UTC: @order.CreatedUtc.ToString("u") · Cập nhật UTC: @order.UpdatedUtc.ToString("u")</p>
-            </div></article>
-        }
-        <nav aria-label="Phân trang đơn hàng">
-            @if (snapshot.Page > 1) {
-                <a asp-page="/Orders/Index" asp-route-PageNumber="@(snapshot.Page - 1)" asp-route-Status="@Model.Status"
-                   asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))">Trang trước</a>
+            <div class="orders-results-heading"><h2>Danh sách đơn hàng <span class="orders-count">@snapshot.TotalCount</span></h2><p role="status">Cập nhật UTC: @snapshot.SnapshotUtc.ToString("dd/MM/yyyy HH:mm")</p></div>
+            @if (snapshot.Items.Count == 0)
+            {
+                <div class="orders-empty">
+                    <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 7h20v34l-5-3-5 3-5-3-5 3V7Z"/><path d="M19 15h10M19 22h10M19 29h6"/></svg>
+                    <h3>Chưa có đơn hàng phù hợp</h3><p>Thử thay đổi bộ lọc hoặc chọn món yêu thích từ thực đơn.</p><a href="/" class="button secondary">Khám phá thực đơn</a>
+                </div>
             }
-            <span>Trang @snapshot.Page</span>
-            @if ((long)snapshot.Page * snapshot.PageSize < snapshot.TotalCount) {
-                <a asp-page="/Orders/Index" asp-route-PageNumber="@(snapshot.Page + 1)" asp-route-Status="@Model.Status"
-                   asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))">Trang sau</a>
+            <div class="orders-list">
+            @foreach (var order in snapshot.Items)
+            {
+                <article class="order-summary-card">
+                    <div class="order-summary-main"><span class="eyebrow">ĐƠN HÀNG</span><h2><a asp-page="/Orders/Details" asp-route-orderId="@order.Id" asp-route-ReturnPage="@Model.PageNumber" asp-route-ReturnStatus="@Model.Status" asp-route-ReturnFromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ReturnToUtc="@(Model.ToUtc?.ToString("O"))">@order.Code</a></h2><p>@FulfilmentLabel(order.Fulfilment) · Đặt lúc @order.CreatedUtc.ToString("dd/MM/yyyy HH:mm") UTC</p></div>
+                    <div class="order-summary-state"><span class="order-state-badge" data-state="@order.Status">@StateLabel(order.Status)</span><span>Cập nhật @order.UpdatedUtc.ToString("dd/MM/yyyy HH:mm") UTC</span></div>
+                </article>
             }
-        </nav>
+            </div>
+            <nav class="orders-pagination" aria-label="Phân trang đơn hàng">
+                @if (snapshot.Page > 1) { <a class="button secondary" asp-page="/Orders/Index" asp-route-PageNumber="@(snapshot.Page - 1)" asp-route-Status="@Model.Status" asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))">Trang trước</a> }
+                <span>Trang @snapshot.Page</span>
+                @if ((long)snapshot.Page * snapshot.PageSize < snapshot.TotalCount) { <a class="button secondary" asp-page="/Orders/Index" asp-route-PageNumber="@(snapshot.Page + 1)" asp-route-Status="@Model.Status" asp-route-FromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ToUtc="@(Model.ToUtc?.ToString("O"))">Trang sau</a> }
+            </nav>
         </div>
     }
 </section>

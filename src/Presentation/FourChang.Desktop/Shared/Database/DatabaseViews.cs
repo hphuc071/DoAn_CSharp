@@ -23,6 +23,7 @@ public static class DatabaseViews
         ["refunds"] = ["HoSoHoanTien", "LanChiHoanTien"],
         ["reports"] = ["NhatKyHeThong", "ThanhToan", "LanChiHoanTien"]
     };
+    /// <summary>Chọn trang theo vai trò và route hiện có; năm UC Admin dùng trang nghiệp vụ riêng thay bảng thô.</summary>
     public static Control Create(string role, string route)
     {
         if (role == "Staff")
@@ -30,10 +31,11 @@ public static class DatabaseViews
             {
                 "shift" => FourChang.Desktop.Staff.WorkSessions.ShiftPage.Create(),
                 "sale" => FourChang.Desktop.Staff.Sales.SalePage.Create(),
-                "orders" => Table("DonHang", false),
+                "orders" => new FourChang.Desktop.Staff.Shared.StaffDocumentsPage(false),
                 "cancel" => Ui.Panel("Hủy món", Ui.Label("Chọn đơn để tra cứu. Thao tác hủy sẽ được triển khai cùng luồng xử lý đơn."), Table("DonHang", false)),
-                "payment" => Table("HoaDon", false),
-                _ => Ui.Label("Chưa có màn hình")};
+                "payment" => new FourChang.Desktop.Staff.Shared.StaffDocumentsPage(true),
+                _ => Ui.Label("Chưa có màn hình")
+            };
         // UC-ADM-01 dùng màn hình nghiệp vụ riêng, thay bảng đọc thô ở chế độ chạy thật.
         if (route == "customers")
             return new FourChang.Desktop.Admin.Customers.Views.CustomersPage();
@@ -41,13 +43,24 @@ public static class DatabaseViews
             return new FourChang.Desktop.Admin.Access.Views.AccessPage();
         if (route == "employees")
             return FourChang.Desktop.Admin.Employees.EmployeesPage.Create();
+        if (route == "work-sessions") return new FourChang.Desktop.Admin.WorkSessions.WorkSessionsPage();
         if (route == "dashboard")
             return FourChang.Desktop.Admin.Dashboard.DashboardPage.Create();
+        if (route == "menu") return new FourChang.Desktop.Admin.Menu.MenuManagementPage();
+        if (route == "ingredients") return new FourChang.Desktop.Admin.Ingredients.IngredientsPage();
+        if (route == "recipes") return new FourChang.Desktop.Admin.Recipes.RecipesPage();
+        if (route == "inventory") return new FourChang.Desktop.Admin.Inventory.InventoryPage();
+        if (route == "stock") return new FourChang.Desktop.Admin.StockDocuments.StockDocumentsPage();
+        if (route == "manage-orders") return new FourChang.Desktop.Admin.Orders.OrdersManagementPage();
+        if (route == "invoices") return new FourChang.Desktop.Admin.Invoices.InvoicesManagementPage();
+        if (route == "refunds") return new FourChang.Desktop.Admin.Refunds.RefundsManagementPage();
+        if (route == "reports") return new FourChang.Desktop.Admin.Reports.ReportsManagementPage();
         if (!AdminTables.TryGetValue(route, out var tables))
             return Ui.Label("Chưa có màn hình");
         return Ui.Tabs(tables.Select(name => (DatabaseLabels.Table(name), Table(name, true))).ToArray());
     }
 
+    /// <summary>Tạo bảng tra cứu chỉ đọc và nút tải lại; dữ liệu lấy từ API phù hợp vai trò.</summary>
     internal static Control Table(string name, bool admin)
     {
         var grid = Ui.Grid(new PreviewTable([], []), 440);
@@ -97,6 +110,7 @@ public static class DatabaseViews
         return box;
     }
 
+    /// <summary>Gắn cột/dữ liệu trả từ API vào grid; không thực thi lệnh ghi database từ control.</summary>
     internal static void SetGrid(DataGridView grid, TableData data)
     {
         var table = new DataTable();

@@ -6,11 +6,14 @@ namespace FourChang.Infrastructure.Database.Configurations.Accounts;
 
 public sealed class TaiKhoanKhachHangConfiguration : IEntityTypeConfiguration<TaiKhoanKhachHang>
 {
+    /// <summary>Ánh xạ thuộc tính, khóa và ràng buộc SQL của TaiKhoanKhachHang; giữ quan hệ dữ liệu nhất quán.</summary>
     public void Configure(EntityTypeBuilder<TaiKhoanKhachHang> b)
     {
         b.ToTable("TaiKhoanKhachHang", "dbo", table =>
         {
             table.UseSqlOutputClause(false);
+            // Cùng CHECK với script nâng cấp SQL: nhập trực tiếp SQL cũng không được lưu số sai.
+            table.HasCheckConstraint("CK_KhachHang_DienThoai10", "DATALENGTH(SoDienThoaiChuanHoa)=10 AND SoDienThoaiChuanHoa COLLATE Latin1_General_100_BIN2 NOT LIKE '%[^0-9]%'");
             table.HasCheckConstraint("CK_TaiKhoanKhachHang_1", "TrangThai IN ('ACTIVE','LOCKED','INACTIVE')");
             table.HasCheckConstraint("CK_TaiKhoanKhachHang_2", "SoLanDangNhapSai >= 0");
             table.HasCheckConstraint("CK_TaiKhoanKhachHang_3", "EmailChuanHoa IS NOT NULL OR SoDienThoaiChuanHoa IS NOT NULL");
@@ -28,7 +31,7 @@ public sealed class TaiKhoanKhachHangConfiguration : IEntityTypeConfiguration<Ta
         b.Property(x => x.DangNhapLanCuoiLuc).HasColumnType("datetime2(3)");
         b.Property(x => x.HoTen).HasColumnType("nvarchar(120)").IsRequired();
         b.Property(x => x.EmailChuanHoa).HasColumnType("nvarchar(254)");
-        b.Property(x => x.SoDienThoaiChuanHoa).HasColumnType("varchar(20)");
+        b.Property(x => x.SoDienThoaiChuanHoa).HasColumnType("varchar(20)").IsRequired();
         b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.Property(x => x.ThoiDiemCapNhat).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.Property(x => x.PhienBanDuLieu).HasColumnType("rowversion").IsRequired().IsRowVersion();

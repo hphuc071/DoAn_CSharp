@@ -1,21 +1,22 @@
-# Test cases UC-ADM-02
+# UC-ADM-02 — Quản lý thực đơn — Test cases
 
-Phạm vi giữ đúng UC-ADM-02 và BR-05, BR-06, BR-07, BR-08, BR-09, BR-14, BR-29 trong tài liệu 26 UC. Không thêm tài khoản nhân viên hoặc Admin thứ hai. Chạy trên database tạm, không sửa mật khẩu/dữ liệu kinh doanh thật.
+Nguồn: `D:\8.tailieu\dac-25-Uc.docx`; giữ số UC mới. Quy tắc liên quan: **BR-03, BR-05, BR-08, BR-11, BR-12, BR-13, BR-14, BR-24, BR-28, BR-29, BR-35**. Tất cả test C# nằm trong project xUnit dùng chung, không tạo `.csproj` riêng theo UC.
 
-| Nhóm | Luồng / quy tắc đối chiếu | Ca kiểm thử và kết quả mong đợi |
-|---|---|---|
-| Đăng nhập | Chính; E1; BR-06/07/08 | Ẩn danh, sai mật khẩu, khóa có thời hạn bị từ chối; Admin duy nhất đăng nhập đúng được cấp phiên |
-| Phạm vi quyền | Chính; E2/E5; BR-06/09 | Customer/Staff không gọi API Admin; không có API tạo Admin thứ hai; ma trận giao diện chỉ đọc |
-| Mật khẩu tạm | A1; BR-07/08 | Phiên giới hạn không vào tài khoản/thiết bị Dashboard; đổi đúng mới cho phép đăng nhập đầy đủ |
-| Đổi mật khẩu | A2; E4; BR-07/08/29 | Kiểm tra mật khẩu hiện tại, xác nhận, độ dài, rowversion; đổi thành công thu hồi tất cả phiên Admin, giữ ca POS |
-| Đăng xuất | A1; BR-08 | Thu hồi phiên Admin, không đóng hoặc xóa ca đang mở |
-| Đăng ký máy | A3; BR-06/09/14 | Mã máy duy nhất, khóa riêng, lý do bắt buộc; header máy/khóa phải khớp; chỉ trả DTO an toàn |
-| Thu hồi/cấp lại | A3; E3/E4/E5 | Thu hồi chặn ngay khóa/phiên cũ; giữ ca và lịch sử; chưa xử lý ca thì không cấp lại; cấp lại đổi khóa không làm sống lại khóa cũ |
-| Ca liên quan | A3/E3; BR-09/14 | Có đơn dang dở thì không chốt; đủ điều kiện lưu tiền thực đếm, người duyệt, lý do và giữ chủ ca |
-| Gửi lặp / mất phản hồi | E6; BR-05/29 | Cùng mã và nội dung trả kết quả cũ; đổi nội dung bị từ chối; tra đổi mật khẩu bằng phiên nguồn đã thu hồi chỉ trong cửa sổ cho phép |
-| Giao dịch và audit | E6; BR-14/29 | Cấm INSERT audit để mô phỏng lỗi: thu hồi thiết bị/đổi mật khẩu quay lui cả dữ liệu và phiên; không có receipt thành công giả |
-| Bí mật | BR-07/09/14 | Audit không chứa mật khẩu, khóa hoặc hash xác thực; DPAPI roundtrip đúng, file không chứa khóa rõ |
-| WinForms | Chính/A2/A3 | Ba tab, dữ liệu thật, che khóa/mật khẩu, cấp/thu hồi thực sự qua form; xác nhận sai giữ form; đổi đúng buộc đăng nhập lại |
-| Hồi quy | BR-05/06/08/09 | Chạy API tích hợp, UC-ADM-01 và bộ ràng buộc DB; bảo toàn chức năng đã có |
+| Mã TC | Tình huống | Kết quả cần đạt | Lớp xUnit |
+|---|---|---|---|
+| TC-ADM-02-01 | Danh mục, món, cấu hình, topping | Giá lấy từ cấu hình chung, kiểm tra trùng/version/tham chiếu. | `MenuAdministrationTests` |
+| TC-ADM-02-02 | Công bố, BOM thiếu, lịch và banner | Chỉ công bố cấu hình hợp lệ; không giả định thiếu BOM bằng 0. | `MenuAdministrationTests` |
+| TC-ADM-02-03 | Audit lỗi/gửi lại sau mất phản hồi | Rollback nguyên tử hoặc trả receipt cũ; không nhân đôi lệnh. | `MenuAdministrationTests` |
+| TC-ADM-02-04 | Admin đổi giá/tồn, Web đang mở | DOM cập nhật giá/trạng thái; giỏ nháp được giữ. | `MenuSynchronizationBrowserTests` |
+| TC-ADM-02-05 | Tắt bán và ẩn | Tắt bán vẫn hiện Tạm hết; chỉ bỏ công bố/ẩn theo thao tác Admin mới mất khỏi menu. | `MenuSynchronizationBrowserTests` |
 
-Chi tiết từng assertion có tên tiếng Việt trong `AccessAdministrationTests.cs` và `WinForms/AccessUiTests.cs`; số lượng PASS thực tế ghi trong `result.json`, không đánh dấu các UC chưa triển khai là PASS.
+Kiểm tra WinForms: `AdminFeaturesUiTests` mở route thật với API, chụp desktop/compact và form nguyên liệu/BOM. Ảnh nằm trong `artifacts/tests/xunit/ADM01-05/<database-fixture>/`. `Theory` giao diện dùng `Layer=WinForms`, tham số UC được lưu trong tên ảnh thay vì gắn Trait động.
+
+```powershell
+dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-02"
+dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "FullyQualifiedName~AdminFeaturesUiTests"
+```
+
+Điều kiện chạy: Windows/.NET 8, SQL Server Docker đã hoạt động, `.env` local đã cấu hình và Playwright Chromium đã có cho test Browser. Fixture dùng database GUID riêng, không chạy lệnh xóa/reset trên database đồ án.
+
+Kiểm tra thủ công bổ sung: ngắt API lúc form có nháp; xác nhận không báo lưu thành công, dữ liệu cũ có cảnh báo; nối lại và tra receipt/version trước gửi lại. Trước xóa/ngừng phải có xác nhận/lý do theo từng thao tác. Chạy SQL test không thay thế kiểm tra trực quan các dialog.

@@ -46,13 +46,22 @@ public static class PosAccess
 }
 public sealed class SessionAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options,ILoggerFactory logger,UrlEncoder encoder,CafeDbContext db) : AuthenticationHandler<AuthenticationSchemeOptions>(options,logger,encoder)
 {
+    /// <summary>Kiểm tra phiên Customer/Admin hoặc chữ ký/trạng thái ca; phiên khóa/đối chiếu không nhận quyền Staff bán hàng.</summary>
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var header=Request.Headers.Authorization.ToString();
         if(!header.StartsWith("Bearer ",StringComparison.Ordinal))return AuthenticateResult.NoResult();
         var token=header[7..];
         List<Claim> claims=[];
-        if(token.StartsWith("pos.",StringComparison.Ordinal))
+        if (token.StartsWith("staff.", StringComparison.Ordinal) || token.StartsWith("recon.", StringComparison.Ordinal))
+        {
+            var grant = await ShiftSessionCodec.Resolve(Context, db);
+            if (grant is null) return AuthenticateResult.Fail("Invalid shift session");
+            var open = await db.CaLamViec.AnyAsync(x => x.MaCaLamViec == grant.Shift && x.TrangThai == "OPEN");
+            var role = grant.ReconciliationOnly ? "STAFF_RECONCILIATION" : open ? "STAFF" : "STAFF_LOCKED";
+            claims.AddRange([new(ClaimTypes.Role, role), new(ClaimTypes.Name, grant.Name), new("shift", grant.Shift.ToString(CultureInfo.InvariantCulture))]);
+        }
+        else if(token.StartsWith("pos.",StringComparison.Ordinal))
         {
             var grant=PosAccess.Validate(token);if(grant is null)return AuthenticateResult.Fail("Invalid session");
             var shift=await db.CaLamViec.AsNoTracking().FirstOrDefaultAsync(x=>x.MaCaLamViec==grant.Shift&&x.TrangThai=="OPEN");

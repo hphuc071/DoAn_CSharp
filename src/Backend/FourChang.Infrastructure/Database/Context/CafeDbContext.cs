@@ -10,6 +10,8 @@ namespace FourChang.Infrastructure.Database.Context;
 
 public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbContext(options)
 {
+    public DbSet<Banner> Banner => Set<Banner>();
+    public DbSet<SuKienDongBo> SuKienDongBo => Set<SuKienDongBo>();
     public DbSet<ThietBiPOS> ThietBiPOS => Set<ThietBiPOS>();
     public DbSet<TaiKhoanKhachHang> TaiKhoanKhachHang => Set<TaiKhoanKhachHang>();
     public DbSet<TaiKhoanQuanLy> TaiKhoanQuanLy => Set<TaiKhoanQuanLy>();
@@ -45,10 +47,12 @@ public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbC
     public DbSet<GiuChoNguyenLieu> GiuChoNguyenLieu => Set<GiuChoNguyenLieu>();
     public DbSet<BienDongKho> BienDongKho => Set<BienDongKho>();
     public DbSet<NhatKyHeThong> NhatKyHeThong => Set<NhatKyHeThong>();
+    /// <summary>Nạp cấu hình entity theo từng nhóm nghiệp vụ để mapping và ràng buộc không dồn vào DbContext.</summary>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CafeDbContext).Assembly);
     }
+    /// <summary>Gắn thời điểm tạo/cập nhật phía máy chủ trước khi lưu; không tin thời điểm do client gửi.</summary>
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;

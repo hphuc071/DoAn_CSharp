@@ -46,3 +46,6 @@ public sealed record CustomerOrderReceipt(
     decimal PhiGiaoHang,
     decimal TongCong,
     DateTime? HetHanLuc);
+
+/// <summary>Thông tin bàn hiển thị cho luồng mô phỏng, không chứa bí mật QR.</summary>
+public sealed record CustomerTableOption(string MaBanHienThi, string TenBan);

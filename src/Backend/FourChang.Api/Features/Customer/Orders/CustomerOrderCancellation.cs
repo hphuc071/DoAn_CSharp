@@ -169,6 +169,7 @@ public static class CustomerOrderCancellation
                 // Yêu cầu duyệt/chi hoàn; không tự xác nhận đã hoàn tiền.
                 db.HoSoHoanTien.Add(new HoSoHoanTien
                 {
+                    LoaiNguon = "CANCELLATION",
                     MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"),
                     MaDonHang = orderId,
                     MaThanhToan = payment.MaThanhToan,

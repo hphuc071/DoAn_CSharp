@@ -13,7 +13,7 @@ public sealed partial class CheckoutBrowserTests
         {
             await page.Locator($"[data-tab='{mode}']").ClickAsync();
             await Assertions.Expect(page.Locator("#checkout-proceed")).ToBeDisabledAsync();
-            Assert.Contains("đang khóa", await page.Locator("#" + mode).InnerTextAsync());
+            Assert.Contains("chưa khả dụng", await page.Locator("#" + mode).InnerTextAsync());
             Assert.Null(await page.EvaluateAsync<string?>("localStorage.getItem('" + IntentKey + "')"));
         }
         Assert.Empty(bodies);

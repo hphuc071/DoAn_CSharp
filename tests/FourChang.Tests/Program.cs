@@ -21,6 +21,8 @@ internal static class Program
         {
             return args[1] switch
             {
+                "TYPOGRAPHY" => TypographyUiTests.RunHarness(args[2]),
+                "ADM01-05" => FourChang.Tests.Admin.AdminFeaturesUiTests.RunHarness(args[2]),
                 "UC-ADM-01" => CustomersUiTests.RunHarness([args[2]]),
                 "UC-ADM-02" => AccessUiTests.RunHarness([args[2]]),
                 "UC-POS-01" => EntryUiTests.RunHarness([args[2]]),

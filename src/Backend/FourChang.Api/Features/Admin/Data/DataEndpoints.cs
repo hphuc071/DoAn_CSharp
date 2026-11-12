@@ -42,9 +42,10 @@ public static class DataEndpoints
         app.MapGet("/api/admin/data/TonKho", async(CafeDbContext db) => await TableReader.Read(db.TonKho)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/GiuChoNguyenLieu", async(CafeDbContext db) => await TableReader.Read(db.GiuChoNguyenLieu)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/BienDongKho", async(CafeDbContext db) => await TableReader.Read(db.BienDongKho)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/NhatKyHeThong", async(CafeDbContext db) => await TableReader.Read(db.NhatKyHeThong)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/dashboard",async(CafeDbContext db)=>
+        app.MapGet("/api/admin/data/NhatKyHeThong", async(CafeDbContext db, FourChang.Api.Features.Admin.Reports.ReportPermissions permissions) => { permissions.Demand("AuditRead"); return await TableReader.Read(db.NhatKyHeThong.OrderByDescending(x=>x.PhatSinhLuc).ThenByDescending(x=>x.MaNhatKy)); }).RequireAuthorization("Admin");
+        app.MapGet("/api/admin/dashboard",async(CafeDbContext db, FourChang.Api.Features.Admin.Reports.ReportPermissions permissions)=>
         {
+            permissions.Demand("ReportsRead");
             var collected=await db.ThanhToan.Where(x=>x.TrangThai=="VERIFIED").SumAsync(x=>(decimal?)x.SoTienDaXacMinh)??0;
             var refunds=await db.LanChiHoanTien.Where(x=>x.TrangThai=="SUCCEEDED").SumAsync(x=>(decimal?)x.SoTien)??0;
             return new DashboardData(collected-refunds,await db.DonHang.CountAsync(x=>x.TrangThai=="COMPLETED"),await db.HoSoHoanTien.CountAsync(x=>x.TrangThai!="REFUNDED"&&x.TrangThai!="REJECTED"),await(from n in db.NguyenLieu join t in db.TonKho on n.MaNguyenLieu equals t.MaNguyenLieu where t.TonThucTe-t.TongGiuCho<=n.NguongCanhBao select n.MaNguyenLieu).CountAsync());

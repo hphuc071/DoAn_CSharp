@@ -14,7 +14,7 @@ public sealed class CustomerAdministrationTests
     public async Task TaoSua_TimKiem_PhanTrang_GuiLapDongThoi_VaQuyen()
     {
         await using var api = await TestApi.Start("UC-ADM-01-CRUD");
-        Assert.Equal("35", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0"));
+        Assert.Equal("37", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0"));
         Assert.Equal("1", await api.Sql("EXECUTE AS USER='fourchang_app'; SELECT CASE WHEN HAS_PERMS_BY_NAME('dbo.TaiKhoanKhachHang','OBJECT','DELETE')=1 AND HAS_PERMS_BY_NAME('dbo.DonHang','OBJECT','DELETE')=0 AND HAS_PERMS_BY_NAME('dbo.NhatKyHeThong','OBJECT','DELETE')=0 THEN 1 ELSE 0 END; REVERT;"));
         (await api.Send("GET", "/api/admin/customers")).Expect(401, "Ẩn danh bị chặn");
         var admin = await api.AdminLogin();
@@ -24,9 +24,11 @@ public sealed class CustomerAdministrationTests
         invalid["Email"] = "sai-email";
         (await api.Send("POST", "/api/admin/customers", invalid, admin)).Expect(400, "Email sai");
         invalid["Email"] = null;
+        invalid["SoDienThoai"] = null;
         (await api.Send("POST", "/api/admin/customers", invalid, admin)).Expect(400, "Cần liên hệ");
         invalid["Email"] = "valid@example.test";
-        invalid["MatKhauTam"] = "short";
+        invalid["SoDienThoai"] = TestData.Phone();
+        invalid["MatKhauTam"] = "1234";
         (await api.Send("POST", "/api/admin/customers", invalid, admin)).Expect(400, "Mật khẩu tạm ngắn");
         var create = api.CustomerInput();
         create["Email"] = "  " + create.Text("Email").ToUpperInvariant() + "  ";
@@ -47,7 +49,7 @@ public sealed class CustomerAdministrationTests
         Assert.Equal(1, search.Number("total"));
         var safe = (await api.Send("GET", $"/api/admin/customers/{id}", headers: admin)).Content;
         Check(!safe.Contains("MatKhauBam") && !safe.Contains("PBKDF2") && !safe.Contains("MaLamMoiDaBam") && !safe.Contains(create.Text("MatKhauTam")), "Không lộ bí mật");
-        var update = Body(("MaThaoTac", NewId()), ("TenDangNhap", customer.Text("tenDangNhap")), ("HoTen", "Khách đã sửa"), ("Email", customer.Text("email")), ("SoDienThoai", "+84912345678"), ("PhienBanDuLieu", customer.Text("phienBanDuLieu")));
+        var update = Body(("MaThaoTac", NewId()), ("TenDangNhap", customer.Text("tenDangNhap")), ("HoTen", "Khách đã sửa"), ("Email", customer.Text("email")), ("SoDienThoai", "0912345678"), ("PhienBanDuLieu", customer.Text("phienBanDuLieu")));
         (await api.Send("PUT", $"/api/admin/customers/{id}", update, admin)).Expect(200, "Sửa hiện tại");
         var stale = update.Copy();
         stale["MaThaoTac"] = NewId();

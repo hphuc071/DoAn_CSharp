@@ -11,3 +11,6 @@ artifacts/
 
 .env.*
 !.env.example
+
+# Kết quả xUnit sinh tự động; source test vẫn được quản lý bởi Git.
+**/TestResults/

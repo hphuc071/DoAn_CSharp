@@ -17,7 +17,7 @@ public sealed partial class CafeApiClient(HttpClient http)
     public string? Token { get; set; }
     public string? PosKey { get; set; }
     public string? PosMachine { get; set; }
-    public static Uri BaseAddress => new(Environment.GetEnvironmentVariable("FOURCHANG_API_URL") ?? "http://localhost:5181");
+    public static Uri BaseAddress => new(Environment.GetEnvironmentVariable("FOURCHANG_API_URL") ?? "http://localhost:15881");
     public Task<List<MenuProduct>> GetSortedMenuAsync(string sort, CancellationToken ct = default) => SendAsync<List<MenuProduct>>(HttpMethod.Get,"/api/menu?sort="+Uri.EscapeDataString(sort),ct:ct);
     public Task<List<MenuProduct>> GetMenuAsync(CancellationToken ct = default) => SendAsync<List<MenuProduct>>(HttpMethod.Get,"/api/menu",ct:ct);
     public Task<List<Employee>> GetEmployeesAsync(bool admin = false) => SendAsync<List<Employee>>(HttpMethod.Get,admin?"/api/admin/employees":"/api/pos/employees");

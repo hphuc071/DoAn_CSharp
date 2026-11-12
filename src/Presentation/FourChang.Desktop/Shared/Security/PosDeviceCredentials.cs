@@ -42,7 +42,8 @@ public static class PosDeviceCredentials
     [DllImport("crypt32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
     [return:MarshalAs(UnmanagedType.Bool)] private static extern bool CryptUnprotectData(ref Blob input,IntPtr description,IntPtr entropy,IntPtr reserved,IntPtr prompt,int flags,out Blob output);
     [DllImport("kernel32.dll")] private static extern IntPtr LocalFree(IntPtr handle);
-    private static byte[] Protect(byte[] bytes,bool decrypt)
+    /// <summary>DPAPI dùng chung cho khóa cũ và cache phiên ca; không ghi dữ liệu dạng rõ.</summary>
+    internal static byte[] Protect(byte[] bytes,bool decrypt)
     {
         var input=new Blob{Length=bytes.Length,Data=Marshal.AllocHGlobal(bytes.Length)};Blob output=default;
         try

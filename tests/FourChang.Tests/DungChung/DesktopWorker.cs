@@ -19,6 +19,7 @@ public static class DesktopWorker
         {
             environment[key] = value;
         }
+        environment.TryAdd("FOURCHANG_SHIFT_SESSION_PATH", Path.Combine(api.Artifacts, "shift-session.dpapi"));
         var log = Path.Combine(api.Artifacts, "winforms-worker");
         await using var worker = new ChildProcess("dotnet", [Assembly.GetExecutingAssembly().Location, "--desktop-scenario", useCase, api.Artifacts], TestApi.Root, environment, log);
         await worker.Wait();

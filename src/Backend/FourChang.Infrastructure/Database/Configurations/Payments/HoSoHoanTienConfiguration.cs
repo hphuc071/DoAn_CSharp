@@ -14,12 +14,15 @@ public sealed class HoSoHoanTienConfiguration : IEntityTypeConfiguration<HoSoHoa
         b.ToTable("HoSoHoanTien", "dbo", table =>
         {
             table.UseSqlOutputClause(false);
+            table.HasCheckConstraint("CK_HoanTien_LoaiNguon", "LoaiNguon IN ('LEGACY','CANCELLATION','OVERPAYMENT','LATE_PAYMENT','COMPLAINT')");
             table.HasCheckConstraint("CK_HoSoHoanTien_1", "SoTienYeuCau > 0");
             table.HasCheckConstraint("CK_HoSoHoanTien_2", "SoTienDuocDuyet IS NULL OR (SoTienDuocDuyet > 0 AND SoTienDuocDuyet <= SoTienYeuCau)");
             table.HasCheckConstraint("CK_HoSoHoanTien_3", "TrangThai IN ('REQUESTED','APPROVED','REJECTED','PROCESSING','PARTIALLY_REFUNDED','REFUNDED','RECONCILING')");
             table.HasCheckConstraint("CK_HoSoHoanTien_4", "(CASE WHEN MaKhachHangYeuCau IS NULL THEN 0 ELSE 1 END + CASE WHEN MaCaYeuCau IS NULL THEN 0 ELSE 1 END + CASE WHEN MaQuanLyYeuCau IS NULL THEN 0 ELSE 1 END) = 1");
             table.HasCheckConstraint("CK_HoSoHoanTien_5", "PhuongThucHoan IN ('CASH','BANK_TRANSFER')");
         });
+        b.Property(x => x.LoaiNguon).HasColumnType("varchar(20)").IsRequired().HasDefaultValue("LEGACY");
+        b.Property(x => x.ChungCuYeuCau).HasColumnType("nvarchar(500)");
         b.HasKey("MaHoanTien");
         b.Property(x => x.MaHoanTien).UseIdentityColumn();
         b.Property(x => x.MaHoanTien).HasColumnType("bigint").IsRequired();

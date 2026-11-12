@@ -13,7 +13,7 @@ internal sealed class EntryInputFrame : Panel
         if (input is ComboBox combo) { combo.FlatStyle = FlatStyle.Flat; combo.Font = CafeTheme.Body(11); }
         if (input is NumericUpDown number) { number.BorderStyle = BorderStyle.None; number.Font = CafeTheme.Body(11); }
         void Position() { input.SetBounds(14, (Height - input.PreferredSize.Height) / 2, Math.Max(80, Width - 28), input.PreferredSize.Height); }
-        Resize += (_, _) => Position(); input.GotFocus += (_, _) => Invalidate(); input.LostFocus += (_, _) => Invalidate(); Position();
+        Resize += (_, _) => Position(); input.FontChanged += (_, _) => Position(); input.GotFocus += (_, _) => Invalidate(); input.LostFocus += (_, _) => Invalidate(); Position();
     }
     protected override void OnPaint(PaintEventArgs e)
     {

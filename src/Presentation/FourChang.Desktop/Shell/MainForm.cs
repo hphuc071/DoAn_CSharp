@@ -35,7 +35,7 @@ public sealed class MainForm:Form
         var brand=new Panel{Dock=DockStyle.Top,Height=staffLayout?86:96};
         var mark=new BrandMark{Location=new Point(staffLayout?24:8,0),Size=new Size(38,38),BackColor=CafeTheme.Dark};
         var brandName=Ui.Label(staffLayout?"4C":"4CHANG",15,true,Color.White);brandName.Location=new Point(staffLayout?28:52,0);brandName.Visible=!staffLayout;
-        var brandSub=Ui.Label("LINH NGU LAM",8,true,Color.FromArgb(225,205,181));brandSub.Location=new Point(53,25);brandSub.Visible=!staffLayout;
+        var brandSub=Ui.Label("LINH NGU LAM",8,true,Color.FromArgb(225,205,181));brandSub.Location=new Point(53,32);brandSub.Visible=!staffLayout;
         var roleName=Ui.Label(role=="Staff"?"POS / NHÂN VIÊN":"DASHBOARD / QUẢN LÝ",8,false,Color.FromArgb(192,171,150));roleName.Location=new Point(staffLayout?18:9,staffLayout?48:64);roleName.Text=staffLayout?"POS":"QUẢN LÝ";
         brand.Controls.AddRange([mark,brandName,brandSub,roleName]);
         var links=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true,Padding=new Padding(0,8,0,0)};
@@ -54,11 +54,12 @@ public sealed class MainForm:Form
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         pageTitle.AutoSize=false;pageTitle.AutoEllipsis=true;pageTitle.Dock=DockStyle.Fill;pageTitle.TextAlign=ContentAlignment.MiddleLeft;pageTitle.Margin=Padding.Empty;
         pageTitle.ForeColor=staffLayout?Color.White:CafeTheme.Ink;
-        var account=Ui.Label(role=="Admin"?"Quản lý":name,10,true);account.ForeColor=staffLayout?Color.FromArgb(255,241,218):CafeTheme.Ink;account.AutoSize=false;account.AutoEllipsis=true;account.Width=160;account.Height=44;account.TextAlign=ContentAlignment.MiddleRight;account.Margin=new Padding(0,0,16,0);
+        var account=Ui.Label(role=="Admin"?"Quản lý":name,10,true);account.ForeColor=staffLayout?Color.FromArgb(255,241,218):CafeTheme.Ink;account.AutoSize=false;account.AutoEllipsis=true;account.Width=Math.Clamp(TextRenderer.MeasureText(account.Text,account.Font).Width+20,160,300);account.Height=44;account.TextAlign=ContentAlignment.MiddleRight;account.Margin=new Padding(0,0,16,0);
         var action=Ui.Button(role=="Admin"?"Tài khoản":"Kết thúc ca",()=>{if(role=="Staff")Navigate("shift");else { if(FourChang.Desktop.Shared.Session.LiveSession.Preview)AccessView.ShowLogin(this);else ShowAccount(); }});action.Margin=Padding.Empty;
         var topRight=Ui.Row(account,action);topRight.Dock=DockStyle.Fill;topRight.WrapContents=false;topRight.Anchor=AnchorStyles.Right;
         header.Controls.Add(pageTitle,0,0);header.Controls.Add(topRight,1,0);top.Controls.Add(header);
         main.Controls.Add(content);main.Controls.Add(top);Controls.Add(main);Controls.Add(side);
+        CafeVisuals.Apply(this);
         Navigate(role=="Admin"?"dashboard":"sale");
     }
     // Tài khoản mở đúng UC-ADM-02; đăng xuất/đổi mật khẩu thành công quay lại màn hình xác thực.
@@ -70,9 +71,12 @@ public sealed class MainForm:Form
     private void ShowAccount()=>Navigate("access");
     public void Navigate(string route)
     {
+        // POS khóa hoặc chỉ đối chiếu không chuyển sang luồng bán; server vẫn kiểm tra độc lập.
+        if (role == "Staff" && !FourChang.Desktop.Shared.Session.LiveSession.Preview &&
+            (FourChang.Desktop.Shared.Session.LiveSession.ShiftLocked || FourChang.Desktop.Shared.Session.LiveSession.Current?.Role == "STAFF_RECONCILIATION")) route = "shift";
         foreach(var pair in navigation)pair.Value.BackColor=pair.Key==route?CafeTheme.Coffee:CafeTheme.Dark;
         var definition=ScreenCatalog.All.FirstOrDefault(s=>s.Role==role&&s.Route==route);
-        pageTitle.Text=definition?.Name??"Tổng quan hôm nay";
+        pageTitle.Text=definition?.Name??"Tổng quan hoạt động";
         Control body=!FourChang.Desktop.Shared.Session.LiveSession.Preview ? FourChang.Desktop.Shared.Database.DatabaseViews.Create(role,route) : route switch
         {
             "shift"=>ShiftView.Create(sessionName),"sale"=>SaleView.Create(),"orders"=>OrdersView.Create(),"cancel"=>CancelView.Create(),"payment"=>PaymentView.Create(),

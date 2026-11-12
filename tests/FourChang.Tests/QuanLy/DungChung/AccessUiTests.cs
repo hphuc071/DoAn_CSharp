@@ -20,7 +20,7 @@ public sealed class AccessUiTests
     /// <summary>
     /// Chuẩn bị thiết bị fixture rồi chạy giao diện tài khoản, cấp hoặc thu hồi máy và đổi mật khẩu Admin trong worker riêng.
     /// </summary>
-    [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-02"), Trait("Layer", "WinForms")]
+    [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "COMMON-ADMIN-AUTH"), Trait("Layer", "WinForms")]
     public async Task GiaoDienVaHanhVi_UC_ADM_02()
     {
         await using var api = await TestApi.Start("UC-ADM-02-WinForms");

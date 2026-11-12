@@ -99,7 +99,7 @@ public sealed class CustomerAccountService(CafeDbContext db)
     {
         if (string.IsNullOrWhiteSpace(input.LyDo) || input.LyDo.Trim().Length > 500) return Error(400, "Lý do bắt buộc, tối đa 500 ký tự.");
         if (action == "STATUS" && input.TrangThai is not ("ACTIVE" or "LOCKED" or "INACTIVE")) return Error(400, "Trạng thái không hợp lệ.");
-        if (action == "RESET_PASSWORD" && !CustomerRules.ValidPassword(input.MatKhauTam)) return Error(400, "Mật khẩu tạm phải có 10–128 ký tự.");
+        if (action == "RESET_PASSWORD" && !CustomerRules.ValidPassword(input.MatKhauTam)) return Error(400, "Mật khẩu tạm phải có 5–128 ký tự.");
         return await Execute(id, action, input.MaThaoTac, input, input.PhienBanDuLieu, input.LyDo.Trim(), context,
             async user =>
             {

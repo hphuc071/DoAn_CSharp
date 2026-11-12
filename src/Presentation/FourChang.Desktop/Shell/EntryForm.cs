@@ -27,6 +27,14 @@ public sealed class EntryForm : Form
     public EntryForm(string role, Action<string> onContinue)
     {
         var staff = role == "Staff";
+        if (staff)
+        {
+            // Luồng hiện tại không đăng ký/đăng nhập theo máy; giữ mã máy làm lịch sử ca.
+            LiveSession.Api.PosKey = null;
+            LiveSession.Api.Token = null;
+            LiveSession.Current = null;
+            LiveSession.ShiftLocked = true;
+        }
         var windowIcon = BrandMark.CreateWindowIcon(); Icon = windowIcon; Disposed += (_, _) => windowIcon.Dispose();
         Text = $"{CafeTheme.Brand} · {(staff ? "Nhân viên — Mở ca" : "Quản lý — Đăng nhập")}";
         ClientSize = new Size(1100, 800); MinimumSize = new Size(1020, 760); AutoScaleMode = AutoScaleMode.Dpi;
@@ -49,6 +57,9 @@ public sealed class EntryForm : Form
         var feedback = Ui.Label("", 9, false, CafeTheme.Danger); feedback.Name = "EntryFeedback"; feedback.MaximumSize = new Size(442, 0); feedback.Visible = false;
         var verified = Ui.Label("", 9, false, CafeTheme.Muted); verified.Visible = false; verified.Name = "StaffVerifyResult"; verified.MaximumSize = new Size(442, 0);
         var button = Ui.Button(staff ? "Mở ca làm việc" : "Đăng nhập", () => { }, true); button.Name = "EntrySubmit"; button.AutoSize = false; button.Size = new Size(442, 50); button.Font = CafeTheme.Strong(11);
+        var continueSaved = Ui.Button("Tiếp tục ca đã lưu", () => { }); continueSaved.Name = "ContinueSavedShift";
+        var recoverShift = Ui.Button("Phục hồi đối chiếu", () => { }); recoverShift.Name = "RecoverShiftByCode";
+        continueSaved.Width = recoverShift.Width = 210;
         var fields = new List<Control> { Ui.Label(staff ? "CA LÀM VIỆC" : "TÀI KHOẢN QUẢN LÝ", 9, true, CafeTheme.Coffee), Ui.Label(staff ? "Sẵn sàng cho ca mới" : "Chào mừng trở lại", 23, true), Ui.Label(staff ? "Nhập thông tin của bạn để bắt đầu ca." : "Đăng nhập để quản lý hoạt động của quán.", 10, false, CafeTheme.Muted) };
         Control Field(string label, Control input, int width = 442)
         { var frame = new FourChang.Desktop.Shared.Controls.Entry.EntryInputFrame(input) { Width = width, Margin = Padding.Empty }; return Ui.Field(label, frame); }
@@ -59,6 +70,7 @@ public sealed class EntryForm : Form
         }
         else { fields.Add(Field("Tài khoản quản lý", name)); fields.Add(Field("Mật khẩu", password)); }
         fields.Add(feedback); fields.Add(button);
+        if (staff) fields.Add(Ui.Row(continueSaved, recoverShift));
         var card = new SurfacePanel { Width = 506, AutoSize = false, MinimumSize = new Size(506, 0), MaximumSize = new Size(506, 0), Padding = new Padding(28) };
         var layout = Ui.Stack(fields.ToArray()); foreach (Control field in layout.Controls) field.Margin = new Padding(0, 0, 0, 12);
         card.Controls.Add(layout); main.Controls.Add(card); Controls.Add(main); Controls.Add(visual); AcceptButton = button;
@@ -79,14 +91,14 @@ public sealed class EntryForm : Form
         bool busy = false; var identityRevision = 0; CancellationTokenSource? pendingIdentity = null;
         var debounce = new System.Windows.Forms.Timer { Interval = 500 };
         void Error(string text) { feedback.ForeColor = CafeTheme.Danger; feedback.Text = text; feedback.Visible = true; }
-        string Friendly(CafeApiException ex) => staff && ex.StatusCode == System.Net.HttpStatusCode.Unauthorized ? "Máy POS chưa được cấp quyền hoặc cấu hình đã bị thu hồi. Vui lòng nhờ Quản lý kiểm tra thiết bị." : ex.Message;
+        string Friendly(CafeApiException ex) => staff && ex.StatusCode == System.Net.HttpStatusCode.Unauthorized ? "Phiên ca không còn hợp lệ. Dùng phiên đã lưu hoặc nhờ Quản lý cấp mã phục hồi đối chiếu." : ex.Message;
         void ShowIdentity(Employee employee) { verified.ForeColor = Color.FromArgb(67, 110, 65); verified.Text = $"{employee.HoTen} · Mã {employee.MaNhanVien}"; verified.Visible = true; }
         async Task<Employee> CheckEmployee()
         {
             if (!long.TryParse(employeeId.Text.Trim(), out var id) || id <= 0 || string.IsNullOrWhiteSpace(employeeName.Text)) throw new CafeApiException("Nhập mã nhân viên hợp lệ và đầy đủ họ tên.");
             var employee = await LiveSession.Api.VerifyEmployeeAsync(new(id, employeeName.Text)); if (!IsDisposed) ShowIdentity(employee); return employee;
         }
-        void SetBusy(bool value) { busy = value; button.Enabled = !value; employeeId.Enabled = employeeName.Enabled = shift.Enabled = opening.Enabled = !value; name.Enabled = password.Enabled = !value; UseWaitCursor = value; }
+        void SetBusy(bool value) { busy = value; button.Enabled = continueSaved.Enabled = recoverShift.Enabled = !value; employeeId.Enabled = employeeName.Enabled = shift.Enabled = opening.Enabled = !value; name.Enabled = password.Enabled = !value; UseWaitCursor = value; }
         // Chờ người dùng ngừng gõ 500ms. Hủy lần kiểm tra cũ và bỏ phản hồi cũ nếu mã/tên đã đổi.
         foreach (var input in new[] { employeeId, employeeName }) input.TextChanged += (_, _) =>
         {
@@ -109,6 +121,38 @@ public sealed class EntryForm : Form
             finally { if (ReferenceEquals(pendingIdentity, cancellation)) pendingIdentity = null; }
         };
         FormClosed += (_, _) => { debounce.Stop(); debounce.Dispose(); pendingIdentity?.Cancel(); };
+        // Tiếp tục chỉ sau khi API kiểm tra token đã lưu; không dùng mã máy/tên để phát lại phiên.
+        continueSaved.Click += async (_, _) =>
+        {
+            if (!staff || busy) return;
+            debounce.Stop(); pendingIdentity?.Cancel(); SetBusy(true);
+            try
+            {
+                var saved = FourChang.Desktop.Shared.Security.ShiftSessionFile.Load();
+                if (saved is null) { Error("Không có phiên ca đã lưu. Nếu ca cũ còn mở, nhờ Quản lý cấp mã phục hồi đối chiếu."); return; }
+                LiveSession.Api.Token = saved.Token;
+                var context = await LiveSession.Api.CurrentShiftSessionAsync();
+                if (context.TrangThai is "CLOSED" or "HANDED_OVER")
+                { FourChang.Desktop.Shared.Security.ShiftSessionFile.Clear(); LiveSession.Api.Token = null; Error("Ca đã kết thúc hoặc bàn giao. Hãy mở ca mới."); return; }
+                LiveSession.Current = context.Phien;
+                LiveSession.ShiftLocked = context.TrangThai != "OPEN" || context.ChiDoiChieu;
+                FourChang.Desktop.Shared.Security.ShiftSessionFile.Save(context.Phien);
+                onContinue(context.Phien.Name);
+            }
+            catch (CafeApiException ex) { LiveSession.Api.Token = null; LiveSession.Current = null; Error(Friendly(ex)); }
+            finally { if (!IsDisposed) SetBusy(false); }
+        };
+        // Mã một lần do Admin cấp chỉ đổi sang phiên đối chiếu; không mở ca mới hoặc quyền bán.
+        recoverShift.Click += (_, _) =>
+        {
+            if (!staff || busy) return;
+            debounce.Stop(); pendingIdentity?.Cancel();
+            using var form = new FourChang.Desktop.Staff.WorkSessions.ShiftRecoveryForm();
+            if (form.ShowDialog(this) != DialogResult.OK || form.Session is not { } session) return;
+            LiveSession.Current = session; LiveSession.Api.Token = session.Token; LiveSession.ShiftLocked = true;
+            FourChang.Desktop.Shared.Security.ShiftSessionFile.Save(session);
+            onContinue(session.Name);
+        };
         button.Click += async (_, _) =>
         {
             if (busy) return; debounce.Stop(); pendingIdentity?.Cancel(); identityRevision++; SetBusy(true); feedback.Visible = false;
@@ -128,6 +172,11 @@ public sealed class EntryForm : Form
                     var context = await LiveSession.Api.GetAdminPasswordContextAsync(); using var change = new FourChang.Desktop.Admin.Access.Views.AdminPasswordForm(context, password.Text);
                     var changed = change.ShowDialog(this) == DialogResult.OK; if (!changed) { try { await LiveSession.Api.LogoutAsync(); } catch (CafeApiException) { } }
                     LiveSession.Api.Token = null; LiveSession.Current = null; password.Clear(); Error(changed ? "Đã đổi mật khẩu. Đăng nhập lại bằng mật khẩu mới." : "Cần đổi mật khẩu tạm trước khi sử dụng Quản lý."); return;
+                }
+                if (staff)
+                {
+                    LiveSession.ShiftLocked = false;
+                    FourChang.Desktop.Shared.Security.ShiftSessionFile.Save(session);
                 }
                 password.Clear(); onContinue(session.Name);
             }

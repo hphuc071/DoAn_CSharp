@@ -23,14 +23,16 @@ public sealed class BrowserFixture : IAsyncDisposable
     /// <summary>
     /// Khởi tạo đầy đủ môi trường kiểm thử riêng; chờ dịch vụ sẵn sàng và dọn tài nguyên nếu khởi tạo thất bại.
     /// </summary>
-    public static async Task<BrowserFixture> Start(string suite)
+    public static async Task<BrowserFixture> Start(string suite, Dictionary<string,string?>? runtime = null)
     {
         var fixture = new BrowserFixture();
         try
         {
-            fixture.Api = await TestApi.Start(suite);
+            fixture.Api = await TestApi.Start(suite, runtime: runtime);
             fixture.Proxy = new(fixture.Api.Url);
-            var server = fixture.Api.StartDotnet("FourChang.Web", ["--urls", fixture.WebUrl], "web", new() { ["FOURCHANG_API_URL"] = fixture.Proxy.Url });
+            var webEnvironment = runtime is null ? new Dictionary<string,string?>() : new(runtime);
+            webEnvironment["FOURCHANG_API_URL"] = fixture.Proxy.Url;
+            var server = fixture.Api.StartDotnet("FourChang.Web", ["--urls", fixture.WebUrl], "web", webEnvironment);
             using var http = new HttpClient
             {
                 Timeout = TimeSpan.FromSeconds(3)

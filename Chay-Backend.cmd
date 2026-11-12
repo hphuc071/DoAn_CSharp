@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-dotnet run --no-launch-profile --project src\Backend\FourChang.Api --urls http://localhost:5181
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\Start-LocalBackend.ps1" -Foreground
 if errorlevel 1 pause

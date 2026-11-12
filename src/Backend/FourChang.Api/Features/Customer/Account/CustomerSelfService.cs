@@ -18,8 +18,11 @@ namespace FourChang.Api.Features.Customer.Account;
 public sealed class CustomerSelfService(CafeDbContext db)
 {
     private sealed class Rule(int code, string message) : Exception(message) { public int Code => code; }
+    /// <summary>Lấy mã khách từ phiên đã xác thực, không nhận mã chủ hồ sơ do client tự khai báo.</summary>
     private static long Owner(HttpContext c) => long.Parse(c.User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+    /// <summary>Kiểm tra rowversion để từ chối ghi đè hồ sơ đã bị thay đổi ở phiên khác.</summary>
     private static void Version(byte[]? input, byte[] current) { if (input is not { Length: 8 }) throw new Rule(400, "Thiếu phiên bản dữ liệu."); if (!input.SequenceEqual(current)) throw new Rule(409, "Dữ liệu đã thay đổi. Tải lại để đối chiếu trước khi lưu."); }
+    /// <summary>Đọc hồ sơ và sổ địa chỉ đang dùng của đúng khách, không trả mật khẩu hoặc dữ liệu người khác.</summary>
     private async Task<CustomerSelfProfile> Profile(long id)
     {
         var u = await db.TaiKhoanKhachHang.AsNoTracking().SingleAsync(x => x.MaKhachHang == id);
@@ -27,7 +30,9 @@ public sealed class CustomerSelfService(CafeDbContext db)
             .Select(x => new CustomerAddress(x.MaDiaChi, x.NhanDiaChi, x.TenNguoiNhan, x.DienThoaiNguoiNhan, x.DiaChiChiTiet, x.ViDo, x.KinhDo, x.GhiChuGiaoHang, x.LaDiaChiMacDinh, x.PhienBanDuLieu)).ToListAsync();
         return new(u.MaKhachHang, u.TenDangNhapChuanHoa, u.HoTen, u.EmailChuanHoa, u.SoDienThoaiChuanHoa, u.PhienBanDuLieu, addresses);
     }
+    /// <summary>Trả hồ sơ của Customer hiện tại qua DTO an toàn.</summary>
     public async Task<IResult> Get(HttpContext context) => Results.Ok(await Profile(Owner(context)));
+    /// <summary>Lưu thông tin cá nhân với validation định danh/điện thoại chung, kiểm tra trùng và version.</summary>
     public Task<IResult> Save(SaveSelfProfile input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_PROFILE_UPDATED", input, input.PhienBanDuLieu, context, async u =>
     {
         var invalid = CustomerRules.Validate(new(input.MaThaoTac, u.TenDangNhapChuanHoa, input.HoTen, input.Email, input.SoDienThoai, null), false);
@@ -36,9 +41,10 @@ public sealed class CustomerSelfService(CafeDbContext db)
         if (await db.TaiKhoanKhachHang.AnyAsync(x => x.MaKhachHang != u.MaKhachHang && (email != null && x.EmailChuanHoa == email || phone != null && x.SoDienThoaiChuanHoa == phone))) throw new Rule(409, "Email hoặc số điện thoại đã được sử dụng.");
         u.HoTen = input.HoTen.Trim(); u.EmailChuanHoa = email; u.SoDienThoaiChuanHoa = phone;
     });
+    /// <summary>Thêm hoặc sửa địa chỉ thuộc khách hiện tại; kiểm tra số người nhận và địa chỉ mặc định.</summary>
     public Task<IResult> Address(long? id, SaveSelfAddress input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_ADDRESS_SAVED", new { id, input }, input.PhienBanHoSo, context, async u =>
     {
-        if (string.IsNullOrWhiteSpace(input.TenNguoiNhan) || input.TenNguoiNhan.Trim().Length > 120 || input.DienThoaiNguoiNhan is null || !Regex.IsMatch(input.DienThoaiNguoiNhan.Trim(), @"^\+?[0-9]{9,15}$") || string.IsNullOrWhiteSpace(input.DiaChiChiTiet) || input.DiaChiChiTiet.Trim().Length > 500 || input.NhanDiaChi?.Length > 50 || input.GhiChuGiaoHang?.Length > 500 || input.ViDo is < -90 or > 90 || input.KinhDo is < -180 or > 180 || (input.ViDo is null) != (input.KinhDo is null)) throw new Rule(400, "Tên người nhận, số điện thoại, địa chỉ hoặc tọa độ không hợp lệ.");
+        if (string.IsNullOrWhiteSpace(input.TenNguoiNhan) || input.TenNguoiNhan.Trim().Length > 120 || input.DienThoaiNguoiNhan is null || !Regex.IsMatch(input.DienThoaiNguoiNhan.Trim(), @"^[0-9]{10}$") || string.IsNullOrWhiteSpace(input.DiaChiChiTiet) || input.DiaChiChiTiet.Trim().Length > 500 || input.NhanDiaChi?.Length > 50 || input.GhiChuGiaoHang?.Length > 500 || input.ViDo is < -90 or > 90 || input.KinhDo is < -180 or > 180 || (input.ViDo is null) != (input.KinhDo is null)) throw new Rule(400, "Tên người nhận, số điện thoại, địa chỉ hoặc tọa độ không hợp lệ.");
         var a = id is null ? new DiaChiKhachHang { MaKhachHang = u.MaKhachHang, DangSuDung = true } : await db.DiaChiKhachHang.SingleOrDefaultAsync(x => x.MaDiaChi == id && x.MaKhachHang == u.MaKhachHang && x.DangSuDung) ?? throw new Rule(404, "Không tìm thấy địa chỉ của bạn.");
         if (id is not null) Version(input.PhienBanDiaChi, a.PhienBanDuLieu);
         var hasOtherActive = await db.DiaChiKhachHang.AnyAsync(x => x.MaKhachHang == u.MaKhachHang && x.DangSuDung && x.MaDiaChi != a.MaDiaChi);
@@ -52,6 +58,7 @@ public sealed class CustomerSelfService(CafeDbContext db)
         a.NhanDiaChi = CustomerRules.Normalize(input.NhanDiaChi); a.TenNguoiNhan = input.TenNguoiNhan.Trim(); a.DienThoaiNguoiNhan = input.DienThoaiNguoiNhan.Trim(); a.DiaChiChiTiet = input.DiaChiChiTiet.Trim(); a.ViDo = input.ViDo; a.KinhDo = input.KinhDo; a.GhiChuGiaoHang = CustomerRules.Normalize(input.GhiChuGiaoHang); a.LaDiaChiMacDinh = setAsDefault;
         if (id is null) db.DiaChiKhachHang.Add(a);
     });
+    /// <summary>Ngừng địa chỉ thuộc đúng khách mà không sửa địa chỉ snapshot của đơn đã đặt.</summary>
     public Task<IResult> Remove(long id, RemoveSelfAddress input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_ADDRESS_REMOVED", new { id, input }, input.PhienBanHoSo, context, async u =>
     {
         var a = await db.DiaChiKhachHang.SingleOrDefaultAsync(x => x.MaDiaChi == id && x.MaKhachHang == u.MaKhachHang && x.DangSuDung) ?? throw new Rule(404, "Không tìm thấy địa chỉ của bạn."); Version(input.PhienBanDiaChi, a.PhienBanDuLieu);
@@ -65,9 +72,10 @@ public sealed class CustomerSelfService(CafeDbContext db)
             if (replacement is not null) replacement.LaDiaChiMacDinh = true;
         }
     });
+    /// <summary>Đổi mật khẩu sau khi xác minh mật khẩu hiện tại; băm mật khẩu mới và thu hồi phiên theo chính sách.</summary>
     public Task<IResult> Password(ChangeSelfPassword input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_PASSWORD_CHANGED", input, input.PhienBanDuLieu, context, async u =>
     {
-        if (input.MatKhauHienTai is null || !CustomerRules.ValidPassword(input.MatKhauMoi) || input.MatKhauMoi != input.XacNhanMatKhau) throw new Rule(400, "Mật khẩu mới phải có 10–128 ký tự và xác nhận khớp.");
+        if (input.MatKhauHienTai is null || !CustomerRules.ValidPassword(input.MatKhauMoi) || input.MatKhauMoi != input.XacNhanMatKhau) throw new Rule(400, "Mật khẩu mới phải có 5–128 ký tự và xác nhận khớp.");
         if (!Passwords.Verify(input.MatKhauHienTai, u.MatKhauBam))
         {
             // E3 (UC-WEB-03 & BR-07): tăng bộ đếm thử sai, nếu chạm ngưỡng 5 lần thì tạm khóa 15 phút và thu hồi phiên.
@@ -87,14 +95,16 @@ public sealed class CustomerSelfService(CafeDbContext db)
         foreach (var s in sessions) { s.ThuHoiLuc = DateTime.UtcNow; s.LyDoThuHoi = "CUSTOMER_PASSWORD_CHANGED"; }
     }, password: true);
     // Cùng giao dịch và receipt như mật khẩu thường, nhưng chỉ nhận phiên hạn chế và không trả hồ sơ.
+    /// <summary>Buộc đổi mật khẩu tạm trước khi cấp lại phiên Customer đầy đủ.</summary>
     public Task<IResult> TemporaryPassword(ChangeTemporaryPassword input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_TEMPORARY_PASSWORD_CHANGED", input, input.PhienBanDuLieu, context, async u =>
     {
-        if (!CustomerRules.ValidPassword(input.MatKhauMoi) || input.MatKhauMoi != input.XacNhanMatKhau) throw new Rule(400, "Mật khẩu mới phải có 10–128 ký tự và xác nhận khớp.");
+        if (!CustomerRules.ValidPassword(input.MatKhauMoi) || input.MatKhauMoi != input.XacNhanMatKhau) throw new Rule(400, "Mật khẩu mới phải có 5–128 ký tự và xác nhận khớp.");
         if (Passwords.Verify(input.MatKhauMoi, u.MatKhauBam)) throw new Rule(400, "Mật khẩu mới phải khác mật khẩu tạm.");
         u.MatKhauBam = Passwords.Hash(input.MatKhauMoi); u.BatBuocDoiMatKhau = false; u.SoLanDangNhapSai = 0; u.KhoaDenLuc = null;
         var sessions = await db.PhienDangNhap.Where(x => x.MaKhachHang == u.MaKhachHang && x.ThuHoiLuc == null).ToListAsync();
         foreach (var session in sessions) { session.ThuHoiLuc = DateTime.UtcNow; session.LyDoThuHoi = "TEMPORARY_PASSWORD_CHANGED"; }
     }, password: true, temporary: true);
+    /// <summary>Thực hiện lệnh trong transaction có audit và mã chống trùng; lỗi phải rollback toàn bộ thay đổi.</summary>
     private async Task<IResult> Execute(Guid operation, string action, object input, byte[] version, HttpContext context, Func<TaiKhoanKhachHang, Task> mutate, bool password = false, bool temporary = false)
     {
         if (operation == Guid.Empty) return Results.Problem(detail: "Thiếu mã thao tác.", statusCode: 400);
@@ -125,6 +135,7 @@ public sealed class CustomerSelfService(CafeDbContext db)
             return Results.Problem(detail: ex.Message, statusCode: ex.Code);
         }
     }
+    /// <summary>Tra kết quả lệnh của chính khách hiện tại để phục hồi sau mất phản hồi, không tạo thêm lệnh.</summary>
     public async Task<IResult> Operation(Guid operation, HttpContext context)
     {
         var header = context.Request.Headers.Authorization.ToString(); if (!header.StartsWith("Bearer ", StringComparison.Ordinal)) return Results.Unauthorized();

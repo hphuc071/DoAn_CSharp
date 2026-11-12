@@ -16,11 +16,11 @@
             <div asp-validation-summary="All" role="alert"></div>
             <label class="field">Họ tên<input asp-for="HoTen" autocomplete="name" maxlength="120" required/></label>
             <label class="field">Tên đăng nhập<input asp-for="TenDangNhap" autocomplete="username" minlength="3" maxlength="100" required/></label>
-            <label class="field">Số điện thoại<input asp-for="SoDienThoai" type="tel" autocomplete="tel" placeholder="VD: 0912345678" maxlength="20"/></label>
+            <label class="field">Số điện thoại<input asp-for="SoDienThoai" type="tel" autocomplete="tel" placeholder="VD: 0912345678" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" required/></label>
             <label class="field">Email<input asp-for="Email" type="email" autocomplete="email" placeholder="Tùy chọn" maxlength="254"/></label>
-            <p class="muted">Cần ít nhất số điện thoại (10 số bắt đầu bằng 0) hoặc email. Mật khẩu tối thiểu 10 ký tự.</p>
-            <label class="field">Mật khẩu<input asp-for="MatKhau" type="password" autocomplete="new-password" minlength="10" maxlength="128" required/></label>
-            <label class="field">Xác nhận mật khẩu<input asp-for="XacNhanMatKhau" type="password" autocomplete="new-password" minlength="10" maxlength="128" required/></label>
+            <p class="muted">Số điện thoại bắt buộc đủ 10 chữ số. Email tùy chọn; mật khẩu tối thiểu 5 ký tự.</p>
+            <label class="field">Mật khẩu<input asp-for="MatKhau" type="password" autocomplete="new-password" minlength="5" maxlength="128" required/></label>
+            <label class="field">Xác nhận mật khẩu<input asp-for="XacNhanMatKhau" type="password" autocomplete="new-password" minlength="5" maxlength="128" required/></label>
             <button class="button primary full">Tạo tài khoản</button>
         </form>
         <a href="/" class="button secondary">Hủy đăng ký</a>

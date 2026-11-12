@@ -31,11 +31,20 @@ dotnet build FourChang.sln
 Chọn ứng dụng cần chạy, mỗi ứng dụng dùng một terminal:
 
 ```powershell
-dotnet run --project src/Presentation/FourChang.Web --urls http://localhost:5180
+dotnet run --project src/Presentation/FourChang.Web --urls http://localhost:15880
 dotnet run --project src/Presentation/FourChang.Pos
 dotnet run --project src/Presentation/FourChang.Admin
 ```
 
 Hoặc mở `Chay-Web.cmd`, `Chay-NhanVien.cmd`, `Chay-QuanLy.cmd` bằng File Explorer. Shortcut `NhanVien` / `QuanLy` trỏ tới executable tên mới sau khi build. Trong VS Code vẫn dùng Run Task → Web preview / POS preview / Admin preview, hoặc F5 chọn ứng dụng.
 
-Không dùng tên cũ `MocCafe.sln` và các lệnh `src/MocCafe.*` nữa. Giao diện, dữ liệu demo và chức năng không đổi do việc đổi tên này. Database hiện tại có đúng 34 bảng; Web và WinForms kết nối qua FourChang.Api (cổng 5181). Chạy ChuanBi-Database.ps1 trước khi mở ứng dụng. Xem [hướng dẫn database](HUONG-DAN-DATABASE.md) và [schema hiện tại](docs/database/34-bang/schema.sql). Tài liệu database cũ chỉ để tham khảo lịch sử.
+Không dùng tên cũ `MocCafe.sln` và các lệnh `src/MocCafe.*` nữa. Giao diện, dữ liệu demo và chức năng không đổi do việc đổi tên này. Database hiện tại có đúng 37 bảng; Web và WinForms kết nối qua FourChang.Api (cổng 15881). Chạy ChuanBi-Database.ps1 trước khi mở ứng dụng. Xem [hướng dẫn database](HUONG-DAN-DATABASE.md) và [schema hiện tại](docs/database/37-bang/schema.sql). Tài liệu database cũ chỉ để tham khảo lịch sử.
+
+## Cổng local đã thống nhất
+
+- Web: http://localhost:15880
+- API: http://localhost:15881
+- Cấu hình trong `.env`: `FOURCHANG_API_URL`, `FOURCHANG_WEB_URL`; `.env.example` chỉ là mẫu không chứa bí mật.
+- `Chay-Backend.cmd` chạy API ở foreground. `Chay-Web.cmd` kiểm tra backend rồi truyền đúng URL API cho process Web. Admin/POS đọc cùng URL trong `.env`.
+- Lệnh trực tiếp: `powershell -NoProfile -File .\scripts\Start-LocalBackend.ps1`, sau đó `powershell -NoProfile -File .\scripts\Start-LocalWeb.ps1`.
+- Cổng 5180/5181 đã nằm trong dải Windows dành riêng trên máy này, vì vậy không dùng trong các lệnh mới. Không xóa dải dành riêng hoặc đổi cấu hình mạng Windows.

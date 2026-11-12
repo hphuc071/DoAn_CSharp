@@ -52,7 +52,7 @@ public sealed class TestApi : IAsyncDisposable
     /// <summary>
     /// Khởi tạo đầy đủ môi trường kiểm thử riêng; chờ dịch vụ sẵn sàng và dọn tài nguyên nếu khởi tạo thất bại.
     /// </summary>
-    public static async Task<TestApi> Start(string suite, bool legacy = false)
+    public static async Task<TestApi> Start(string suite, bool legacy = false, Dictionary<string, string?>? runtime = null)
     {
         var api = new TestApi(suite);
         try
@@ -93,7 +93,10 @@ public sealed class TestApi : IAsyncDisposable
                     }
                 }
             });
-            var server = api.StartDotnet("FourChang.Api", ["--urls", api.Url], "api");
+            // Link QR trong test luôn trỏ API fixture riêng, không trỏ localhost của database quán.
+            if (runtime is not null && !runtime.ContainsKey("Payments__SimulationPublicBaseUrl"))
+                runtime["Payments__SimulationPublicBaseUrl"] = api.Url;
+            var server = api.StartDotnet("FourChang.Api", ["--urls", api.Url], "api", runtime);
             for (int attempt = 0; attempt < 100; attempt++)
             {
                 if (server.HasExited)
@@ -171,6 +174,7 @@ public sealed class TestApi : IAsyncDisposable
         env["FOURCHANG_DATABASE"] = Database;
         env["ConnectionStrings__FourChang"] = null;
         env["ASPNETCORE_ENVIRONMENT"] = "Development";
+        env["Orders__FulfillmentSimulationEnabled"] = "false"; // Test chỉ mở mô phỏng khi runtime của chính test yêu cầu.
         env["FOURCHANG_LOCAL"] = "true";
         return env;
     }
@@ -254,7 +258,7 @@ public sealed class TestApi : IAsyncDisposable
     {
         var stamp = Guid.NewGuid().ToString("N");
         var password = TestData.Password();
-        var body = TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", "web" + stamp[..12] + suffix), ("HoTen", "Khách kiểm thử " + suffix), ("Email", stamp + "@example.test"), ("SoDienThoai", null), ("MatKhau", password), ("XacNhanMatKhau", password));
+        var body = TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", "web" + stamp[..12] + suffix), ("HoTen", "Khách kiểm thử " + suffix), ("Email", stamp + "@example.test"), ("SoDienThoai", TestData.Phone()), ("MatKhau", password), ("XacNhanMatKhau", password));
         var receipt = (await Send("POST", "/api/auth/customer/register", body)).Expect(200, "Tạo khách fixture").Json;
         return new(body, receipt.Number("maKhachHang"));
     }
@@ -280,7 +284,7 @@ public sealed class TestApi : IAsyncDisposable
     public JsonObject CustomerInput(string suffix = "admin")
     {
         var stamp = Guid.NewGuid().ToString("N");
-        return TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", "adm" + stamp[..12] + suffix), ("HoTen", "Khách kiểm thử " + suffix), ("Email", stamp + "@example.test"), ("SoDienThoai", null), ("MatKhauTam", TestData.Password()));
+        return TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", "adm" + stamp[..12] + suffix), ("HoTen", "Khách kiểm thử " + suffix), ("Email", stamp + "@example.test"), ("SoDienThoai", TestData.Phone()), ("MatKhauTam", TestData.Password()));
     }
 
     /// <summary>
@@ -312,7 +316,7 @@ public sealed class TestApi : IAsyncDisposable
     /// <summary>
     /// Tạo hồ sơ nhân viên qua API Admin; không tạo tài khoản đăng nhập cá nhân cho nhân viên.
     /// </summary>
-    public async Task<JsonNode> Employee(Dictionary<string, string> admin, string name = "Nhân viên trùng tên kiểm thử") => (await Send("POST", "/api/admin/employees", TestData.Body(("HoTen", name), ("SoDienThoai", "0912345678"), ("NgayVaoLam", "2026-11-01"), ("TrangThai", "ACTIVE")), admin)).Expect(200, "Tạo nhân viên fixture").Json;
+    public async Task<JsonNode> Employee(Dictionary<string, string> admin, string name = "Nhân viên trùng tên kiểm thử") => (await Send("POST", "/api/admin/employees", TestData.Body(("HoTen", name), ("SoDienThoai", "0912345678"), ("NgayVaoLam", "2026-11-01"), ("TrangThai", "ACTIVE"), ("MaThaoTac", TestData.NewId())), admin)).Expect(200, "Tạo nhân viên fixture").Json;
 
     /// <summary>
     /// Chuẩn bị yêu cầu mở ca theo mã, họ tên nhân viên và đúng mã máy đã cấp quyền.

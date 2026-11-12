@@ -2,6 +2,8 @@ namespace FourChang.Domain.Entities.Payments;
 
 public sealed class HoaDon
 {
+    // Trường nghiệp vụ UC-ADM-06..10 đã được chấp thuận, không tạo bảng mới.
+    public long? MaHoanTien { get; set; }
     public long MaHoaDon { get; set; }
     public string SoHoaDon { get; set; } = string.Empty;
     public long MaDonHang { get; set; }

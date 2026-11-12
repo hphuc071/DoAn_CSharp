@@ -17,7 +17,7 @@ namespace FourChang.Api.Features.Admin.Access;
 // Đăng nhập và đổi mật khẩu của đúng một Quản lý, không cấp tài khoản cho nhân viên.
 public sealed class AdminAccountService(CafeDbContext db)
 {
-    private const int MinimumPasswordLength = 10;
+    private const int MinimumPasswordLength = 5;
     private const int MaximumPasswordLength = 128;
     private static IResult Error(int code, string text) => Results.Problem(detail: text, statusCode: code);
     private static IResult Denied() => Error(401, "Tên đăng nhập hoặc mật khẩu không đúng, hoặc tài khoản tạm khóa.");
@@ -70,7 +70,7 @@ public sealed class AdminAccountService(CafeDbContext db)
         if (input.MaThaoTac == Guid.Empty || input.PhienBanDuLieu is not { Length: 8 }) return Error(400, "Thiếu mã thao tác hoặc phiên bản tài khoản.");
         if (input.MatKhauHienTai is null || input.MatKhauHienTai.Length > MaximumPasswordLength ||
             input.MatKhauMoi is not { Length: >= MinimumPasswordLength and <= MaximumPasswordLength } || input.MatKhauMoi != input.XacNhanMatKhau)
-            return Error(400, "Mật khẩu mới phải có 10–128 ký tự và xác nhận khớp.");
+            return Error(400, "Mật khẩu mới phải có 5–128 ký tự và xác nhận khớp.");
         var sessionId = long.Parse(context.User.FindFirst("session")!.Value);
         var secret = Environment.GetEnvironmentVariable("FOURCHANG_POS_KEY") ?? throw new InvalidOperationException("Thiếu khóa máy chủ.");
         var digest = HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), JsonSerializer.SerializeToUtf8Bytes(input));

@@ -6,6 +6,7 @@ namespace FourChang.Tests.Shared;
 // Không thay kết quả nghiệp vụ và không ghi mật khẩu/token vào log kiểm thử.
 public sealed class NetworkFaultProxy : IAsyncDisposable
 {
+    private readonly CancellationTokenSource lifetime = new();
     private readonly HttpListener listener = new();
     private readonly HttpClient client = new();
     private readonly string upstream;
@@ -14,6 +15,7 @@ public sealed class NetworkFaultProxy : IAsyncDisposable
     public string Url { get; } = TestApi.FreeUrl();
 
     public volatile bool Offline;
+    public volatile bool DropMenu;
     public volatile bool DropProfile;
     public volatile bool DropTemporary;
     public int ProfileWrites;
@@ -78,10 +80,12 @@ public sealed class NetworkFaultProxy : IAsyncDisposable
                 Interlocked.Increment(ref TemporaryWrites);
             }
 
-            var drop = (DropProfile && profile) || (DropTemporary && temporary);
+            var menu = path.StartsWith("/api/admin/menu/") && context.Request.HttpMethod is "POST" or "PUT";
+            var drop = (DropMenu && menu) || (DropProfile && profile) || (DropTemporary && temporary);
             if (drop)
             {
                 DropProfile = false;
+                DropMenu = false;
                 DropTemporary = false;
             }
 
@@ -99,7 +103,24 @@ public sealed class NetworkFaultProxy : IAsyncDisposable
                 request.Headers.TryAddWithoutValidation("Authorization", authorization);
             }
 
-            using var response = await client.SendAsync(request);
+            // Luồng tạo đơn cần giữ mã chống trùng và tổng tiền khách đã chấp thuận khi đi qua proxy test.
+            foreach (var header in new[] { "Idempotency-Key", "X-Checkout-Accepted-Total" })
+                if (context.Request.Headers.GetValues(header) is { } values) request.Headers.TryAddWithoutValidation(header, values);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, lifetime.Token);
+            // SSE phải chuyển từng khối ngay, không đợi response vô hạn hoàn tất rồi mới trả browser.
+            if (response.Content.Headers.ContentType?.MediaType == "text/event-stream")
+            {
+                context.Response.ContentType = "text/event-stream"; context.Response.SendChunked = true;
+                await using var stream = await response.Content.ReadAsStreamAsync(lifetime.Token);
+                var buffer = new byte[4096];
+                int count;
+                while ((count = await stream.ReadAsync(buffer, lifetime.Token)) > 0)
+                {
+                    await context.Response.OutputStream.WriteAsync(buffer.AsMemory(0, count), lifetime.Token);
+                    await context.Response.OutputStream.FlushAsync(lifetime.Token);
+                }
+                context.Response.Close(); return;
+            }
             var bytes = await response.Content.ReadAsByteArrayAsync();
             context.Response.StatusCode = (int)response.StatusCode;
             context.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
@@ -115,7 +136,7 @@ public sealed class NetworkFaultProxy : IAsyncDisposable
                 context.Response.Close();
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or HttpListenerException or IOException or ObjectDisposedException)
+        catch (Exception ex) when (ex is HttpRequestException or HttpListenerException or IOException or ObjectDisposedException or OperationCanceledException)
         {
             try
             {
@@ -132,10 +153,11 @@ public sealed class NetworkFaultProxy : IAsyncDisposable
     /// </summary>
     public async ValueTask DisposeAsync()
     {
+        lifetime.Cancel();
         listener.Stop();
         listener.Close();
         await loop;
         await Task.WhenAll(requests);
-        client.Dispose();
+        client.Dispose(); lifetime.Dispose();
     }
 }

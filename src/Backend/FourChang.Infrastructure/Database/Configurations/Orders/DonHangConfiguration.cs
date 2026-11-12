@@ -19,12 +19,13 @@ public sealed class DonHangConfiguration : IEntityTypeConfiguration<DonHang>
             table.HasCheckConstraint("CK_DonHang_4", "(HinhThucNhanMon = 'DINE_IN' AND MaBan IS NOT NULL) OR (HinhThucNhanMon <> 'DINE_IN' AND MaBan IS NULL)");
             table.HasCheckConstraint("CK_DonHang_5", "HinhThucNhanMon <> 'DELIVERY' OR (TenNguoiNhan IS NOT NULL AND DienThoaiNguoiNhan IS NOT NULL AND DiaChiGiaoDaChot IS NOT NULL)");
             table.HasCheckConstraint("CK_DonHang_6", "PhiGiaoHangBanDau >= 0 AND PhiGiaoHangHienTai >= 0 AND PhiGiaoHangHienTai <= PhiGiaoHangBanDau");
-            table.HasCheckConstraint("CK_DonHang_7", "TrangThai IN ('DRAFT','PENDING_PAYMENT','PENDING_CONFIRMATION','ACCEPTED','PREPARING','READY','DELIVERING','COMPLETED','REJECTED','CANCELLED','DELIVERY_FAILED')");
+            table.HasCheckConstraint("CK_DonHang_7", "TrangThai IN ('DRAFT','PENDING_PAYMENT','PENDING_CONFIRMATION','ACCEPTED','PREPARING','READY','DELIVERING','COMPLETED','REJECTED','CANCELLED','DELIVERY_FAILED','EXPIRED')");
             table.HasCheckConstraint("CK_DonHang_8", "ChinhSachGiaoHangDaChotJson IS NULL OR ISJSON(ChinhSachGiaoHangDaChotJson) = 1");
             table.HasCheckConstraint("CK_DonHang_9", "ViDo IS NULL OR ViDo BETWEEN -90 AND 90");
             table.HasCheckConstraint("CK_DonHang_10", "KinhDo IS NULL OR KinhDo BETWEEN -180 AND 180");
             table.HasCheckConstraint("CK_DonHang_11", "KhoangCachGiaoKm IS NULL OR KhoangCachGiaoKm >= 0");
         });
+        b.Property(x => x.MaXuLyNgoaiLe).HasColumnType("varchar(30)");
         b.HasKey("MaDonHang");
         b.Property(x => x.MaDonHang).UseIdentityColumn();
         b.Property(x => x.MaDonHang).HasColumnType("bigint").IsRequired();

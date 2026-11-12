@@ -20,6 +20,10 @@ public sealed class HoaDonConfiguration : IEntityTypeConfiguration<HoaDon>
             table.HasCheckConstraint("CK_HoaDon_4", "TrangThai <> 'ISSUED' OR PhatHanhLuc IS NOT NULL");
             table.HasCheckConstraint("CK_HoaDon_5", "ISJSON(NoiDungHoaDonDaChotJson) = 1");
         });
+        b.Property(x => x.MaHoanTien).HasColumnType("bigint");
+        b.HasOne<HoSoHoanTien>().WithMany().HasForeignKey(x => x.MaHoanTien).OnDelete(DeleteBehavior.NoAction);
+        b.HasIndex(x => new { x.MaHoaDonGoc, x.MaHuyMon }).IsUnique().HasDatabaseName("UX_HoaDon_NguonHuy").HasFilter("LoaiHoaDon = 'ADJUSTMENT' AND MaHuyMon IS NOT NULL");
+        b.HasIndex(x => new { x.MaHoaDonGoc, x.MaHoanTien }).IsUnique().HasDatabaseName("UX_HoaDon_NguonHoan").HasFilter("LoaiHoaDon = 'ADJUSTMENT' AND MaHoanTien IS NOT NULL");
         b.HasKey("MaHoaDon");
         b.Property(x => x.MaHoaDon).UseIdentityColumn();
         b.Property(x => x.MaHoaDon).HasColumnType("bigint").IsRequired();

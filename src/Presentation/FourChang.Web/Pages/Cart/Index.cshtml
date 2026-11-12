@@ -1,7 +1,7 @@
 
 @page "/Cart"
 @model FourChang.Web.Pages.Cart.IndexModel
-@{
+@{ ViewData["CommerceClass"] = "commerce-page cart-screen";
     ViewData["Title"] = "Giỏ hàng";
 }
 
@@ -11,17 +11,18 @@
 
 <div class="page-heading">
     <div>
-        <span class="eyebrow">UC-WEB-05</span>
+        <span class="eyebrow">MÓN NGON BẠN ĐÃ CHỌN</span>
         <h1>Giỏ hàng của bạn</h1>
         <span class="muted" id="cart-count">Đang tải giỏ...</span>
     </div>
     <a class="button secondary" href="/">
-        ＋ Chọn thêm món
+        Chọn thêm món
     </a>
 </div>
 
-<div class="two-columns">
-    <section class="panel">
+<partial name="_CheckoutSteps"/>
+<div class="two-columns commerce-columns">
+    <section class="panel cart-main"><div class="commerce-section-heading"><h2>Món trong giỏ</h2><span class="muted">Tùy chỉnh theo khẩu vị của bạn</span></div>
 
         <div id="cart-empty" hidden>
             <h3>Giỏ hàng đang trống</h3>
@@ -33,25 +34,22 @@
 
         <p id="cart-status" role="status"></p>
         <div id="cart-lines"></div>
-        <section id="cart-editor" class="panel" aria-label="Sửa dòng giỏ" hidden></section>
+
 
         <p class="reference-note">
-            Giỏ hàng là bản nháp.
-            Giá, topping, cấu hình và tình trạng
-            nguyên liệu phải được API kiểm tra lại
-            trước khi tạo đơn hàng.
+            Bạn có thể sửa món hoặc số lượng. Giá và tình trạng món sẽ được kiểm tra lại trước khi xác nhận đơn.
         </p>
 
         <button type="button"
                 class="text-button"
                 id="clear-cart">
-            Xóa toàn bộ giỏ nháp
+            Xóa toàn bộ giỏ hàng
         </button>
 
     </section>
 
-    <aside class="panel">
-        <h3>Tóm tắt giỏ hàng</h3>
+    <aside class="panel commerce-summary">
+        <h3>TÓM TẮT GIỎ HÀNG</h3>
 
         <dl class="totals">
             <div class="total">
@@ -61,21 +59,25 @@
         </dl>
 
         <p class="fine-print">
-            Giá nháp từ cấu hình đã chọn, chưa gồm phí giao hàng. Giỏ cũ thiếu snapshot
-            topping cần mở Sửa món để xác minh. Backend sẽ tính lại trước khi đặt.
+Tạm tính gồm món và topping đã chọn. Kiểm tra giá cuối cùng ở bước đặt món.
         </p>
 
         <a href="/Checkout"
-           class="button secondary full">
-            Kiểm tra giá và tiếp tục Checkout
+           class="button primary full">
+            Thanh toán →
         </a>
 
         <p class="fine-print">
-            Tạo đơn chịu kiểm soát của máy chủ; QR bàn và giao hàng vẫn khóa.
+            Chọn hình thức nhận món tại bước thanh toán. Chuyển khoản trước khi quán tiếp nhận.
         </p>
     </aside>
 </div>
 
+<!-- Dùng lại bộ cấu hình hiện có; đóng cửa sổ không thay đổi dòng giỏ khi chưa lưu. -->
+<dialog id="cart-edit-dialog" class="product-config-dialog" aria-label="Sửa món trong giỏ">
+    <button type="button" class="config-close" aria-label="Đóng sửa món">×</button>
+    <section id="cart-editor" class="customizer panel" aria-label="Sửa dòng giỏ" hidden></section>
+</dialog>
 @section Scripts {
     <script src="~/js/cart-draft.js" asp-append-version="true"></script>
     <script src="~/js/cart-editor.js" asp-append-version="true"></script>

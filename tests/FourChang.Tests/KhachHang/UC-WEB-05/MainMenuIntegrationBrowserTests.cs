@@ -26,6 +26,9 @@ public sealed class MainMenuIntegrationBrowserTests
         builder.WebHost.UseTestServer();
         builder.Services.AddDbContext<CafeDbContext>(o => o.UseSqlServer(
             "Server=forbidden.invalid;Database=NoDatabase;Integrated Security=true"));
+        // Catalog đã dùng service chung với ADM-02/POS; đăng ký dependency thật,
+        // giữ connection forbidden để test vẫn chứng minh validation không chạm SQL.
+        builder.Services.AddScoped<FourChang.Api.Features.Admin.Menu.CatalogReadService>();
         await using var app = builder.Build();
         app.MapCatalog(); await app.StartAsync();
         using var client = app.GetTestClient();
@@ -39,8 +42,10 @@ public sealed class MainMenuIntegrationBrowserTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Assert.Equal(HttpMethod.Get, request.Method); Requested = request.RequestUri;
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) {
-                Content = new StringContent("[]", System.Text.Encoding.UTF8, "application/json") });
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("[]", System.Text.Encoding.UTF8, "application/json")
+            });
         }
     }
     [Fact]
@@ -48,9 +53,13 @@ public sealed class MainMenuIntegrationBrowserTests
     {
         var source = new CatalogSource();
         var model = new FourChang.Web.Pages.Menu.IndexModel(new CafeApiClient(
-            new HttpClient(source) { BaseAddress = new Uri("http://catalog.invalid") })) {
-            PageContext = new Microsoft.AspNetCore.Mvc.RazorPages.PageContext {
-                HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext() } };
+            new HttpClient(source) { BaseAddress = new Uri("http://catalog.invalid") }))
+        {
+            PageContext = new Microsoft.AspNetCore.Mvc.RazorPages.PageContext
+            {
+                HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext()
+            }
+        };
         await model.OnGetAsync("bestseller");
         Assert.Equal("/api/menu?sort=bestseller", source.Requested?.PathAndQuery);
         Assert.Null(model.Error);
@@ -65,7 +74,8 @@ public sealed class MainMenuIntegrationBrowserTests
         await using var context = await browser.NewContextAsync();
         var page = await context.NewPageAsync();
         var requests = new List<string>();
-        await context.RouteAsync("**/*", async route => {
+        await context.RouteAsync("**/*", async route =>
+        {
             Assert.Equal("GET", route.Request.Method);
             requests.Add(route.Request.Url);
             await route.FulfillAsync(new() { ContentType = "text/html; charset=utf-8", Body = """
