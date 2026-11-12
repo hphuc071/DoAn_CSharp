@@ -1,5 +1,8 @@
 using System.Data;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text.Json;
+using Microsoft.AspNetCore.RateLimiting;
 using FourChang.Domain.Entities.Payments;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Domain.Entities.Orders;
@@ -51,6 +54,10 @@ public static class CustomerOrdersEndpoints
         });
 
         app.MapPost("/api/customer/orders", CreateAsync).RequireAuthorization("Customer");
+        // Dedicated v2 contract. The legacy /orders handler must NEVER accept DINE_IN.
+        // An independent SQL validation gate remains OFF until a new isolated fixture passes.
+        app.MapPost("/api/customer/orders/dine-in", CreateDineInAsync)
+            .RequireAuthorization("Customer").RequireRateLimiting("auth");
         app.MapPost("/api/customer/orders/fulfillment-preview", FulfillmentPreviewAsync)
             .RequireAuthorization("Customer");
 
@@ -68,40 +75,85 @@ public static class CustomerOrdersEndpoints
         catch (FulfillmentUnavailable ex) { return Results.Json(new { code = ex.Code }, statusCode: ex.Status); }
         catch (OrderQuoteValidationException) { return Results.Json(new { code = "CART_INVALID" }, statusCode: 400); }
     }
-    // A separate Backend capability: Web configuration cannot secure a direct API caller.
-    public static async Task<IResult> CreateAsync(CreateCustomerOrderRequest req, HttpContext context,
-        CafeDbContext db, CancellationToken ct, IConfiguration configuration)
+    private sealed record DineInContext(DineInOrderCreateRequest Request,
+        ITableQrLookup Tables, FulfillmentPreviewService Previews, TimeProvider Clock);
+
+    // The original method and TAKEAWAY DTO remain unchanged for historical replay hashes.
+    public static Task<IResult> CreateAsync(CreateCustomerOrderRequest req, HttpContext context,
+        CafeDbContext db, CancellationToken ct, IConfiguration configuration) =>
+        CreateCoreAsync(req, context, db, ct, configuration, null);
+
+    public static Task<IResult> CreateDineInAsync(DineInOrderCreateRequest request,
+        HttpContext context, [Microsoft.AspNetCore.Mvc.FromServices] CafeDbContext db,
+        [Microsoft.AspNetCore.Mvc.FromServices] ITableQrLookup tables,
+        [Microsoft.AspNetCore.Mvc.FromServices] FulfillmentPreviewService previews,
+        [Microsoft.AspNetCore.Mvc.FromServices] TimeProvider clock,
+        CancellationToken ct, IConfiguration configuration)
+    {
+        context.Response.Headers.CacheControl = "no-store";
+        context.Response.Headers.Vary = "Cookie";
+        // Before even inspecting session, QR/token or opening SQL: independent fail-closed gate.
+        if (!DineInOrderCreation.Ready(configuration))
+            return Task.FromResult<IResult>(Results.Json(new { code = "DINE_IN_CREATION_NOT_VALIDATED" }, statusCode: 503));
+        // QR secret must not be submitted over plain HTTP. Deployment behind a
+        // reverse proxy needs a separately reviewed forwarded-proto trust boundary.
+        if (!context.Request.IsHttps)
+            return Task.FromResult<IResult>(Results.Json(new { code = "DINE_IN_HTTPS_REQUIRED" }, statusCode: 503));
+        var error = DineInOrderCreation.Validate(request);
+        if (error is not null)
+            return Task.FromResult<IResult>(Results.BadRequest(new { code = error }));
+        var legacyShape = new CreateCustomerOrderRequest("DINE_IN", null, null, null,
+            null, null, request.GhiChu, request.Items);
+        return CreateCoreAsync(legacyShape, context, db, ct, configuration,
+            new DineInContext(request, tables, previews, clock));
+    }
+
+    // Reuses the TAKEAWAY transactional BOM/stock/payment/audit writer, but only after
+    // authoritative QR/price verification WITHIN the same SERIALIZABLE transaction.
+    private static async Task<IResult> CreateCoreAsync(CreateCustomerOrderRequest req,
+        HttpContext context, CafeDbContext db, CancellationToken ct,
+        IConfiguration configuration, DineInContext? dineIn)
     {
         if (!bool.TryParse(configuration["Orders:CustomerCreationEnabled"], out var enabled) || !enabled)
             return Results.Json(new { code = "CUSTOMER_ORDER_CREATION_DISABLED" }, statusCode: 503);
+        if (req is null) return Results.BadRequest(new { code = "CUSTOMER_ORDER_INPUT_INVALID" });
+        if (dineIn is not null && !DineInOrderCreation.Ready(configuration))
+            return Results.Json(new { code = "DINE_IN_CREATION_NOT_VALIDATED" }, statusCode: 503);
         var claim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!long.TryParse(claim, out var customerId) || customerId <= 0)
             return Results.Unauthorized();
         if (!OrderIdempotency.TryReadKey(context, out var idempotencyKey))
             return Results.BadRequest(new { message = "Cần Idempotency-Key là một GUID khác rỗng cho mỗi lần xác nhận đặt hàng." });
-        // Read-only previews do not authorize writes. No flag may bypass the missing atomic
-        // QR/quote revalidation + snapshot integration. Preserve the existing TAKEAWAY protocol.
-        if (string.Equals(req.HinhThucNhanMon, "DINE_IN", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(req.HinhThucNhanMon, "DELIVERY", StringComparison.OrdinalIgnoreCase))
+        // Legacy contracts never gain DINE_IN/DELIVERY writing ability, regardless of flags.
+        if (dineIn is null && (string.Equals(req.HinhThucNhanMon, "DINE_IN", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(req.HinhThucNhanMon, "DELIVERY", StringComparison.OrdinalIgnoreCase)))
             return Results.Json(new { code = "FULFILLMENT_CREATION_NOT_VALIDATED" }, statusCode: 503);
         // Customer WEB always requires consent, including direct API calls and replays.
         // This is independent of POS/Admin contracts and precedes any business SQL.
         if (!OrderIdempotency.TryReadAcceptedTotal(context, out var acceptedTotal))
             return Results.BadRequest(new { code = "CHECKOUT_ACCEPTED_TOTAL_INVALID",
                 message = "Cần một X-Checkout-Accepted-Total duy nhất, không âm và theo định dạng số bất biến." });
-        var requestFingerprint = OrderIdempotency.Hash(req);
+        // V2 fingerprint binds QR token, protected proof, exact cart and note. Never mutate
+        // the historical TAKEAWAY hash/receipt contract.
+        var requestFingerprint = dineIn is null ? OrderIdempotency.Hash(req) :
+            DineInOrderCreation.Hash(dineIn.Request);
         var earlyReplay = await OrderIdempotency.ReplayAsync(
             db, customerId, idempotencyKey, requestFingerprint, acceptedTotal, ct);
         if (earlyReplay is not null)
             return earlyReplay;
 
         // Historical DTO hashes/receipts are retained. Validate new operations only after replay.
-        if (!string.Equals(req.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
+        if (dineIn is null && (!string.Equals(req.HinhThucNhanMon, "TAKEAWAY", StringComparison.Ordinal) ||
                 string.IsNullOrWhiteSpace(req.TenNguoiNhan) || req.TenNguoiNhan.Length > 120 ||
                 req.TenNguoiNhan.Any(char.IsControl) ||
                 !System.Text.RegularExpressions.Regex.IsMatch(req.DienThoaiNguoiNhan ?? "", @"^\+?[0-9]{9,15}\z") ||
-                req.MaBanHienThi is not null || req.DiaChiGiao is not null || req.KhoangCachKm is not null)
+                req.MaBanHienThi is not null || req.DiaChiGiao is not null || req.KhoangCachKm is not null))
             return Results.BadRequest(new { message = "Thông tin nhận mang đi không hợp lệ." });
+        if (dineIn is not null && (req.HinhThucNhanMon != "DINE_IN" ||
+                req.MaBanHienThi is not null || req.TenNguoiNhan is not null ||
+                req.DienThoaiNguoiNhan is not null || req.DiaChiGiao is not null ||
+                req.KhoangCachKm is not null || req.ThoiDiemHenNhan is not null))
+            return Results.BadRequest(new { code = "DINE_IN_HYBRID_INPUT" });
 
         // Replays above keep their original receipt. New operations must not write
         // an order note longer than the Web/quote contract (including direct API callers).
@@ -111,18 +163,74 @@ public static class CustomerOrdersEndpoints
 
         if (req.Items is null || req.Items.Count == 0)
             return Results.BadRequest(new { message = "Giỏ hàng đang trống." });
+        // Discover candidate before the table app lock; lookup is not an authorization.
+        // The protected proof, QR digest/version, active table and price are ALL rechecked
+        // under transaction locks below. Replay above works even after QR expiry/revocation.
+        QrTable? candidate = null;
+        byte[]? digest = null;
+        if (dineIn is not null)
+        {
+            digest = DineInOrderCreation.Digest(dineIn.Request);
+            candidate = await dineIn.Tables.FindAsync(digest, ct);
+            if (candidate is null || candidate.Id <= 0)
+                return Results.Conflict(new { code = "DINE_IN_QR_RECONFIRM_REQUIRED" });
+        }
         // Hold menu/recipe read locks until commit, so the authoritative total and persisted
         // line/topping/BOM snapshots cannot come from different menu versions.
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var lockedReplay = await OrderIdempotency.LockAndReplayAsync(
             db, tx, customerId, idempotencyKey, requestFingerprint, acceptedTotal, ct);
         if (lockedReplay is not null) return lockedReplay;
+
+        long? trustedTableId = null;
+        string? trustedTableCode = null;
+        int? trustedQrVersion = null;
+        DateTimeOffset? previewDeadline = null;
+        FulfillmentPreview? verifiedPreview = null;
+        if (dineIn is not null)
+        {
+            // Same transaction-scoped lock as Admin issuer/revoke; do not block on a
+            // table row BEFORE this lock (otherwise conflicting app-lock order deadlocks).
+            if (!await OrderIntegrationSafety.LockAsync(db, tx,
+                "4chang.tableqr." + candidate!.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), ct))
+                return Results.Conflict(new { code = "DINE_IN_TABLE_BUSY" });
+            try
+            {
+                verifiedPreview = await dineIn.Previews.PreviewAsync(customerId,
+                    DineInOrderCreation.ToPreview(dineIn.Request), ct);
+            }
+            catch (FulfillmentUnavailable ex)
+            {
+                return Results.Json(new { code = ex.Code }, statusCode: ex.Status);
+            }
+            catch (OrderQuoteValidationException)
+            {
+                return Results.Conflict(new { code = "DINE_IN_CART_CHANGED" });
+            }
+            var table = await db.Ban.SingleOrDefaultAsync(x => x.MaBan == candidate.Id, ct);
+            if (table is null || !table.DangSuDung || table.PhienBanQR <= 0 ||
+                table.MaBamQR is not { Length: 32 } ||
+                !CryptographicOperations.FixedTimeEquals(table.MaBamQR, digest!) ||
+                table.MaBanHienThi != verifiedPreview.TableCode ||
+                table.QRHetHanLuc is not { } qrExpiry ||
+                DateTime.SpecifyKind(qrExpiry, DateTimeKind.Utc) <= dineIn.Clock.GetUtcNow().UtcDateTime)
+                return Results.Conflict(new { code = "DINE_IN_QR_RECONFIRM_REQUIRED" });
+            if (verifiedPreview.Method != "DINE_IN" || verifiedPreview.CreationEnabled ||
+                verifiedPreview.Price.PhiGiaoHang != 0 ||
+                !OrderIdempotency.MatchesAcceptedTotal(acceptedTotal, verifiedPreview.Price))
+                return Results.Conflict(new { code = "DINE_IN_TOTAL_RECONFIRM_REQUIRED" });
+            trustedTableId = table.MaBan;
+            trustedTableCode = table.MaBanHienThi;
+            trustedQrVersion = table.PhienBanQR;
+            previewDeadline = verifiedPreview.ExpiresAt;
+        }
         // Validate before stock checks or any database writes.
         OrderPriceSummary priceSummary;
         try
         {
             priceSummary = await OrderPricingService.CalculateOrderTotalAsync(
-                db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct);
+                db, dineIn is null ? req.HinhThucNhanMon : "TAKEAWAY",
+                dineIn is null ? req.KhoangCachKm : null, req.Items, ct);
         }
         catch (OrderQuoteValidationException ex)
         {
@@ -130,6 +238,8 @@ public static class CustomerOrdersEndpoints
         }
         if (!OrderIdempotency.MatchesAcceptedTotal(acceptedTotal, priceSummary))
             return Results.Conflict(new { code = "CHECKOUT_PRICE_CHANGED", message = "Giá đã thay đổi. Vui lòng lấy báo giá mới và xác nhận lại trước khi đặt." });
+        if (verifiedPreview is not null && verifiedPreview.Price != priceSummary)
+            return Results.Conflict(new { code = "DINE_IN_PRICE_RECONFIRM_REQUIRED" });
         // BR-17: payment deadline is an operator-configured policy, not a fixed 10-minute SLA.
         // Refuse new order creation if the policy is missing or invalid; do not guess a deadline.
         var timeoutText = configuration["Orders:PendingPaymentTimeoutMinutes"];
@@ -144,9 +254,9 @@ public static class CustomerOrdersEndpoints
         var now = DateTime.UtcNow;
         var expiresAt = now.AddMinutes(timeoutMinutes);
         // Keep old idempotent receipts: optional pickup checks run only AFTER replay.
-        var pickupError = TakeawayPickupSchedule.Validate(req.ThoiDiemHenNhan, configuration,
+        var pickupError = dineIn is null ? TakeawayPickupSchedule.Validate(req.ThoiDiemHenNhan, configuration,
             new DateTimeOffset(DateTime.SpecifyKind(now, DateTimeKind.Utc)),
-            new DateTimeOffset(DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc)));
+            new DateTimeOffset(DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc))) : null;
         if (pickupError is not null)
             return Results.Json(new { code = pickupError,
                 message = "Giờ nhận chưa hợp lệ hoặc chính sách hẹn giờ chưa được phê duyệt. Giữ nguyên mã thao tác để đối soát." },
@@ -249,12 +359,9 @@ public static class CustomerOrdersEndpoints
                 return Results.Conflict(new { message = $"Nguyên liệu '{ing.TenNguyenLieu}' vừa hết, vui lòng chỉnh lại giỏ hàng." });
         }
 
-        long? maBan = null;
-        if (string.Equals(req.HinhThucNhanMon, "DINE_IN", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(req.MaBanHienThi))
-        {
-            var ban = await db.Ban.AsNoTracking().FirstOrDefaultAsync(b => b.MaBanHienThi == req.MaBanHienThi && b.DangSuDung, ct);
-            maBan = ban?.MaBan;
-        }
+        // A DINE_IN table must come exclusively from the locked, verified QR row.
+        // A legacy caller can never request DINE_IN at this point.
+        long? maBan = trustedTableId;
 
         // 16 hex characters (64 random bits) instead of only 9,000 possibilities per day.
         // Database UNIQUE index is still the final collision safeguard.
@@ -266,7 +373,7 @@ public static class CustomerOrdersEndpoints
             KenhDatHang = "WEB",
             HinhThucNhanMon = req.HinhThucNhanMon.ToUpperInvariant(),
             MaBan = maBan,
-            MaBanDaChot = req.MaBanHienThi,
+            MaBanDaChot = trustedTableCode,
             TenNguoiNhan = req.TenNguoiNhan,
             DienThoaiNguoiNhan = req.DienThoaiNguoiNhan,
             DiaChiGiaoDaChot = req.DiaChiGiao,
@@ -380,9 +487,24 @@ public static class CustomerOrdersEndpoints
             priceSummary.PhiGiaoHang,
             priceSummary.TongCong,
             order.HetHanLuc);
-        db.NhatKyHeThong.Add(OrderAuditOutbox.Stamp(OrderIdempotency.CreateAudit(
-            customerId, idempotencyKey, requestFingerprint, order.MaDonHang, receipt, now)));
+        var audit = OrderIdempotency.CreateAudit(customerId, idempotencyKey,
+            requestFingerprint, order.MaDonHang, receipt, now);
+        if (dineIn is not null)
+        {
+            // Audit may contain table/version/deadline but never the QR secret or proof.
+            audit.DuLieuSauJson = JsonSerializer.Serialize(new
+            {
+                Fulfillment = "DINE_IN", TableId = trustedTableId,
+                TableCode = trustedTableCode, QrVersion = trustedQrVersion,
+                PreviewDeadlineUtc = previewDeadline
+            });
+        }
+        db.NhatKyHeThong.Add(OrderAuditOutbox.Stamp(audit));
         await db.SaveChangesAsync(ct);
+        // All earlier writes remain uncommitted. Expiry forces a full rollback,
+        // including stock holds, payment intent, audit and order rows.
+        if (dineIn is not null && previewDeadline <= dineIn.Clock.GetUtcNow())
+            return Results.Conflict(new { code = "DINE_IN_CONFIRMATION_EXPIRED" });
         await tx.CommitAsync(ct);
 
         return Results.Created($"/api/customer/orders/{order.MaDonHang}", receipt);
