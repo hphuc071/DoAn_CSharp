@@ -135,7 +135,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                     Assert.Equal(2, unit.Items.Count);
                     Assert.Empty(Descendants(editor).OfType<DataGridView>());
                     Assert.DoesNotContain(Descendants(editor).OfType<Button>(), x => x.Text.Contains("quy đổi", StringComparison.CurrentCultureIgnoreCase) || x.Text == "Đơn vị tính");
-                    // Cả hai lựa chọn phải lưu được bằng form thật và có đúng một hàng cơ sở hệ số 1.
+                    // Cả hai lựa chọn phải lưu được bằng form thật và không tạo dòng quy đổi.
                     foreach (var unitIndex in new[] { 0, 1 })
                     {
                         using var create = new IngredientEditorForm(await LiveSession.Api.GetIngredientsAsync(), null);
@@ -149,7 +149,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                         await WaitUntil(() => !create.Visible);
                         Assert.Equal(DialogResult.OK, create.DialogResult);
                         var saved = (await LiveSession.Api.GetIngredientsAsync()).NguyenLieu.Single(x => x.TenNguyenLieu == materialName);
-                        Assert.Equal(selectedId, saved.MaDonViCoSo); Assert.Single(saved.QuyDoi); Assert.Equal(1m, saved.QuyDoi[0].HeSoVeDonViCoSo);
+                        Assert.Equal(selectedId, saved.MaDonViCoSo); Assert.Empty(saved.QuyDoi);
                         using var edit = new IngredientEditorForm(await LiveSession.Api.GetIngredientsAsync(), saved);
                         edit.StartPosition = FormStartPosition.Manual; edit.Location = new Point(-14000, -14000); edit.Show();
                         Assert.Equal(selectedId, Descendants(edit).OfType<ComboBox>().Single(x => x.Name == "IngredientBaseUnit").SelectedValue);

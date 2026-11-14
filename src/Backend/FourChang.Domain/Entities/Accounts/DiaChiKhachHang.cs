@@ -8,8 +8,6 @@ public sealed class DiaChiKhachHang
     public string TenNguoiNhan { get; set; } = string.Empty;
     public string DienThoaiNguoiNhan { get; set; } = string.Empty;
     public string DiaChiChiTiet { get; set; } = string.Empty;
-    public decimal? ViDo { get; set; }
-    public decimal? KinhDo { get; set; }
     public string? GhiChuGiaoHang { get; set; }
     public bool LaDiaChiMacDinh { get; set; }
     public bool DangSuDung { get; set; }

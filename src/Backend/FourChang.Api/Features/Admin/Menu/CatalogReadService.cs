@@ -1,3 +1,4 @@
+using FourChang.Domain.Shared;
 using FourChang.Domain.Entities.Menu;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Infrastructure.Database.Context;
@@ -13,8 +14,6 @@ public sealed class CatalogReadService(CafeDbContext db)
     private List<ChiTietCongThuc> lines = [];
     private List<NguyenLieu> ingredients = [];
     private List<TonKho> stocks = [];
-    private HashSet<long> validUnits = [];
-    private List<QuyDoiDonViNguyenLieu> conversions = [];
 
     /// <summary>Chụp dữ liệu đọc trong phạm vi request; không giữ cache giá/tồn qua các yêu cầu.</summary>
     private async Task Load()
@@ -26,8 +25,6 @@ public sealed class CatalogReadService(CafeDbContext db)
         lines = await db.ChiTietCongThuc.AsNoTracking().ToListAsync();
         ingredients = await db.NguyenLieu.AsNoTracking().ToListAsync();
         stocks = await db.TonKho.AsNoTracking().ToListAsync();
-        validUnits = (await db.DonViTinh.AsNoTracking().Where(x => x.DangSuDung).Select(x => x.MaDonVi).ToListAsync()).ToHashSet();
-        conversions = await db.QuyDoiDonViNguyenLieu.AsNoTracking().ToListAsync();
     }
     /// <summary>Chọn đúng một BOM có hiệu lực; mơ hồ hoặc thiếu quy đổi thì không đủ điều kiện công bố.</summary>
     private CongThuc? Recipe(long? variant, long? topping)
@@ -37,7 +34,7 @@ public sealed class CatalogReadService(CafeDbContext db)
             return null;
         var recipe = matches[0];
         var requirements = lines.Where(x => x.MaCongThuc == recipe.MaCongThuc).ToList();
-        if (requirements.Count == 0 || requirements.Any(l => !ingredients.Any(n => n.MaNguyenLieu == l.MaNguyenLieu && n.DangSuDung && validUnits.Contains(n.MaDonViCoSo) && conversions.Any(c => c.MaNguyenLieu == n.MaNguyenLieu && c.MaDonVi == n.MaDonViCoSo && c.HeSoVeDonViCoSo == 1))))
+        if (requirements.Count == 0 || requirements.Any(l => !ingredients.Any(n => n.MaNguyenLieu == l.MaNguyenLieu && n.DangSuDung && n.DonViCoSo is "g" or "ml")))
             return null;
         return recipe;
     }
@@ -69,22 +66,19 @@ public sealed class CatalogReadService(CafeDbContext db)
     {
         await Load();
         var now = DateTime.UtcNow;
-        var cats = await db.DanhMucMon.AsNoTracking().Where(x => x.DaCongBo && x.DangSuDung).ToListAsync();
-        var catIds = cats.Select(x => x.MaDanhMuc).ToArray();
-        var dishes = await db.Mon.AsNoTracking().Where(x => x.DaCongBo && (x.CongBoTuLuc == null || x.CongBoTuLuc <= now) && catIds.Contains(x.MaDanhMuc)).OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaMon).ToListAsync();
+        var cats = CafeOptions.Categories;
+        var dishes = await db.Mon.AsNoTracking().Where(x => x.DaCongBo && (x.CongBoTuLuc == null || x.CongBoTuLuc <= now)).OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaMon).ToListAsync();
         var ids = dishes.Select(x => x.MaMon).ToArray();
         var variants = await db.CauHinhMon.AsNoTracking().Where(x => ids.Contains(x.MaMon) && x.DangBan).ToListAsync();
-        var choices = await db.TuyChonPhaCheHopLe.AsNoTracking().Where(x => x.DangSuDung).ToListAsync();
-        var links = await db.CauHinhMonThem.AsNoTracking().Where(x => x.DangSuDung).ToListAsync();
         var tops = await db.MonThem.AsNoTracking().Where(x => x.DangSuDung).ToListAsync();
-        var result = dishes.Select(m => new CatalogDish(m.MaMon, m.MaDanhMuc, cats.Single(c => c.MaDanhMuc == m.MaDanhMuc).TenDanhMuc, m.TenMon, m.MoTa, m.DuongDanAnh, m.ThuTuHienThi, m.DangBan,
+        var result = dishes.Select(m => new CatalogDish(m.MaMon, m.MaDanhMuc, m.LoaiMon, m.TenMon, m.MoTa, m.DuongDanAnh, m.ThuTuHienThi, m.DangBan,
             variants.Where(v => v.MaMon == m.MaMon).OrderByDescending(v => v.LaMacDinh).ThenBy(v => v.MaCauHinhMon).Select(v =>
             {
-                var options = choices.Where(x => x.MaCauHinhMon == v.MaCauHinhMon).Select(x => new CatalogChoice(x.PhanTramDuong, x.PhanTramDa, x.LaMacDinh, m.DangBan && Available(v.MaCauHinhMon, null, x.PhanTramDuong, x.PhanTramDa))).ToList();
+                var options = CafeOptions.BrewChoices(v.NhietDo).Select(x => new CatalogChoice(x.Sugar, x.Ice, x.Sugar == 50 && x.Ice == (v.NhietDo == "HOT" ? 0 : 50), m.DangBan && Available(v.MaCauHinhMon, null, x.Sugar, x.Ice))).ToList();
                 return new CatalogVariant(v.MaCauHinhMon, v.KichCo, v.NhietDo, v.GiaBan, v.LaMacDinh, options.Any(x => x.ConHang), options,
-                    links.Where(l => l.MaCauHinhMon == v.MaCauHinhMon).Join(tops, l => l.MaMonThem, t => t.MaMonThem, (l, t) => new CatalogTopping(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, Math.Min(l.GioiHanMoiLy, t.GioiHanMacDinhMoiLy), Available(null, t.MaMonThem))).ToList());
+                    tops.Select(t => new CatalogTopping(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMacDinhMoiLy, Available(null, t.MaMonThem))).ToList());
             }).ToList())).ToList();
         var banners = await db.Banner.AsNoTracking().Where(x => x.DaCongBo && x.BatDauLuc <= now && (x.KetThucLuc == null || x.KetThucLuc > now)).OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaBanner).ToListAsync();
-        return new(result, banners.Select(x => new MenuBanner(x.MaBanner, x.TenBanner, x.NoiDung, x.DuongDanAnh, x.LienKet, x.ViTri, x.ThuTuHienThi, x.BatDauLuc, x.KetThucLuc, x.DaCongBo, x.PhienBanDuLieu)).ToList(), cats.OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaDanhMuc).Select(x => new CatalogCategory(x.MaDanhMuc, x.TenDanhMuc, x.ThuTuHienThi)).ToList());
+        return new(result, banners.Select(x => new MenuBanner(x.MaBanner, x.TenBanner, x.NoiDung, x.DuongDanAnh, x.LienKet, x.ViTri, x.ThuTuHienThi, x.BatDauLuc, x.KetThucLuc, x.DaCongBo, x.PhienBanDuLieu)).ToList(), cats.Select(x => new CatalogCategory(x.Id, x.Name, (int)x.Id)).ToList());
     }
 }

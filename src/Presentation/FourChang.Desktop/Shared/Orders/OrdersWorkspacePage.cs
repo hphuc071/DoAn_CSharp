@@ -186,7 +186,7 @@ public partial class OrdersWorkspacePage : AdminWorkspacePage<AdminOrderRow>
         var eligible = data.Mon.Where(x => !lineAction || Remaining(x) > 0).ToList();
         if (eligible.Count == 0) { Message.Text = "Không còn số ly phù hợp để xử lý bước này."; return; }
         if (!drafts.TryGetValue(key, out var draft)) drafts[key] = draft = new();
-        var title = action switch { "START" => "Bắt đầu pha", "FINISH" => "Xác nhận pha xong", "COMPLETE" => "Hoàn tất đơn hàng", "ACCEPT" => "Tiếp nhận đơn", "CANCEL" => staff ? "Gửi yêu cầu hủy cho Quản lý" : "Hủy phần chưa pha", _ => OperationsPresentation.Label(action) };
+        var title = action switch { "START" => "Bắt đầu pha", "FINISH" => "Xác nhận pha xong", "COMPLETE" => "Hoàn tất đơn hàng", "ACCEPT" => "Tiếp nhận đơn", "DELIVER" => "Bắt đầu giao hàng", "CANCEL" => staff ? "Gửi yêu cầu hủy cho Quản lý" : "Hủy phần chưa pha", _ => OperationsPresentation.Label(action) };
         using var form = new AdminCommandDialog<OrderActionInput>(title + " · " + selected.MaDon, draft);
         ComboBox? line = null; NumericUpDown? count = null; TextBox? reason = null; TextBox? evidence = null; TextBox? resolution = null; CheckBox? reconciled = null;
         if (lineAction)
@@ -197,14 +197,14 @@ public partial class OrdersWorkspacePage : AdminWorkspacePage<AdminOrderRow>
             count.Name = "OrderActionQuantity"; count.Minimum = 1; count.Maximum = Remaining(eligible[0]);
             line.SelectedIndexChanged += (_, _) => { if (line.SelectedIndex < 0) return; count.Maximum = Remaining(eligible[line.SelectedIndex]); count.Value = action == "CANCEL" ? 1 : count.Maximum; };
         }
-        if (action is not ("ACCEPT" or "START" or "FINISH" or "COMPLETE")) reason = form.TextField("Lý do bắt buộc");
+        if (action is not ("ACCEPT" or "START" or "FINISH" or "DELIVER" or "COMPLETE")) reason = form.TextField("Lý do bắt buộc");
         if (action is "FAIL_DELIVERY" or "RETRY_DELIVERY" or "EXPIRE") evidence = form.TextField("Chứng cứ / xác nhận của khách");
         if (action == "FAIL_DELIVERY") resolution = form.TextField("Mã xử lý khi giao thất bại", max: 30);
         if (action == "EXPIRE") reconciled = form.CheckField("Đã đối chiếu sao kê tiền đến hạn");
-        if (action is "ACCEPT" or "START" or "FINISH" or "COMPLETE")
+        if (action is "ACCEPT" or "START" or "FINISH" or "DELIVER" or "COMPLETE")
         {
             form.MinimumSize = new Size(640, 320); form.ClientSize = new Size(730, lineAction ? 440 : 320);
-            form.Info(action == "ACCEPT" ? "Xác nhận tiếp nhận đơn hàng để chuẩn bị món cho khách." : action == "COMPLETE" ? "Xác nhận đã bàn giao đủ món cho khách và hoàn tất đơn hàng." : "Mặc định chọn toàn bộ số ly còn cần xử lý của món đã chọn.");
+            form.Info(action == "ACCEPT" ? "Xác nhận tiếp nhận đơn hàng để chuẩn bị món cho khách." : action == "DELIVER" ? "Xác nhận đã bàn giao đơn để bắt đầu giao hàng cho khách." : action == "COMPLETE" ? "Xác nhận đã bàn giao đủ món cho khách và hoàn tất đơn hàng." : "Mặc định chọn toàn bộ số ly còn cần xử lý của món đã chọn.");
         }
         form.Submit(op => new(action, reason?.Text ?? "", data.Don.PhienBanDuLieu, op, lineAction ? eligible[line!.SelectedIndex].MaDong : null,
             (int)(count?.Value ?? 0), evidence?.Text, resolution?.Text, reconciled?.Checked ?? false), async input => { if (staff) await LiveSession.Api.StaffOrderActionAsync(selected.MaDonHang, input);
@@ -225,12 +225,10 @@ public partial class OrdersWorkspacePage : AdminWorkspacePage<AdminOrderRow>
         if (!addressDrafts.TryGetValue(selected.MaDonHang, out var addressDraft)) addressDrafts[selected.MaDonHang] = addressDraft = new();
         using var form = new AdminCommandDialog<OrderAddressInput>("Điều chỉnh địa chỉ giao", addressDraft);
         var address = form.TextField("Địa chỉ đề nghị", data.DiaChi, 500);
-        var latitude = form.TextField("Vĩ độ (dấu chấm thập phân)"); var longitude = form.TextField("Kinh độ (dấu chấm thập phân)");
-        var distance = form.NumberField("Khoảng cách đã đối chiếu (km)", decimals: 3);
         var customer = form.CheckField("Khách đã đồng ý địa chỉ/phương án giao"); var admin = form.CheckField("Quản lý xác nhận quán có thể giao, giữ phí đã chốt");
         var reason = form.TextField("Lý do"); var evidence = form.TextField("Tham chiếu chứng cứ xác nhận");
-        form.Submit(op => new(address.Text, decimal.Parse(latitude.Text, System.Globalization.CultureInfo.InvariantCulture), decimal.Parse(longitude.Text, System.Globalization.CultureInfo.InvariantCulture),
-            distance.Value, customer.Checked, admin.Checked, reason.Text, evidence.Text, data.Don.PhienBanDuLieu, op),
+        form.Submit(op => new(address.Text, null, null,
+            null, customer.Checked, admin.Checked, reason.Text, evidence.Text, data.Don.PhienBanDuLieu, op),
             async input => { await LiveSession.Api.AdminOrderAddressAsync(selected.MaDonHang, input); }, async op => { if (staff) await LiveSession.Api.StaffOrderReceiptAsync(op);
             else await LiveSession.Api.AdminOrderReceiptAsync(op); });
         if (form.ShowDialog(FindForm()) == DialogResult.OK) await Reload();

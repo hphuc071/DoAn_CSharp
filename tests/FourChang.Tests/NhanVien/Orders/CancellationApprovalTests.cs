@@ -27,7 +27,7 @@ public sealed class CancellationApprovalTests
         Assert.Equal("PENDING_CONFIRMATION", requested.Text("trangThai"));
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.HoSoHoanTien WHERE MaDonHang={data.Order}"));
         Assert.Equal("0", await api.Sql($"SELECT SoLuongDaHuy FROM dbo.ChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
-        var holds = await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}");
+        var holds = await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}");
         var detail = await Detail(api, data.Order, admin);
         await Command(api, data.Order, "APPROVE", requestId, detail, admin, 409);
         await Command(api, data.Order, "APPROVE", requestId, detail, staff, 403);
@@ -35,18 +35,18 @@ public sealed class CancellationApprovalTests
         await Command(api, data.Order, "FORWARD", requestId, detail, staff);
         detail = await Detail(api, data.Order, admin);
         Assert.Equal("FORWARDED", detail.Don.YeuCauHuy!.TrangThai);
-        Assert.Equal(holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}"));
+        Assert.Equal(holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
         // Nếu không lưu được audit, toàn bộ hủy/kho/duyệt tiền phải rollback, không báo hủy thành công một phần.
         await api.Sql("CREATE TRIGGER dbo.TestFailCancelApprove ON dbo.NhatKyHeThong AFTER INSERT AS BEGIN IF EXISTS(SELECT 1 FROM inserted WHERE HanhDong='CANCELLATION_APPROVE') THROW 51012,'Test cancel approval rollback',1; END");
         await Command(api, data.Order, "APPROVE", requestId, detail, admin, -1);
         Assert.Equal("PENDING_CONFIRMATION", (await Detail(api, data.Order, admin)).Don.TrangThai);
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.HoSoHoanTien WHERE MaDonHang={data.Order}"));
-        Assert.Equal(holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}"));
+        Assert.Equal(holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
         await api.Sql("DROP TRIGGER dbo.TestFailCancelApprove");
         await Command(api, data.Order, "APPROVE", requestId, detail, admin);
         var approved = await Detail(api, data.Order, admin);
         Assert.Equal("CANCELLED", approved.Don.TrangThai);
-        Assert.Equal("0.0000", await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}"));
+        Assert.Equal("0.0000", await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.LanChiHoanTien a JOIN dbo.HoSoHoanTien r ON a.MaHoanTien=r.MaHoanTien WHERE r.MaDonHang={data.Order}"));
         var refund = (await api.Send("GET", $"/api/pos/orders/{data.Order}/counter-refunds", headers: staff)).Expect(200, "Khoản được duyệt tại quầy").Json.AsArray().Single()!;
         var payId = Guid.NewGuid(); var refundId = refund.Number("maHoanTien");
@@ -97,7 +97,7 @@ public sealed class CancellationApprovalTests
         var data = await OperationsScenarioSeed.Create(api, state: "ACCEPTED");
         var staff = TestApi.Bearer(await Open(api, admin, 500000));
         var detail = await Detail(api, data.Order, admin);
-        var holds = await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}");
+        var holds = await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}");
         var operation = Guid.NewGuid();
         var input = JsonSerializer.SerializeToNode(new OrderActionInput("CANCEL", "Khách yêu cầu hủy tại quầy", detail.Don.PhienBanDuLieu, operation, data.Line, 2));
         (await api.Send("POST", $"/api/pos/orders/{data.Order}/actions", input, staff)).Expect(200, "Gửi yêu cầu chờ duyệt");
@@ -108,7 +108,7 @@ public sealed class CancellationApprovalTests
         Assert.Equal("1", await api.Sql($"SELECT COUNT(*) FROM dbo.HuyMon WHERE MaNhomHuy='{operation}'"));
         Assert.Equal("0", await api.Sql($"SELECT SoLuongDaHuy FROM dbo.ChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.HoSoHoanTien WHERE MaDonHang={data.Order}"));
-        Assert.Equal(holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}"));
+        Assert.Equal(holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
         await Command(api, data.Order, "APPROVE", operation, detail, staff, 403);
         (await api.Send("POST", $"/api/pos/orders/{data.Order}/actions", JsonSerializer.SerializeToNode(new OrderActionInput("START", "Pha", detail.Don.PhienBanDuLieu, Guid.NewGuid(), data.Line, 2)), staff)).Expect(409, "Chờ duyệt không pha");
         await Command(api, data.Order, approve ? "APPROVE" : "REJECT", operation, detail, admin);
@@ -118,7 +118,7 @@ public sealed class CancellationApprovalTests
         Assert.Equal(approve ? "2" : "0", await api.Sql($"SELECT SoLuongDaHuy FROM dbo.ChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
         Assert.Equal(approve ? "1" : "0", await api.Sql($"SELECT COUNT(*) FROM dbo.HoSoHoanTien WHERE MaDonHang={data.Order} AND TrangThai='APPROVED'"));
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.LanChiHoanTien c JOIN dbo.HoSoHoanTien h ON h.MaHoanTien=c.MaHoanTien WHERE h.MaDonHang={data.Order}"));
-        Assert.Equal(approve ? "0.0000" : holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={data.Line}"));
+        Assert.Equal(approve ? "0.0000" : holds, await api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={data.Line}"));
     }
     /// <summary>Seed snapshot tồn tại rồi gắn chủ đơn Web thật trong database test; không sửa database đồ án.</summary>
     private static async Task<OperationsScenario> WebOrder(TestApi api, long customer)

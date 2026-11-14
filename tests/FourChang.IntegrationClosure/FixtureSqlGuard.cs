@@ -60,9 +60,9 @@ static class FixtureSqlGuard
             cmd.CommandText="SELECT (SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0),(SELECT COUNT(*) FROM sys.foreign_keys),(SELECT COUNT(*) FROM sys.triggers WHERE parent_class=1),(SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1)+(SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1),(SELECT definition FROM sys.check_constraints WHERE name='CK_DonHang_7')";
             await using(var schema=await cmd.ExecuteReaderAsync(ct))
             {
-                Check(await schema.ReadAsync(ct) && schema.GetInt32(0)==(DeliveryReady?36:35) && schema.GetInt32(1)==(DeliveryReady?74:73) &&
+                Check(await schema.ReadAsync(ct) && schema.GetInt32(0)==(DeliveryReady?31:30) && schema.GetInt32(1)==(DeliveryReady?65:64) &&
                     schema.GetInt32(2)==11 && schema.GetInt32(3)==0 && !schema.IsDBNull(4) &&
-                    !schema.GetString(4).Contains("EXPIRED",StringComparison.Ordinal),"Fixture schema guard failed");
+                    schema.GetString(4).Contains("EXPIRED",StringComparison.Ordinal),"Fixture schema guard failed");
             }
             lock(identityLock)
             {

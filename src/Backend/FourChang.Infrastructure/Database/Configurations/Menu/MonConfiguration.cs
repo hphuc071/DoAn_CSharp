@@ -17,7 +17,7 @@ public sealed class MonConfiguration : IEntityTypeConfiguration<Mon>
         b.HasKey("MaMon");
         b.Property(x => x.MaMon).UseIdentityColumn();
         b.Property(x => x.MaMon).HasColumnType("bigint").IsRequired();
-        b.Property(x => x.MaDanhMuc).HasColumnType("bigint").IsRequired();
+        b.Property(x => x.LoaiMon).HasColumnType("nvarchar(100)").IsRequired();
         b.Property(x => x.TenMon).HasColumnType("nvarchar(150)").IsRequired();
         b.Property(x => x.MoTa).HasColumnType("nvarchar(1000)");
         b.Property(x => x.DuongDanAnh).HasColumnType("nvarchar(500)");
@@ -27,7 +27,6 @@ public sealed class MonConfiguration : IEntityTypeConfiguration<Mon>
         b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.Property(x => x.ThoiDiemCapNhat).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.Property(x => x.PhienBanDuLieu).HasColumnType("rowversion").IsRequired().IsRowVersion();
-        b.HasIndex(new[] { "MaDanhMuc", "TenMon" }).IsUnique().HasDatabaseName("UQ_Mon_1");
-        b.HasOne<DanhMucMon>().WithMany().HasForeignKey("MaDanhMuc").OnDelete(DeleteBehavior.NoAction);
+        b.HasIndex(new[] { "LoaiMon", "TenMon" }).IsUnique().HasDatabaseName("UQ_Mon_1");
     }
 }

@@ -95,7 +95,7 @@ static partial class ConsentRun
   }
  }
  public static async Task ValidateSeedAsync(Fixture f) {
-  await using var db=Db();Check(!await db.DonHang.AnyAsync()&&!await db.ThanhToan.AnyAsync()&&!await db.GiuChoNguyenLieu.AnyAsync(),"Minimal F1 seed has no orders");
+  await using var db=Db();Check(!await db.DonHang.AnyAsync()&&!await db.ThanhToan.AnyAsync()&&!await db.NguyenLieuChiTietDonHang.AnyAsync(),"Minimal F1 seed has no orders");
   Check(await db.TonKho.SumAsync(x=>x.TonThucTe)==1000&&await db.TonKho.SumAsync(x=>x.TongGiuCho)==0,"Minimal F1 stock");
  }
  static async Task CompleteSeedAsync(Fixture f) {
@@ -107,7 +107,7 @@ static partial class ConsentRun
   var top=new MonThem{TenMonThem="Synthetic topping",GiaMoiPhan=2000,GioiHanMacDinhMoiLy=2,DangSuDung=true};db.Add(top);await db.SaveChangesAsync();Topping=top.MaMonThem;
   var recipe=new CongThuc{MaMonThem=Topping,SoPhienBan=1,TenCongThuc="Topping recipe",TrangThai="DRAFT",MaQuanLyTao=admin.MaQuanLy};db.Add(recipe);await db.SaveChangesAsync();
   db.Add(new ChiTietCongThuc{MaCongThuc=recipe.MaCongThuc,MaNguyenLieu=Ingredient,LoaiDinhMuc="FIXED",DinhMucCoSo=2});
-  db.Add(new CauHinhMonThem{MaCauHinhMon=Variant,MaMonThem=Topping,DangSuDung=true,GioiHanMoiLy=2});await db.SaveChangesAsync();
+  await db.SaveChangesAsync(); // Topping dùng chung; giới hạn lưu trên MonThem.
   recipe.TrangThai="ACTIVE";recipe.MaQuanLyDuyet=admin.MaQuanLy;recipe.HieuLucTu=DateTime.UtcNow;
   var token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));AdminToken=token;
   db.Add(new PhienDangNhap{MaQuanLy=admin.MaQuanLy,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien="FULL",LoaiUngDung="WEB",HetHanLuc=DateTime.UtcNow.AddHours(1)});
@@ -116,8 +116,7 @@ static partial class ConsentRun
   var order=new DonHang{MaDonHienThi="UC06-HISTORICAL",MaKhachHang=f.CustomerId,KenhDatHang="WEB",HinhThucNhanMon="TAKEAWAY",TrangThai="PENDING_PAYMENT",HetHanLuc=deadline};
   db.Add(order);await db.SaveChangesAsync();
   var line=new ChiTietDonHang{MaDonHang=order.MaDonHang,MaCauHinhMon=Variant,MaCongThuc=Recipe,TenMonDaChot="Historical fixture beverage",KichCoDaChot="M",NhietDoDaChot="ICED",PhanTramDuong=100,PhanTramDa=100,GiaMonDaChot=10000,SoLuongDat=1};db.Add(line);await db.SaveChangesAsync();
-  db.Add(new NguyenLieuChiTietDonHang{MaChiTietDonHang=line.MaChiTietDonHang,MaNguyenLieu=Ingredient,TenNguyenLieuDaChot="Fixture ingredient",DonViCoSoDaChot="g",DinhMucMoiLy=10});
-  db.Add(new FourChang.Domain.Entities.Inventory.GiuChoNguyenLieu{MaChiTietDonHang=line.MaChiTietDonHang,MaNguyenLieu=Ingredient,SoLuongGiuCho=10,TrangThai="RESERVED",HetHanLuc=deadline});
+  db.Add(new NguyenLieuChiTietDonHang{MaChiTietDonHang=line.MaChiTietDonHang,MaNguyenLieu=Ingredient,TenNguyenLieuDaChot="Fixture ingredient",DonViCoSoDaChot="g",DinhMucMoiLy=10,SoLuongGiuCho=10,TrangThai="RESERVED",HetHanLuc=deadline});
   (await db.TonKho.SingleAsync()).TongGiuCho=10;
   db.Add(new ThanhToan{MaDonHang=order.MaDonHang,MaThanhToanHienThi="UC06-HISTORICAL-P",PhuongThuc="BANK_TRANSFER",SoTienYeuCau=10000,TrangThai="PENDING",MaThaoTac=HistoricalKey,HetHanLuc=deadline});
   HistoricalReceipt=new(order.MaDonHang,order.MaDonHienThi,"PENDING_PAYMENT",10000,0,10000,deadline);

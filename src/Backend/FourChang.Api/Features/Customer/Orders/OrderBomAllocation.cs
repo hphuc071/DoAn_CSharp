@@ -7,7 +7,7 @@ namespace FourChang.Api.Features.Customer.Orders;
 // BR-23/BR-24: calculate with decimal before rounding, then round the
 // TOTAL demand of each ingredient up to 4 decimal places exactly once.
 // Allocate the resulting 0.0001-unit quantities to order lines so that
-// sum(GiuChoNguyenLieu.SoLuongGiuCho) == TonKho.TongGiuCho increase.
+// sum(NguyenLieuChiTietDonHang.SoLuongGiuCho) == TonKho.TongGiuCho increase.
 internal static class OrderBomAllocation
 {
     private const decimal Scale = 10000m;

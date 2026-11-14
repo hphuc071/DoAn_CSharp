@@ -63,7 +63,7 @@ public sealed class ReportAdministrationTests(AdminFeatureFixture fixture)
     public async Task ThuNhieuDot_KhacKy_KhongDonVaoLanXacMinhCuoi()
     {
         var s = await OperationsScenarioSeed.Create(fixture, paid:false);
-        await fixture.Api.Sql($"UPDATE dbo.ThanhToan SET PhuongThuc='BANK_TRANSFER',TienKhachDua=NULL WHERE MaThanhToan={s.Payment}");
+        await fixture.Api.Sql($"UPDATE dbo.ThanhToan SET PhuongThuc='BANK_TRANSFER' WHERE MaThanhToan={s.Payment}");
         var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
         var yesterday = DateTime.UtcNow.Date.AddDays(-1).AddHours(12);
         foreach (var time in new[] { yesterday, DateTime.UtcNow.AddMinutes(-1) })

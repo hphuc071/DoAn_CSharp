@@ -12,19 +12,19 @@ public static class DatabaseChecks
     public static async Task RunAsync()
     {
         await using var connection = new SqlConnection(DatabaseSettings.ConnectionString()); await connection.OpenAsync();
-        await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("PASS: 37 bảng, đúng cột và 74 FK hoạt động.");
+        await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("PASS: 30 bảng, đúng cột và 64 FK hoạt động.");
         await using var db = new CafeDbContext(new DbContextOptionsBuilder<CafeDbContext>().UseSqlServer(DatabaseSettings.ConnectionString()).Options);
-        if (db.Model.GetEntityTypes().Count() != 37) throw new InvalidOperationException("EF Core ánh xạ sai số bảng.");
+        if (db.Model.GetEntityTypes().Count() != 30) throw new InvalidOperationException("EF Core ánh xạ sai số bảng.");
         if (!Passwords.Verify("Test-password-123!", Passwords.Hash("Test-password-123!")) || Passwords.Verify("Wrong", Passwords.Hash("Test-password-123!"))) throw new InvalidOperationException("Password hashing failed.");
-        Console.WriteLine("PASS: EF Core 37 entity; băm mật khẩu xác minh đúng/sai.");
+        Console.WriteLine("PASS: EF Core 30 entity; băm mật khẩu xác minh đúng/sai.");
         await Reject(connection, "FK khách hàng không tồn tại", "INSERT dbo.DiaChiKhachHang(MaKhachHang,TenNguoiNhan,DienThoaiNguoiNhan,DiaChiChiTiet,LaDiaChiMacDinh,DangSuDung) VALUES(9223372036854775800,N'Test','0900000000',N'Test',0,1)");
-        await Reject(connection, "Không trùng danh mục", "INSERT dbo.DanhMucMon(TenDanhMuc,ThuTuHienThi,DaCongBo,DangSuDung) SELECT TOP(1) TenDanhMuc,0,1,1 FROM dbo.DanhMucMon");
+        await Reject(connection, "Chỉ dùng đơn vị g/ml", "UPDATE dbo.NguyenLieu SET DonViCoSo='kg' WHERE MaNguyenLieu=(SELECT MIN(MaNguyenLieu) FROM dbo.NguyenLieu)");
         await Reject(connection, "Giá cấu hình không âm", "UPDATE dbo.CauHinhMon SET GiaBan=-1 WHERE MaCauHinhMon=(SELECT MIN(MaCauHinhMon) FROM dbo.CauHinhMon)");
         await Reject(connection, "Phiên đăng nhập có đúng một chủ sở hữu", "INSERT dbo.PhienDangNhap(MaLamMoiDaBam,PhamViPhien,LoaiUngDung,HetHanLuc) VALUES(CRYPT_GEN_RANDOM(32),'FULL','WEB',DATEADD(hour,1,SYSUTCDATETIME()))");
         await Reject(connection, "Tồn kho không âm", "UPDATE dbo.TonKho SET TonThucTe=-1 WHERE MaNguyenLieu=(SELECT MIN(MaNguyenLieu) FROM dbo.TonKho)");
         await Reject(connection, "Giữ chỗ không vượt tồn thực tế", "UPDATE dbo.TonKho SET TongGiuCho=TonThucTe+1 WHERE MaNguyenLieu=(SELECT MIN(MaNguyenLieu) FROM dbo.TonKho)");
         await Reject(connection, "Công thức có đúng một chủ sở hữu", "INSERT dbo.CongThuc(SoPhienBan,TenCongThuc,TrangThai,MaQuanLyTao) VALUES(1,N'Test','DRAFT',1)");
-        await Reject(connection, "FK ghép giữ chỗ phải có snapshot dòng món", "INSERT dbo.GiuChoNguyenLieu(MaChiTietDonHang,MaNguyenLieu,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai) VALUES(9223372036854775800,9223372036854775800,1,0,0,'RESERVED')");
+        await Reject(connection, "FK ghép giữ chỗ phải có snapshot dòng món", "INSERT dbo.NguyenLieuChiTietDonHang(MaChiTietDonHang,MaNguyenLieu,TenNguyenLieuDaChot,DonViCoSoDaChot,DinhMucMoiLy,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai) VALUES(9223372036854775800,9223372036854775800,N'Test','g',1,1,0,0,'RESERVED')");
         await Reject(connection, "Audit Log bất biến", "UPDATE dbo.NhatKyHeThong SET KetQua='CHANGED' WHERE MaNhatKy=(SELECT MIN(MaNhatKy) FROM dbo.NhatKyHeThong)");
         await Reject(connection, "Phiếu đã ghi sổ bất biến", "UPDATE dbo.PhieuKho SET LyDo=N'Test' WHERE MaPhieuKho=(SELECT MIN(MaPhieuKho) FROM dbo.PhieuKho WHERE TrangThai='POSTED')");
         await Reject(connection, "Không sửa định mức đã công bố", "UPDATE dbo.ChiTietCongThuc SET DinhMucCoSo=DinhMucCoSo+1 WHERE MaCongThuc=(SELECT MIN(MaCongThuc) FROM dbo.CongThuc WHERE TrangThai='ACTIVE')");

@@ -36,7 +36,7 @@ public sealed class IncomingReconciliationTests(AdminFeatureFixture fixture)
         Assert.Equal("EXPIRED", await State(s));
         Assert.Equal("LATE_PAYMENT", await fixture.Api.Sql($"SELECT LoaiNguon FROM dbo.HoSoHoanTien WHERE MaDonHang={s.Order}"));
         Assert.Equal(stock, await fixture.Api.Sql("SELECT SUM(TonThucTe) FROM dbo.TonKho"));
-        Assert.Equal("0.0000", await fixture.Api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong-SoLuongDaTieuHao) FROM dbo.GiuChoNguyenLieu WHERE MaChiTietDonHang={s.Line}"));
+        Assert.Equal("0.0000", await fixture.Api.Sql($"SELECT SUM(SoLuongGiuCho-SoLuongDaGiaiPhong-SoLuongDaTieuHao) FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang={s.Line}"));
         var payment = await Payment(s);
         await Match(input with { PhienBanDuLieu = payment.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() });
         Assert.Equal("EXPIRED", await State(s));
@@ -66,7 +66,7 @@ public sealed class IncomingReconciliationTests(AdminFeatureFixture fixture)
     {
         var s = await OperationsScenarioSeed.Create(fixture, paid: false);
         var customer = await fixture.Api.NewCustomer("incoming");
-        await fixture.Api.Sql($"UPDATE dbo.DonHang SET MaKhachHang={customer.Id},KenhDatHang='WEB',TrangThai='PENDING_PAYMENT',HetHanLuc=DATEADD(minute,{(expired ? -10 : 10)},SYSUTCDATETIME()) WHERE MaDonHang={s.Order}; UPDATE dbo.ThanhToan SET PhuongThuc='BANK_TRANSFER',TienKhachDua=NULL WHERE MaThanhToan={s.Payment}");
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET MaKhachHang={customer.Id},KenhDatHang='WEB',TrangThai='PENDING_PAYMENT',HetHanLuc=DATEADD(minute,{(expired ? -10 : 10)},SYSUTCDATETIME()) WHERE MaDonHang={s.Order}; UPDATE dbo.ThanhToan SET PhuongThuc='BANK_TRANSFER' WHERE MaThanhToan={s.Payment}");
         return s;
     }
 

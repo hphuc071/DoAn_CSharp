@@ -102,7 +102,7 @@ static class Closure
   }
  }
  public static async Task ValidateSeedAsync(Fixture f) {
-  await using var db=Db();Check(await db.DonHang.CountAsync()==10 && await db.ThanhToan.CountAsync()==10 && await db.GiuChoNguyenLieu.CountAsync()==10,"F1 counts");
+  await using var db=Db();Check(await db.DonHang.CountAsync()==10 && await db.ThanhToan.CountAsync()==10 && await db.NguyenLieuChiTietDonHang.CountAsync()==10,"F1 counts");
   Check(await db.DonHang.AllAsync(x=>x.MaKhachHang==f.CustomerId&&x.TrangThai=="PENDING_PAYMENT"),"F1 owner/state");
   Check(await db.TonKho.SumAsync(x=>x.TongGiuCho)==100 && await db.TonKho.SumAsync(x=>x.TonThucTe)==1000,"F1 holds/stock");
  }
@@ -236,7 +236,7 @@ static class Closure
  sealed class Source(VerifiedBankTransfer e):IPaymentVerificationSource {public Task<VerifiedBankTransfer?> AuthenticateAsync(ReadOnlyMemory<byte>b,IReadOnlyDictionary<string,string> h,CancellationToken ct)=>Task.FromResult<VerifiedBankTransfer?>(e);}
  public static async Task<string> SnapshotAsync() {
   await using var sql=new SqlConnection(FixtureSqlGuard.Connection());await sql.OpenAsync();
-  return JsonSerializer.Serialize(await FixtureProvisioner.ReadRows(sql,"SELECT (SELECT MaDonHang,TrangThai,PhienBanDuLieu FROM DonHang ORDER BY MaDonHang FOR JSON PATH) orders,(SELECT MaThanhToan,TrangThai,SoTienDaXacMinh FROM ThanhToan ORDER BY MaThanhToan FOR JSON PATH) payments,(SELECT COUNT(*) FROM NguyenLieuChiTietDonHang) bomRows,(SELECT COUNT(*) FROM GiaoDichNganHang) bankRows,(SELECT COUNT(*) FROM NhatKyHeThong) audits,(SELECT COUNT(*) FROM HoSoHoanTien) refunds,(SELECT COUNT(*) FROM LanChiHoanTien) payouts,(SELECT MaChiTietDonHang,MaNguyenLieu,TrangThai,SoLuongGiuCho,SoLuongDaGiaiPhong FROM GiuChoNguyenLieu ORDER BY MaChiTietDonHang,MaNguyenLieu FOR JSON PATH) holds,(SELECT TonThucTe,TongGiuCho FROM TonKho FOR JSON PATH) stock"));
+  return JsonSerializer.Serialize(await FixtureProvisioner.ReadRows(sql,"SELECT (SELECT MaDonHang,TrangThai,PhienBanDuLieu FROM DonHang ORDER BY MaDonHang FOR JSON PATH) orders,(SELECT MaThanhToan,TrangThai,SoTienDaXacMinh FROM ThanhToan ORDER BY MaThanhToan FOR JSON PATH) payments,(SELECT COUNT(*) FROM NguyenLieuChiTietDonHang) bomRows,(SELECT COUNT(*) FROM GiaoDichNganHang) bankRows,(SELECT COUNT(*) FROM NhatKyHeThong) audits,(SELECT COUNT(*) FROM HoSoHoanTien) refunds,(SELECT COUNT(*) FROM LanChiHoanTien) payouts,(SELECT MaChiTietDonHang,MaNguyenLieu,TrangThai,SoLuongGiuCho,SoLuongDaGiaiPhong FROM NguyenLieuChiTietDonHang ORDER BY MaChiTietDonHang,MaNguyenLieu FOR JSON PATH) holds,(SELECT TonThucTe,TongGiuCho FROM TonKho FOR JSON PATH) stock"));
  }
  // Outbox scenarios are defined separately, kept out of production registrations.
  static async Task OutboxAsync(Fixture f)=>await OutboxScenarios.RunAsync(f,Config,BankAsync,SnapshotAsync,Check);

@@ -63,15 +63,14 @@ public sealed class ReportAdministrationService(CafeDbContext db, ReportPermissi
         { g.Key.ToString(), g.Last().TenMonDaChot, N(g.Sum(x => x.SoLuongDat - x.SoLuongDaHuy)), N(g.Sum(x => Unit(x) * (x.SoLuongDat - x.SoLuongDaHuy))),
             N(g.Sum(x => toppings.Where(t => t.MaChiTietDonHang == x.MaChiTietDonHang).Sum(t => t.GiaMoiPhanDaChot * t.SoPhanMoiLy) * (x.SoLuongDat - x.SoLuongDaHuy))) }).OrderByDescending(x => decimal.Parse(x[2]!, CultureInfo.InvariantCulture)).ToList();
         var stock = await (from n in db.NguyenLieu.AsNoTracking() join t in db.TonKho.AsNoTracking() on n.MaNguyenLieu equals t.MaNguyenLieu
-                           join u in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals u.MaDonVi
                            where t.TonThucTe - t.TongGiuCho <= n.NguongCanhBao
-                           select new { n.MaNguyenLieu, n.TenNguyenLieu, u.KyHieu, t.TonThucTe, t.TongGiuCho, n.TonAnToan, n.NguongCanhBao }).ToListAsync();
+                           select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, t.TonThucTe, t.TongGiuCho, n.TonAnToan, n.NguongCanhBao }).ToListAsync();
         var tables = new List<ReportTable>
         {
             new("Món đã phục vụ", [new("Mã món"), new("Tên món"), new("Số ly", "number"), new("Tiền hàng gồm topping", "number"), new("Trong đó topping", "number")], top),
             new("Tỷ lệ đơn theo ngày tạo", [new("Trạng thái"), new("Số đơn", "number"), new("Tỷ lệ", "number")], created.GroupBy(x => x.TrangThai).Select(g => (IReadOnlyList<string?>)new string?[] { g.Key, N(g.Count()), N((decimal)g.Count() / created.Count) }).ToList()),
             new("Nguyên liệu cảnh báo", [new("Mã"), new("Nguyên liệu"), new("Đơn vị"), new("Thực tế", "number"), new("Giữ", "number"), new("An toàn", "number"), new("Ngưỡng", "number")],
-                stock.Select(x => (IReadOnlyList<string?>)new string?[] { x.MaNguyenLieu.ToString(), x.TenNguyenLieu, x.KyHieu, N(x.TonThucTe), N(x.TongGiuCho), N(x.TonAnToan), N(x.NguongCanhBao) }).ToList()),
+                stock.Select(x => (IReadOnlyList<string?>)new string?[] { x.MaNguyenLieu.ToString(), x.TenNguyenLieu, x.DonViCoSo, N(x.TonThucTe), N(x.TongGiuCho), N(x.TonAnToan), N(x.NguongCanhBao) }).ToList()),
             new("Nguồn thu trong kỳ", [new("Mã thu"), new("Mã đơn"), new("Phương thức"), new("Thực thu", "number"), new("Thời điểm UTC")],
                 payments.Where(x => x.PhuongThuc == "CASH").Concat(legacyBank).Select(x => (IReadOnlyList<string?>)new string?[] { x.MaThanhToan.ToString(), x.MaDonHang.ToString(), x.PhuongThuc + (x.PhuongThuc == "BANK_TRANSFER" ? " (số thu cũ chưa tách giao dịch)" : ""), N(x.SoTienDaXacMinh), x.XacMinhLuc?.ToString("O") })
                     .Concat(bankTransfers.Select(x => (IReadOnlyList<string?>)new string?[] { "GD-" + x.MaGiaoDichNganHang + "/TT-" + x.MaThanhToan, x.MaDonHang.ToString(), "BANK_TRANSFER", N(x.SoTien), x.ThoiDiemNganHang.ToString("O") })).ToList()),

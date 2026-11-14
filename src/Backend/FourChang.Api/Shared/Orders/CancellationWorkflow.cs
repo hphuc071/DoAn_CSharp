@@ -110,7 +110,7 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
         if (await db.HoSoHoanTien.AnyAsync(x => x.MaDonHang == order.MaDonHang && x.TrangThai != "REJECTED"))
             throw new AdminRule(409, "Đơn có hồ sơ hoàn khác; cần Quản lý đối soát trước.");
         var ids = lines.Select(x => x.MaChiTietDonHang).ToArray();
-        var holds = await db.GiuChoNguyenLieu.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync();
+        var holds = await db.NguyenLieuChiTietDonHang.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync();
         if (holds.Count == 0 || ids.Any(id => !holds.Any(x => x.MaChiTietDonHang == id))) throw new AdminRule(409, "Thiếu dữ liệu giữ chỗ.");
         var error = await OrderInventoryRelease.ReleaseAllUnconsumedAsync(db, holds, "RELEASED", now, CancellationToken.None);
         if (error is not null) throw new AdminRule(409, error);

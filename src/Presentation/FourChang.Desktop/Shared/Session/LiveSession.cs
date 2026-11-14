@@ -11,7 +11,7 @@ public static class LiveSession
     public static CafeApiClient Api { get; } = Create();
     private static CafeApiClient Create()
     {
-        // Client chỉ đọc URL từ .env; khóa từng máy được đọc riêng từ kho DPAPI.
+        // Client chỉ đọc URL từ .env; POS xác thực bằng phiên ca, không nạp khóa thiết bị cũ.
         var settings=new Dictionary<string,string>(StringComparer.Ordinal);
         var dir=new DirectoryInfo(AppContext.BaseDirectory);
         while(dir is not null&&!File.Exists(Path.Combine(dir.FullName,"FourChang.sln")))dir=dir.Parent;
@@ -22,7 +22,6 @@ public static class LiveSession
             if(key is "FOURCHANG_API_URL")settings[key]=line[(split+1)..].Trim().Trim('"','\'');
         }
         var url=Environment.GetEnvironmentVariable("FOURCHANG_API_URL")??settings.GetValueOrDefault("FOURCHANG_API_URL")??"http://127.0.0.1:15881";
-        var credential=FourChang.Desktop.Shared.Security.PosDeviceCredentials.Load();
-        return new CafeApiClient(new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(20)}){PosKey=credential?.KhoaThietBi,PosMachine=credential?.MaMay??Environment.MachineName.ToUpperInvariant()};
+        return new CafeApiClient(new HttpClient{BaseAddress=new Uri(url),Timeout=TimeSpan.FromSeconds(20)}){PosMachine=Environment.MachineName.ToUpperInvariant()};
     }
 }

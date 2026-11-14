@@ -75,11 +75,11 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
             x.GiaMonDaChot + topping.Where(t => t.MaChiTietDonHang == x.MaChiTietDonHang).Sum(t => t.SoPhanMoiLy * t.GiaMoiPhanDaChot), x.PhienBanDuLieu,
             string.Join(", ", topping.Where(t => t.MaChiTietDonHang == x.MaChiTietDonHang).Select(t => t.TenMonThemDaChot + " × " + t.SoPhanMoiLy)))).ToList();
         var ingredientRows = await (from n in db.NguyenLieuChiTietDonHang.AsNoTracking()
-            join g in db.GiuChoNguyenLieu.AsNoTracking() on new { n.MaChiTietDonHang, n.MaNguyenLieu } equals new { g.MaChiTietDonHang, g.MaNguyenLieu }
+            join g in db.NguyenLieuChiTietDonHang.AsNoTracking() on new { n.MaChiTietDonHang, n.MaNguyenLieu } equals new { g.MaChiTietDonHang, g.MaNguyenLieu }
             where ids.Contains(n.MaChiTietDonHang)
             select new AdminOrderIngredient(n.MaChiTietDonHang, n.MaNguyenLieu, n.TenNguyenLieuDaChot, n.DonViCoSoDaChot,
                 n.DinhMucMoiLy, g.SoLuongGiuCho, g.SoLuongDaTieuHao, g.SoLuongDaGiaiPhong)).ToListAsync();
-        var held = await db.GiuChoNguyenLieu.AsNoTracking().Where(x => ids.Contains(x.MaChiTietDonHang)).Select(x => new StockReservationView(x.MaChiTietDonHang, id, x.SoLuongGiuCho, x.SoLuongDaTieuHao, x.SoLuongDaGiaiPhong, x.TrangThai, x.HetHanLuc)).ToListAsync();
+        var held = await db.NguyenLieuChiTietDonHang.AsNoTracking().Where(x => ids.Contains(x.MaChiTietDonHang)).Select(x => new StockReservationView(x.MaChiTietDonHang, id, x.SoLuongGiuCho, x.SoLuongDaTieuHao, x.SoLuongDaGiaiPhong, x.TrangThai, x.HetHanLuc)).ToListAsync();
         var movements = await db.BienDongKho.AsNoTracking().Where(x => x.MaChiTietDonHang != null && ids.Contains(x.MaChiTietDonHang.Value))
             .Select(x => new StockMovementView(x.MaBienDongKho, x.LoaiBienDong, x.SoLuongThayDoi, x.PhatSinhLuc, x.MaDongPhieuKho,
                 x.MaChiTietDonHang, null, id, order.MaCaLamViec, null, null, x.GhiChu)).ToListAsync();
@@ -109,11 +109,11 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
             var order = await db.DonHang.SingleOrDefaultAsync(x => x.MaDonHang == id) ?? throw new AdminRule(404, "Không tìm thấy đơn.");
             AdminOperation.Version(input.PhienBanDuLieu, order.PhienBanDuLieu); AdminOperation.Reason(input.LyDo);
             if (order.HinhThucNhanMon != "DELIVERY" || order.TrangThai is not ("ACCEPTED" or "PREPARING" or "READY" or "DELIVERING")) throw new AdminRule(409, "Đơn không ở giai đoạn cho phép đổi địa chỉ giao.");
-            if (!input.KhachDongY || !input.QuanLyXacNhanGiaoDuoc || string.IsNullOrWhiteSpace(input.ChungCu) || string.IsNullOrWhiteSpace(input.DiaChiMoi) || input.DiaChiMoi.Length > 1000 || input.ViDo is < -90 or > 90 || input.KinhDo is < -180 or > 180 || input.KhoangCachKm is < 0 or > 10)
-                throw new AdminRule(400, "Cần địa chỉ trong phạm vi, tọa độ, chứng cứ và chấp thuận khách/Quản lý. Không tự coi khoảng cách là đã được API bản đồ xác minh.");
+            if (!input.KhachDongY || !input.QuanLyXacNhanGiaoDuoc || string.IsNullOrWhiteSpace(input.ChungCu) || string.IsNullOrWhiteSpace(input.DiaChiMoi) || input.DiaChiMoi.Length > 1000)
+                throw new AdminRule(400, "Cần địa chỉ, chứng cứ và chấp thuận của khách/Quản lý. Giữ nguyên phí giao đã chốt.");
             var before = JsonSerializer.Serialize(order);
-            order.DiaChiGiaoDaChot = input.DiaChiMoi.Trim(); order.ViDo = input.ViDo; order.KinhDo = input.KinhDo;
-            order.KhoangCachGiaoKm = input.KhoangCachKm; order.ThoiDiemCapNhat = DateTime.UtcNow;
+            order.DiaChiGiaoDaChot = input.DiaChiMoi.Trim();
+            order.ThoiDiemCapNhat = DateTime.UtcNow;
             db.SuKienDongBo.Add(new() { MaSuKien = Guid.NewGuid(), MaThaoTac = input.MaThaoTac, LoaiSuKien = "ORDER_CHANGED", NoiDungJson = JsonSerializer.Serialize(new { MaDonHang = id }), PhatSinhLuc = DateTime.UtcNow });
             await db.SaveChangesAsync(); return (id, (object)new OrderActionReceipt(id, order.TrangThai, order.PhienBanDuLieu), before, input.LyDo);
         });

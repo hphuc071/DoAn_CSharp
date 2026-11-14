@@ -1,3 +1,4 @@
+using FourChang.Domain.Shared;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.EntityFrameworkCore;
@@ -37,45 +38,26 @@ public static class OrderPricingService
         var variants = await (
             from variant in db.CauHinhMon.AsNoTracking()
             join product in db.Mon.AsNoTracking() on variant.MaMon equals product.MaMon
-            join category in db.DanhMucMon.AsNoTracking() on product.MaDanhMuc equals category.MaDanhMuc
             where variantIds.Contains(variant.MaCauHinhMon) && variant.DangBan &&
-                  product.DangBan && product.DaCongBo && category.DangSuDung && category.DaCongBo
-            select new { variant.MaCauHinhMon, variant.GiaBan }
-        ).ToDictionaryAsync(x => x.MaCauHinhMon, x => x.GiaBan, ct);
+                  product.DangBan && product.DaCongBo && (product.CongBoTuLuc == null || product.CongBoTuLuc <= DateTime.UtcNow)
+            select new { variant.MaCauHinhMon, variant.GiaBan, variant.NhietDo }
+        ).ToDictionaryAsync(x => x.MaCauHinhMon, ct);
 
         if (variants.Count != variantIds.Count)
             throw new OrderQuoteValidationException("Một số biến thể món không tồn tại hoặc đã ngừng bán.");
 
-        var choices = await db.TuyChonPhaCheHopLe.AsNoTracking()
-            .Where(x => variantIds.Contains(x.MaCauHinhMon) && x.DangSuDung)
-            .Select(x => new { x.MaCauHinhMon, x.PhanTramDuong, x.PhanTramDa })
-            .ToListAsync(ct);
-        var validOptions = choices
-            .Select(x => (x.MaCauHinhMon, x.PhanTramDuong, x.PhanTramDa))
-            .ToHashSet();
-
         var toppingIds = items.SelectMany(i => i.Toppings ?? [])
             .Select(t => t.MaMonThem).Distinct().ToList();
-        var toppingLinks = await (
-            from link in db.CauHinhMonThem.AsNoTracking()
-            join top in db.MonThem.AsNoTracking() on link.MaMonThem equals top.MaMonThem
-            where variantIds.Contains(link.MaCauHinhMon) &&
-                  toppingIds.Contains(link.MaMonThem) && link.DangSuDung && top.DangSuDung
-            select new
-            {
-                link.MaCauHinhMon,
-                link.MaMonThem,
-                top.GiaMoiPhan,
-                Limit = link.GioiHanMoiLy > 0 ? link.GioiHanMoiLy : top.GioiHanMacDinhMoiLy
-            }
-        ).ToListAsync(ct);
-        var allowedToppings = toppingLinks
-            .ToDictionary(x => (x.MaCauHinhMon, x.MaMonThem));
+        // Topping dùng chung cho mọi món; giá và giới hạn luôn đọc từ máy chủ.
+        var allowedToppings = await db.MonThem.AsNoTracking()
+            .Where(x => toppingIds.Contains(x.MaMonThem) && x.DangSuDung)
+            .Select(x => new { x.MaMonThem, x.GiaMoiPhan, Limit = x.GioiHanMacDinhMoiLy })
+            .ToDictionaryAsync(x => x.MaMonThem, ct);
 
         decimal subtotal = 0m;
         foreach (var item in items)
         {
-            if (!validOptions.Contains((item.MaCauHinhMon, item.PhanTramDuong, item.PhanTramDa)))
+            if (!CafeOptions.ValidBrew(variants[item.MaCauHinhMon].NhietDo, item.PhanTramDuong, item.PhanTramDa))
                 throw new OrderQuoteValidationException(
                     $"Biến thể {item.MaCauHinhMon} không hỗ trợ tỷ lệ đường/đá đã chọn.");
 
@@ -86,7 +68,7 @@ public static class OrderPricingService
             decimal topPricePerCup = 0m;
             foreach (var top in tops)
             {
-                if (!allowedToppings.TryGetValue((item.MaCauHinhMon, top.MaMonThem), out var allowed))
+                if (!allowedToppings.TryGetValue(top.MaMonThem, out var allowed))
                     throw new OrderQuoteValidationException(
                         $"Topping {top.MaMonThem} không hợp lệ cho biến thể {item.MaCauHinhMon}.");
                 if (allowed.Limit < 1 || top.SoPhanMoiLy > allowed.Limit)
@@ -98,7 +80,7 @@ public static class OrderPricingService
                 topPricePerCup += allowed.GiaMoiPhan * top.SoPhanMoiLy;
             }
 
-            var basePrice = variants[item.MaCauHinhMon];
+            var basePrice = variants[item.MaCauHinhMon].GiaBan;
             if (basePrice < 0m)
                 throw new OrderQuoteValidationException("Giá món trong database không hợp lệ.");
             subtotal += (basePrice + topPricePerCup) * item.SoLuong;

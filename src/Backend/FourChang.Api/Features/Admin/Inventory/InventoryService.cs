@@ -14,7 +14,6 @@ public sealed class InventoryService(CafeDbContext db)
     {
         await using var tx = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null;
         var data = await (from n in db.NguyenLieu.AsNoTracking()
-                          join u in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals u.MaDonVi
                           join t in db.TonKho.AsNoTracking() on n.MaNguyenLieu equals t.MaNguyenLieu into stock
                           from t in stock.DefaultIfEmpty()
                           orderby n.MaNguyenLieu
@@ -22,7 +21,7 @@ public sealed class InventoryService(CafeDbContext db)
                           {
                               n.MaNguyenLieu,
                               n.TenNguyenLieu,
-                              u.KyHieu,
+                              KyHieu = n.DonViCoSo,
                               n.TonAnToan,
                               n.NguongCanhBao,
                               OnHand = t == null ? (decimal?)null : t.TonThucTe,
@@ -65,7 +64,7 @@ public sealed class InventoryService(CafeDbContext db)
                                select new StockMovementView(m.MaBienDongKho, m.LoaiBienDong, m.SoLuongThayDoi, m.PhatSinhLuc, m.MaDongPhieuKho,
                                    m.MaChiTietDonHang, p == null ? null : p.MaPhieuKho, o == null ? null : o.MaDonHang,
                                    o == null ? null : o.MaCaLamViec, employee == null ? null : employee.HoTen, shift == null ? null : shift.MaMay, m.GhiChu)).ToListAsync();
-        var reservations = await (from r in db.GiuChoNguyenLieu.AsNoTracking()
+        var reservations = await (from r in db.NguyenLieuChiTietDonHang.AsNoTracking()
                                   join l in db.ChiTietDonHang on r.MaChiTietDonHang equals l.MaChiTietDonHang
                                   where r.MaNguyenLieu == id
                                   orderby r.MaChiTietDonHang descending

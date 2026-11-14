@@ -23,7 +23,7 @@ public sealed record AdminTraceRow(long Ma, DateTime Luc, string Nguoi, long? Ma
     string HanhDong, string? LyDo, string KetQua, string? Truoc, string? Sau, Guid CorrelationId, long? MaNhanVien = null, string? LoaiDoiTuong = null, string? MaDoiTuong = null);
 public sealed record OrderActionInput(string HanhDong, string LyDo, byte[] PhienBanDuLieu, Guid MaThaoTac,
     long? MaDong = null, int SoLuong = 0, string? ChungCu = null, string? ResolutionCode = null, bool DaDoiChieuSaoKe = false);
-public sealed record OrderAddressInput(string DiaChiMoi, decimal ViDo, decimal KinhDo, decimal KhoangCachKm,
+public sealed record OrderAddressInput(string DiaChiMoi, decimal? ViDo, decimal? KinhDo, decimal? KhoangCachKm,
     bool KhachDongY, bool QuanLyXacNhanGiaoDuoc, string LyDo, string ChungCu,
     byte[] PhienBanDuLieu, Guid MaThaoTac);
 public sealed record OrderActionReceipt(long MaDonHang, string TrangThai, byte[] PhienBanDuLieu);

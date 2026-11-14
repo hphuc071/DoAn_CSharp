@@ -32,7 +32,6 @@ public sealed class CaLamViecConfiguration : IEntityTypeConfiguration<CaLamViec>
         b.Property(x => x.TienMatDauCa).HasColumnType("decimal(18,0)").IsRequired();
         b.Property(x => x.TienMatDuKienCuoiCa).HasColumnType("decimal(18,0)");
         b.Property(x => x.TienMatThucDem).HasColumnType("decimal(18,0)");
-        b.Property(x => x.LyDoChenhLech).HasColumnType("nvarchar(500)");
         b.Property(x => x.MaCaBanGiaoTruoc).HasColumnType("bigint");
         b.Property(x => x.MaQuanLyDuyet).HasColumnType("bigint");
         b.Property(x => x.GhiChu).HasColumnType("nvarchar(500)");

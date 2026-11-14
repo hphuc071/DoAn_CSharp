@@ -285,5 +285,12 @@
       ],
       "filter": "UseCase=UC-ADM-12"
     }
-  ]
+  ],
+  "databaseSchema": {
+    "tables": 30,
+    "foreignKeys": 64,
+    "manifest": "../docs/database/30-bang/model.json",
+    "migrationTests": "FourChang.Tests/TichHop/Schema30MigrationTests.cs",
+    "filter": "UseCase=Schema30"
+  }
 }

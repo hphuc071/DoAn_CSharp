@@ -32,7 +32,7 @@ using Microsoft.EntityFrameworkCore;
 LocalEnvironment.Load();
 try
 {
-    if (args.Contains("--init-db")) { await DatabaseBootstrap.InitializeAsync(); Console.WriteLine("DATABASE OK: đúng 37 bảng, dữ liệu khởi tạo và tài khoản ứng dụng đã sẵn sàng."); return; }
+    if (args.Contains("--init-db")) { await DatabaseBootstrap.InitializeAsync(); Console.WriteLine("DATABASE OK: đúng 30 bảng, dữ liệu khởi tạo và tài khoản ứng dụng đã sẵn sàng."); return; }
     if (args.Contains("--seed-customers"))
     {
         await using var sampleDb = new CafeDbContext(new DbContextOptionsBuilder<CafeDbContext>().UseSqlServer(DatabaseSettings.ConnectionString()).Options);
@@ -40,7 +40,7 @@ try
         Console.WriteLine($"Đã thêm {added} khách hàng mẫu; dữ liệu hiện hữu được giữ nguyên.");
         return;
     }
-    if (args.Contains("--check-db")) { await using var connection = new SqlConnection(DatabaseSettings.ConnectionString()); await connection.OpenAsync(); await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("CHECK OK: đúng 37 bảng và 74 FK, kết nối bằng fourchang_app."); return; }
+    if (args.Contains("--check-db")) { await using var connection = new SqlConnection(DatabaseSettings.ConnectionString()); await connection.OpenAsync(); await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("CHECK OK: đúng 30 bảng và 64 FK, kết nối bằng fourchang_app."); return; }
     if (args.Contains("--test-db")) { await DatabaseChecks.RunAsync(); return; }
     var builder = WebApplication.CreateBuilder(args);
     // EXPIRED đã được chốt và migration hỗ trợ; chỉ bật đọc, không tự bật worker hay xác minh ngân hàng.
@@ -129,7 +129,7 @@ FourChang.Api.Features.Staff.Orders.StaffOrderEndpoints.MapStaffOrders(app); app
 catch (Exception exception)
 {
     Console.Error.WriteLine("Không khởi động được backend/database. Kiểm tra Docker, .env và hướng dẫn database. " + exception.GetType().Name);
-    if (args.Any(a => a is "--init-db" or "--check-db" or "--test-db")) Console.Error.WriteLine(exception.Message);
+    if (args.Any(a => a is "--init-db" or "--check-db" or "--test-db")) Console.Error.WriteLine(exception.GetBaseException().Message);
     Environment.ExitCode = 1;
 }
 static async Task Problem(HttpContext context, int status, string message)

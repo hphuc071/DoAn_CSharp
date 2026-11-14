@@ -25,15 +25,15 @@ internal static class OperationsScenarioSeed
               VALUES('POS-{key}',@ca,'POS','TAKEAWAY',N'Nguyễn Tuấn Kiệt','0907000001',0,0,'{state}',{(state == "PENDING_CONFIRMATION" ? "NULL" : "SYSUTCDATETIME()")},{(state == "COMPLETED" ? "SYSUTCDATETIME()" : "NULL")}); SET @dh=SCOPE_IDENTITY();
             INSERT dbo.ChiTietDonHang(MaDonHang,MaCauHinhMon,MaCongThuc,TenMonDaChot,KichCoDaChot,NhietDoDaChot,PhanTramDuong,PhanTramDa,GiaMonDaChot,SoLuongDat,SoLuongBatDauPha,SoLuongPhaXong,SoLuongDaHuy)
               SELECT @dh,@variant,@recipe,m.TenMon,c.KichCo,c.NhietDo,100,100,@price,2,{(state == "COMPLETED" ? 2 : 0)},{(state == "COMPLETED" ? 2 : 0)},0 FROM dbo.CauHinhMon c JOIN dbo.Mon m ON m.MaMon=c.MaMon WHERE c.MaCauHinhMon=@variant; SET @line=SCOPE_IDENTITY();
-            INSERT dbo.NguyenLieuChiTietDonHang(MaChiTietDonHang,MaNguyenLieu,TenNguyenLieuDaChot,DonViCoSoDaChot,DinhMucMoiLy)
-              SELECT @line,d.MaNguyenLieu,n.TenNguyenLieu,u.KyHieu,CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000 FROM dbo.ChiTietCongThuc d
-              JOIN dbo.NguyenLieu n ON n.MaNguyenLieu=d.MaNguyenLieu JOIN dbo.DonViTinh u ON u.MaDonVi=n.MaDonViCoSo WHERE d.MaCongThuc=@recipe GROUP BY d.MaNguyenLieu,n.TenNguyenLieu,u.KyHieu;
-            INSERT dbo.GiuChoNguyenLieu(MaChiTietDonHang,MaNguyenLieu,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai)
-              SELECT @line,MaNguyenLieu,2*DinhMucMoiLy,{(state == "COMPLETED" ? "2*DinhMucMoiLy" : "0")},0,'{(state == "COMPLETED" ? "CONSUMED" : "RESERVED")}' FROM dbo.NguyenLieuChiTietDonHang WHERE MaChiTietDonHang=@line;
+            INSERT dbo.NguyenLieuChiTietDonHang(MaChiTietDonHang,MaNguyenLieu,TenNguyenLieuDaChot,DonViCoSoDaChot,DinhMucMoiLy,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai)
+              SELECT @line,d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo,CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000,
+              2*CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000,
+              {(state == "COMPLETED" ? "2*CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000" : "0")},0,'{(state == "COMPLETED" ? "CONSUMED" : "RESERVED")}'
+              FROM dbo.ChiTietCongThuc d JOIN dbo.NguyenLieu n ON n.MaNguyenLieu=d.MaNguyenLieu WHERE d.MaCongThuc=@recipe GROUP BY d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo;
             UPDATE t SET TongGiuCho=TongGiuCho+{(state == "COMPLETED" ? "0" : "g.SoLuongGiuCho")},TonThucTe=TonThucTe-{(state == "COMPLETED" ? "g.SoLuongDaTieuHao" : "0")}
-              FROM dbo.TonKho t JOIN dbo.GiuChoNguyenLieu g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;
-            INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TienKhachDua,TrangThai,XacMinhLuc,MaThaoTac)
-              VALUES('TT-{key}',@dh,@ca,'CASH',2*@price,{(paid ? "2*@price" : "0")},2*@price,'{(paid ? "VERIFIED" : "PENDING")}',{(paid ? "SYSUTCDATETIME()" : "NULL")},NEWID()); SET @pay=SCOPE_IDENTITY();
+              FROM dbo.TonKho t JOIN dbo.NguyenLieuChiTietDonHang g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;
+            INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TrangThai,XacMinhLuc,MaThaoTac)
+              VALUES('TT-{key}',@dh,@ca,'CASH',2*@price,{(paid ? "2*@price" : "0")},'{(paid ? "VERIFIED" : "PENDING")}',{(paid ? "SYSUTCDATETIME()" : "NULL")},NEWID()); SET @pay=SCOPE_IDENTITY();
             {(invoice ? "INSERT dbo.HoaDon(SoHoaDon,MaDonHang,LoaiHoaDon,TenNguoiMua,SoTien,NoiDungHoaDonDaChotJson,TrangThai,PhatHanhLuc,MaQuanLyPhatHanh,MaCaLamViec) VALUES('HD-" + key + "',@dh,'ORIGINAL',N'Nguyễn Tuấn Kiệt',2*@price,N'{\"Version\":1,\"Mon\":\"Cà phê đã chốt\",\"SoLy\":2}', 'ISSUED',SYSUTCDATETIME(),1,@ca); SET @inv=SCOPE_IDENTITY();" : "")}
             SELECT CONCAT(@dh,',',@line,',',@pay,',',@ca,',',ISNULL(CONVERT(varchar(30),@inv),'0'),',',CONVERT(varchar(30),2*@price));
             """;

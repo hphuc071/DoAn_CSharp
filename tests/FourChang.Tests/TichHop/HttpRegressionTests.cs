@@ -26,7 +26,7 @@ public sealed class HttpRegressionTests
         input["MaThaoTac"] = NewId();
         (await api.Send("PUT", $"/api/admin/employees/{employee.Number("maNhanVien")}", input, admin)).Expect(409, "Rowversion nhân viên cũ");
         employee = updated.Json;
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         var open = api.OpenBody(employee, device);
         var shift = (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(200, "Mở ca không tài khoản Staff").Json;
         var staff = TestApi.Bearer(shift);

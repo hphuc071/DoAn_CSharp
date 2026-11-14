@@ -56,8 +56,8 @@ public sealed class StockDocumentService(CafeDbContext db)
             {
                 var n = await db.NguyenLieu.SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung)
                     ?? throw Bad("Nguyên liệu không tồn tại hoặc đã ngừng sử dụng.");
-                var unit = await db.DonViTinh.SingleAsync(x => x.MaDonVi == n.MaDonViCoSo);
-                if (!IngredientUnits.IsSupported(unit.KyHieu)) throw Bad("Chỉ sử dụng Gam hoặc Mililit cơ sở.");
+                var unit = n.DonViCoSo;
+                if (!IngredientUnits.IsSupported(unit)) throw Bad("Chỉ sử dụng Gam hoặc Mililit cơ sở.");
                 if (line.SoLuong < 0 || line.SoLuong > 99999999999999m || decimal.Round(line.SoLuong, 4) != line.SoLuong ||
                     (header.MocKiemKe is null && line.SoLuong == 0) || line.DonGiaNhap < 0 || (line.GhiChu?.Length ?? 0) > 500)
                     throw Bad("Số lượng cần dương (thực đếm cho phép 0), tối đa 4 số lẻ; giá nhập không âm.");
@@ -69,7 +69,7 @@ public sealed class StockDocumentService(CafeDbContext db)
                     if (line.TonSoDaChot != stock.TonThucTe) throw new AdminRule(409, "Tồn sổ đã đổi. Đối chiếu và xác nhận lại số thực đếm.");
                 }
                 db.ChiTietPhieuKho.Add(new ChiTietPhieuKho { MaPhieuKho = header.MaPhieuKho, MaNguyenLieu = n.MaNguyenLieu,
-                    MaDonViNhap = n.MaDonViCoSo, DonViNhapDaChot = unit.KyHieu, HeSoQuyDoiDaChot = 1,
+                    DonViNhapDaChot = unit,
                     SoLuongTheoDonViNhap = line.SoLuong, DonGiaNhap = line.DonGiaNhap, GhiChu = line.GhiChu,
                     TonSoDaChot = header.MocKiemKe is null ? null : stock.TonThucTe,
                     SoLuongThucDem = header.MocKiemKe is null ? null : line.SoLuong,
@@ -123,7 +123,7 @@ public sealed class StockDocumentService(CafeDbContext db)
             foreach (var old in await db.ChiTietPhieuKho.Where(x => x.MaPhieuKho == id).ToListAsync())
             {
                 var line = new ChiTietPhieuKho { MaPhieuKho = header.MaPhieuKho, MaNguyenLieu = old.MaNguyenLieu,
-                    MaDonViNhap = old.MaDonViNhap, DonViNhapDaChot = old.DonViNhapDaChot, HeSoQuyDoiDaChot = old.HeSoQuyDoiDaChot,
+                    DonViNhapDaChot = old.DonViNhapDaChot,
                     SoLuongTheoDonViNhap = Math.Abs(old.ChenhLechDonViCoSo), DonGiaNhap = old.DonGiaNhap, ThoiDiemTao = now, ThoiDiemCapNhat = now };
                 db.ChiTietPhieuKho.Add(line); await db.SaveChangesAsync();
                 var movement = await db.BienDongKho.SingleOrDefaultAsync(x => x.MaDongPhieuKho == old.MaDongPhieuKho);

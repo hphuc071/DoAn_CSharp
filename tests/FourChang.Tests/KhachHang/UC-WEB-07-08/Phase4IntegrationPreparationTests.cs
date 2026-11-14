@@ -118,7 +118,7 @@ public sealed class Phase4IntegrationPreparationTests
     [InlineData("EXPIRED", 10, true)]
     public void Sql_expiry_rejects_inconsistent_terminal_holds_before_release(string status, int released, bool expected)
     {
-        var hold = new FourChang.Domain.Entities.Inventory.GiuChoNguyenLieu
+        var hold = new FourChang.Domain.Entities.Orders.NguyenLieuChiTietDonHang
         {
             TrangThai = status, SoLuongGiuCho = 10, SoLuongDaGiaiPhong = released, SoLuongDaTieuHao = 0
         };

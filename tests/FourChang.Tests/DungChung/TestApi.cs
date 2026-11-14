@@ -52,7 +52,7 @@ public sealed class TestApi : IAsyncDisposable
     /// <summary>
     /// Khởi tạo đầy đủ môi trường kiểm thử riêng; chờ dịch vụ sẵn sàng và dọn tài nguyên nếu khởi tạo thất bại.
     /// </summary>
-    public static async Task<TestApi> Start(string suite, bool legacy = false, Dictionary<string, string?>? runtime = null)
+    public static async Task<TestApi> Start(string suite, bool legacy = false, Dictionary<string, string?>? runtime = null, Func<TestApi, Task>? beforeInitialize = null)
     {
         var api = new TestApi(suite);
         try
@@ -62,6 +62,7 @@ public sealed class TestApi : IAsyncDisposable
                 await api.CreateLegacyDatabase();
             }
 
+            if (beforeInitialize is not null) await beforeInitialize(api);
             // Bootstrap chỉnh SQL login dùng chung, nên tuần tự hóa giữa các testhost.
             await Task.Run(() =>
             {
@@ -302,15 +303,13 @@ public sealed class TestApi : IAsyncDisposable
     }
 
     /// <summary>
-    /// Đăng ký thiết bị POS fixture qua Admin và trả khóa/header riêng cho đúng máy kiểm thử.
+    /// Chuẩn bị mã máy lịch sử cho POS fixture; không cấp thiết bị hay khóa xác thực.
     /// </summary>
-    public async Task<Device> NewDevice(Dictionary<string, string> admin, string? machine = null)
+    public Task<Device> NewPosClient(Dictionary<string, string> admin, string? machine = null)
     {
         machine ??= "TEST-" + Guid.NewGuid().ToString("N")[..10];
-        var key = "Device-" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-        var input = TestData.Body(("MaThaoTac", TestData.NewId()), ("MaMay", machine), ("TenMay", "Máy xUnit"), ("KhoaThietBi", key), ("LyDo", "Kiểm thử"));
-        var record = (await Send("POST", "/api/admin/access/devices", input, admin)).Expect(200, "Đăng ký máy fixture").Json["device"]!;
-        return new(input, record, new() { ["X-POS-Machine"] = machine, ["X-POS-Key"] = key });
+        var input = TestData.Body(("MaMay", machine));
+        return Task.FromResult(new Device(input, input.DeepClone(), []));
     }
 
     /// <summary>

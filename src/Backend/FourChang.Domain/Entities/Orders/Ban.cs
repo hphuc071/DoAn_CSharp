@@ -7,9 +7,6 @@ public sealed class Ban
     public string TenBan { get; set; } = string.Empty;
     public string? TenKhuVuc { get; set; }
     public int? SoChoNgoi { get; set; }
-    public byte[] MaBamQR { get; set; } = [];
-    public int PhienBanQR { get; set; }
-    public DateTime? QRHetHanLuc { get; set; }
     public bool DangSuDung { get; set; }
     public DateTime ThoiDiemTao { get; set; }
     public DateTime ThoiDiemCapNhat { get; set; }

@@ -1,9 +1,12 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using FourChang.Domain.Shared;
 namespace FourChang.Domain.Entities.Menu;
 
 public sealed class Mon
 {
     public long MaMon { get; set; }
-    public long MaDanhMuc { get; set; }
+    public string LoaiMon { get; set; } = "Cà phê";
+    [NotMapped] public long MaDanhMuc { get => CafeOptions.CategoryId(LoaiMon); set => LoaiMon = CafeOptions.Category(value); }
     public string TenMon { get; set; } = string.Empty;
     public string? MoTa { get; set; }
     public string? DuongDanAnh { get; set; }

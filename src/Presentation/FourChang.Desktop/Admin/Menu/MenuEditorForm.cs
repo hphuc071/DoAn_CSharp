@@ -143,7 +143,7 @@ internal sealed class MenuEditorForm : Form
         switch (kind)
         {
             case "dishes":
-                Pair("Danh mục", "Tên món");
+                Pair("Loại món", "Tên món");
                 break;
             case "categories":
                 Pair("Tên danh mục", "Thứ tự");
@@ -235,7 +235,7 @@ internal sealed class MenuEditorForm : Form
     private void Dish()
     {
         var x = id is null ? null : data.Mon.Single(x => x.MaMon == id);
-        var category = Select("Danh mục", data.DanhMuc.Select(c => (c.MaDanhMuc, c.TenDanhMuc)), x?.MaDanhMuc);
+        var category = Select("Loại món", data.DanhMuc.Select(c => (c.MaDanhMuc, c.TenDanhMuc)), x?.MaDanhMuc);
         var name = TextField("Tên món", x?.TenMon, 150);
         var description = TextField("Mô tả", x?.MoTa, 1000);
         var image = TextField("Ảnh (sprite:0…5 hoặc đường dẫn ảnh)", x?.DuongDanAnh);
@@ -262,42 +262,11 @@ internal sealed class MenuEditorForm : Form
         var price = Number("Giá bán (VND)", x?.GiaBan ?? 0);
         var sell = Flag("Bật cấu hình", x?.DangBan ?? true);
         var def = Flag("Cấu hình mặc định của món", x?.LaMacDinh ?? false);
-        var options = new CheckedListBox { Width = 700, Height = 180, CheckOnClick = true, MultiColumn = false, ColumnWidth = 170, Name = "BrewChoices", Font = CafeTheme.Body(9) };
-        var defaultChoice = Ui.Select();
-        defaultChoice.Width = 700;
-        defaultChoice.Name = "DefaultBrewChoice";
-        var pairs = new List<(int Sugar, int Ice)>();
-        void Rebuild()
-        {
-            pairs.Clear();
-            options.Items.Clear();
-            defaultChoice.Items.Clear();
-            foreach (var sugar in new[] { 0, 25, 50, 75, 100 })
-                foreach (var ice in Key(temperature) == 1 ? new[] { 0 } : new[] { 0, 25, 50, 75, 100 })
-                {
-                    pairs.Add((sugar, ice));
-                    var caption = $"{sugar}% đường · {ice}% đá";
-                    options.Items.Add(caption, x?.TuyChon.Any(c => c.PhanTramDuong == sugar && c.PhanTramDa == ice) ?? (sugar == 50 && ice == (Key(temperature) == 1 ? 0 : 50)));
-                    defaultChoice.Items.Add(caption);
-                }
-            defaultChoice.SelectedIndex = Math.Max(0, pairs.FindIndex(p => x?.TuyChon.Any(c => c.LaMacDinh && c.PhanTramDuong == p.Sugar && c.PhanTramDa == p.Ice) ?? (p.Sugar == 50 && p.Ice == (Key(temperature) == 1 ? 0 : 50))));
-        }
-        Rebuild();
-        temperature.SelectedIndexChanged += (_, _) => Rebuild();
-        fields.Add(Ui.Label("Các cặp đường/đá được phép", 10, true));
-        fields.Add(options);
-        fields.Add(AdminListLayout.Field("Cặp mặc định (phải được tích trong danh sách)", defaultChoice));
-        var toppingInputs = new List<(long Id, CheckBox Enabled, NumericUpDown Limit)>();
-        fields.Add(Ui.Label("Topping áp dụng · giá theo phần từ danh sách Topping", 10, true));
-        foreach (var top in data.MonThem)
-        {
-            var link = x?.MonThem.FirstOrDefault(l => l.MaMonThem == top.MaMonThem);
-            var check = new CheckBox { Text = $"{top.TenMonThem} · {top.GiaMoiPhan:N0}đ/phần", Checked = link is not null, Width = 430, Height = 38 };
-            var limit = new NumericUpDown { Minimum = 1, Maximum = top.GioiHanMacDinhMoiLy, Value = link?.GioiHanMoiLy ?? 1, Width = 100 };
-            fields.Add(Ui.Row(check, limit));
-            toppingInputs.Add((top.MaMonThem, check, limit));
-        }
-        build = op => new MenuVariantInput(Key(dish), Key(size) switch { 2 => "M", 3 => "L", _ => "S" }, Key(temperature) == 1 ? "HOT" : "ICED", price.Value, sell.Checked, def.Checked, options.CheckedIndices.Cast<int>().Select(i => new MenuChoice(pairs[i].Sugar, pairs[i].Ice, i == defaultChoice.SelectedIndex)).ToList(), toppingInputs.Where(t => t.Enabled.Checked).Select(t => new MenuToppingLink(t.Id, (int)t.Limit.Value)).ToList(), x?.PhienBanDuLieu, op);
+        fields.Add(Ui.Label("Đường: 0%, 25%, 50%, 75%, 100%. Món nóng không có đá; món lạnh chọn thêm mức đá tương tự.", 10));
+        fields.Add(Ui.Label("Topping đang sử dụng áp dụng cho mọi món. Giá và số phần tối đa quản lý ở tab Topping.", 10));
+        build = op => new MenuVariantInput(Key(dish), Key(size) switch { 2 => "M", 3 => "L", _ => "S" },
+            Key(temperature) == 1 ? "HOT" : "ICED", price.Value, sell.Checked, def.Checked, [], [], x?.PhienBanDuLieu, op);
+
     }
     /// <summary>Topping giá/phần và giới hạn; mới lưu ngừng rồi gắn BOM trước khi bật.</summary>
     private void Topping()

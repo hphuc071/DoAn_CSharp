@@ -20,7 +20,7 @@ public sealed class AccountAccessTests
         var id = customer.Id;
         var a = await api.CustomerAccount(id, admin);
         Assert.Equal(a.Text("hoTen"), (await api.Profile(h)).Text("hoTen"));
-        var save = Body(("MaThaoTac", NewId()), ("PhienBanDuLieu", a.Text("phienBanDuLieu")), ("HoTen", "Khách sửa qua Web"), ("Email", customer.Input.Text("Email")), ("SoDienThoai", null));
+        var save = Body(("MaThaoTac", NewId()), ("PhienBanDuLieu", a.Text("phienBanDuLieu")), ("HoTen", "Khách sửa qua Web"), ("Email", customer.Input.Text("Email")), ("SoDienThoai", customer.Input.Text("SoDienThoai")));
         (await api.Send("PUT", "/api/customer/profile", save, h)).Expect(200, "Web sửa hồ sơ");
         a = await api.CustomerAccount(id, admin);
         Assert.Equal("Khách sửa qua Web", a.Text("hoTen"));
@@ -48,15 +48,15 @@ public sealed class AccountAccessTests
         h = await api.Login(customer);
         (await api.Send("GET", "/api/customer/profile", headers: h)).Expect(200, "Đăng nhập mới");
         (await api.Send("GET", "/api/admin/access/account", headers: h)).Expect(403, "Customer không có quyền Admin");
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         var employee = (await api.Send("GET", "/api/pos/employees", headers: device.Headers)).Expect(200, "Danh sách nhân viên fixture").Json[0]!;
         var shift = (await api.Send("POST", "/api/pos/shifts", api.OpenBody(employee, device), device.Headers)).Expect(200, "POS mở ca").Json;
         var staff = TestApi.Bearer(shift);
         (await api.Send("GET", "/api/customer/profile", headers: staff)).Expect(403, "Staff không đọc Customer");
         (await api.Send("GET", "/api/admin/customers", headers: staff)).Expect(403, "Staff không quản lý khách");
         (await api.Send("POST", "/api/admin/access/devices", device.Input, staff)).Expect(403, "Staff không cấp máy");
-        (await api.Send("POST", $"/api/admin/access/devices/{device.Record.Number("maThietBiPOS")}/revoke", TestApi.Action(device.Record), admin)).Expect(200, "Admin thu hồi máy");
-        (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(401, "Token ca bị chặn ngay");
+        (await api.Send("GET", "/api/admin/access/devices", headers: admin)).Expect(410, "Quản lý thiết bị đã bỏ");
+        (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(200, "Phiên ca không phụ thuộc thiết bị");
         Assert.Equal("1", await api.Sql($"SELECT COUNT(*) FROM dbo.CaLamViec WHERE MaCaLamViec={shift.Number("shiftId")} AND TrangThai='OPEN'"));
         Assert.Equal("1", await api.Sql("SELECT COUNT(*) FROM dbo.TaiKhoanQuanLy"));
     }

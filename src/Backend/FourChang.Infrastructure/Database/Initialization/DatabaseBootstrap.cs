@@ -30,9 +30,10 @@ public static class DatabaseBootstrap
             {
                 await using var schema = connection.CreateCommand();
                 schema.CommandTimeout = 120;
-                schema.CommandText = await ReadResourceAsync("FourChang.Schema35.sql");
+                schema.CommandText = await ReadResourceAsync("FourChang.Schema30.sql");
                 await schema.ExecuteNonQueryAsync();
             }
+            else if (await HasSchema30(connection)) await ValidateAsync(connection);
             else if (!existing.Contains("ThietBiPOS"))
             {
                 // Chỉ nâng cấp từ schema 34 bảng đã xác minh; không tự sửa database lạ hoặc xóa sysdiagrams.
@@ -63,7 +64,7 @@ public static class DatabaseBootstrap
                 upgrade.CommandText = await ReadResourceAsync("FourChang.Upgrade37.sql");
                 await upgrade.ExecuteNonQueryAsync();
             }
-            if (!await HasPhoneRules(connection))
+            if (!await HasSchema30(connection) && !await HasPhoneRules(connection))
             {
                 await ValidateAsync(connection, "FourChang.Model37BeforePhones.json");
                 await using var phonePatch = connection.CreateCommand();
@@ -91,6 +92,22 @@ public static class DatabaseBootstrap
                 shifts.CommandText = await ReadResourceAsync("FourChang.IndependentShifts.sql");
                 await shifts.ExecuteNonQueryAsync();
             }
+            if (!await HasSchema30(connection))
+            {
+                await ValidateAsync(connection, "FourChang.Model37.json");
+                // Backup native và xác minh trước DDL; lỗi nâng cấp không làm mất bản phục hồi.
+                var backupPath = $"/var/opt/mssql/data/{database}_before30_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}.bak";
+                await using var backup = connection.CreateCommand();
+                backup.CommandTimeout = 180;
+                backup.CommandText = $"BACKUP DATABASE [{database}] TO DISK=@path WITH COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=@path WITH CHECKSUM;";
+                backup.Parameters.AddWithValue("@path", backupPath);
+                await backup.ExecuteNonQueryAsync();
+                Console.WriteLine("Backup trước schema30 đã xác minh: " + backupPath);
+                await using var simplify = connection.CreateCommand();
+                simplify.CommandTimeout = 180;
+                simplify.CommandText = await ReadResourceAsync("FourChang.Upgrade30.sql");
+                await simplify.ExecuteNonQueryAsync();
+            }
             await ValidateAsync(connection);
         }
         await CreateApplicationLoginAsync();
@@ -100,6 +117,14 @@ public static class DatabaseBootstrap
         await check.OpenAsync();
         await ValidateAsync(check);
     }
+    /// <summary>Nhận diện schema gộp bằng cột mới trước khi so đầy đủ manifest 30 bảng.</summary>
+    private static async Task<bool> HasSchema30(SqlConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH(N'dbo.Mon',N'LoaiMon') IS NOT NULL AND COL_LENGTH(N'dbo.NguyenLieuChiTietDonHang',N'SoLuongGiuCho') IS NOT NULL THEN 1 ELSE 0 END";
+        return Convert.ToInt32(await command.ExecuteScalarAsync()) == 1;
+    }
+
     /// <summary>Nhận diện bổ sung tài chính trước khi so khớp đầy đủ model, không suy từ số bảng.</summary>
     private static async Task<bool> HasAdminFinance(SqlConnection connection)
     {
@@ -133,7 +158,7 @@ public static class DatabaseBootstrap
     }
 
     /// <summary>Đối chiếu cấu trúc SQL thực tế với model đã chốt; không bỏ qua bảng hoặc ràng buộc lạ.</summary>
-    public static async Task ValidateAsync(SqlConnection connection, string manifestName = "FourChang.Model37.json")
+    public static async Task ValidateAsync(SqlConnection connection, string manifestName = "FourChang.Model30.json")
     {
         using var manifest = JsonDocument.Parse(await ReadResourceAsync(manifestName));
         var expected = manifest.RootElement.GetProperty("tables").EnumerateArray().Select(t => t.GetProperty("name").GetString()!).Order().ToArray();
@@ -197,11 +222,11 @@ public static class DatabaseBootstrap
         grant.CommandText = "IF USER_ID(N'fourchang_app') IS NULL CREATE USER [fourchang_app] FOR LOGIN [fourchang_app]; GRANT SELECT, INSERT, UPDATE ON SCHEMA::dbo TO [fourchang_app]; REVOKE DELETE ON SCHEMA::dbo FROM [fourchang_app]; GRANT DELETE ON OBJECT::dbo.TaiKhoanKhachHang TO [fourchang_app];";
         await grant.ExecuteNonQueryAsync();
         // UC-ADM-01/11 chỉ xóa hồ sơ chưa tham chiếu; ca và audit vẫn không được xóa. DELETE phiếu kho chỉ dùng cho nháp; trigger vẫn chặn sửa/xóa POSTED. Không cấp DELETE đơn/tiền/nhật ký.
-        using var manifest = JsonDocument.Parse(await ReadResourceAsync("FourChang.Model37.json"));
+        using var manifest = JsonDocument.Parse(await ReadResourceAsync("FourChang.Model30.json"));
         foreach (var table in manifest.RootElement.GetProperty("tables").EnumerateArray())
         {
             var name = table.GetProperty("name").GetString()!;
-            if (new[] { "TaiKhoanKhachHang", "NhanVien", "DanhMucMon", "Mon", "CauHinhMon", "MonThem", "CauHinhMonThem", "TuyChonPhaCheHopLe", "Banner", "NguyenLieu", "DonViTinh", "QuyDoiDonViNguyenLieu", "CongThuc", "ChiTietCongThuc", "PhieuKho", "ChiTietPhieuKho" }.Contains(name))
+            if (new[] { "TaiKhoanKhachHang", "NhanVien", "Mon", "CauHinhMon", "MonThem", "Banner", "NguyenLieu", "CongThuc", "ChiTietCongThuc", "PhieuKho", "ChiTietPhieuKho" }.Contains(name))
             {
                 // Chỉ các đối tượng ADM-03 chưa tham chiếu được xóa qua service kiểm tra quyền/version.
                 await using var allow = db.CreateCommand();

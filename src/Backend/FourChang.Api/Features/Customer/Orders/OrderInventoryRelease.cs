@@ -1,3 +1,4 @@
+using FourChang.Domain.Entities.Orders;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ internal static class OrderInventoryRelease
 {
     internal static async Task<string?> ReleaseAllUnconsumedAsync(
         CafeDbContext db,
-        IReadOnlyCollection<GiuChoNguyenLieu> holds,
+        IReadOnlyCollection<NguyenLieuChiTietDonHang> holds,
         string targetStatus,
         DateTime now,
         CancellationToken ct)

@@ -22,7 +22,7 @@ public sealed class CustomerAddressService(CafeDbContext db)
         await db.DiaChiKhachHang.AsNoTracking().Where(x => x.MaKhachHang == user.MaKhachHang)
             .OrderByDescending(x => x.DangSuDung).ThenByDescending(x => x.LaDiaChiMacDinh).ThenBy(x => x.MaDiaChi)
             .Select(x => new AdminCustomerAddress(x.MaDiaChi, x.NhanDiaChi, x.TenNguoiNhan, x.DienThoaiNguoiNhan, x.DiaChiChiTiet,
-                x.ViDo, x.KinhDo, x.GhiChuGiaoHang, x.LaDiaChiMacDinh, x.DangSuDung, x.PhienBanDuLieu)).ToListAsync());
+                null, null, x.GhiChuGiaoHang, x.LaDiaChiMacDinh, x.DangSuDung, x.PhienBanDuLieu)).ToListAsync());
 
     /// <summary>Endpoint chỉ đọc; snapshot transaction tránh trộn version hồ sơ và sổ địa chỉ từ hai thời điểm.</summary>
     public async Task<IResult> Get(long owner)
@@ -43,7 +43,7 @@ public sealed class CustomerAddressService(CafeDbContext db)
         if (input.LaDiaChiMacDinh) await ClearDefault(owner, item.MaDiaChi);
         item.NhanDiaChi = Clean(input.NhanDiaChi); item.TenNguoiNhan = input.TenNguoiNhan.Trim(); item.DienThoaiNguoiNhan = input.DienThoaiNguoiNhan.Trim();
         item.DiaChiChiTiet = input.DiaChiChiTiet.Trim(); item.GhiChuGiaoHang = Clean(input.GhiChuGiaoHang);
-        item.ViDo = input.ViDo; item.KinhDo = input.KinhDo; item.LaDiaChiMacDinh = input.LaDiaChiMacDinh; item.ThoiDiemCapNhat = DateTime.UtcNow;
+        item.LaDiaChiMacDinh = input.LaDiaChiMacDinh; item.ThoiDiemCapNhat = DateTime.UtcNow;
         if (id is null) db.DiaChiKhachHang.Add(item);
     });
 

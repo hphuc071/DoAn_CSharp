@@ -20,7 +20,7 @@ public sealed class TypographyUiTests
         await using var api = await TestApi.Start("Typography-" + role);
         var admin = await api.AdminLogin();
         var session = (await api.Send("POST", "/api/auth/admin/login", TestData.Body(("TenDangNhap", "quanly"), ("MatKhau", api.AdminPassword)))).Expect(200, "Phiên kiểm tra UI").Json;
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         if (role == "Staff")
             session = (await api.Send("POST", "/api/pos/shifts", api.OpenBody(await api.Employee(admin, "Nguyễn Hoàng Minh"), device), device.Headers)).Expect(200, "Mở ca fixture").Json;
         await DesktopWorker.Run(api, "TYPOGRAPHY", new()

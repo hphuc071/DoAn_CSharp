@@ -54,7 +54,7 @@ public sealed class OrderAdministrationTests(AdminFeatureFixture fixture)
     public async Task GiaoThatBai_CoChungCu_GiaoLai_KhongHoiKho()
     {
         var s = await OperationsScenarioSeed.Create(fixture, "ACCEPTED");
-        await fixture.Api.Sql($"UPDATE dbo.DonHang SET HinhThucNhanMon='DELIVERY',DiaChiGiaoDaChot=N'Địa chỉ kiểm thử',ViDo=10.77,KinhDo=106.69,KhoangCachGiaoKm=2 WHERE MaDonHang={s.Order}");
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET HinhThucNhanMon='DELIVERY',DiaChiGiaoDaChot=N'Địa chỉ kiểm thử' WHERE MaDonHang={s.Order}");
         await Act(s.Order, "START", s.Line, 2); await Act(s.Order, "FINISH", s.Line, 2); await Act(s.Order, "DELIVER");
         var stock = await fixture.Api.Sql("SELECT SUM(TonThucTe) FROM dbo.TonKho");
         await Act(s.Order, "FAIL_DELIVERY", expected:409);

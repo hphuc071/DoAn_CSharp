@@ -21,9 +21,6 @@ public sealed class DonHangConfiguration : IEntityTypeConfiguration<DonHang>
             table.HasCheckConstraint("CK_DonHang_6", "PhiGiaoHangBanDau >= 0 AND PhiGiaoHangHienTai >= 0 AND PhiGiaoHangHienTai <= PhiGiaoHangBanDau");
             table.HasCheckConstraint("CK_DonHang_7", "TrangThai IN ('DRAFT','PENDING_PAYMENT','PENDING_CONFIRMATION','ACCEPTED','PREPARING','READY','DELIVERING','COMPLETED','REJECTED','CANCELLED','DELIVERY_FAILED','EXPIRED')");
             table.HasCheckConstraint("CK_DonHang_8", "ChinhSachGiaoHangDaChotJson IS NULL OR ISJSON(ChinhSachGiaoHangDaChotJson) = 1");
-            table.HasCheckConstraint("CK_DonHang_9", "ViDo IS NULL OR ViDo BETWEEN -90 AND 90");
-            table.HasCheckConstraint("CK_DonHang_10", "KinhDo IS NULL OR KinhDo BETWEEN -180 AND 180");
-            table.HasCheckConstraint("CK_DonHang_11", "KhoangCachGiaoKm IS NULL OR KhoangCachGiaoKm >= 0");
         });
         b.Property(x => x.MaXuLyNgoaiLe).HasColumnType("varchar(30)");
         b.HasKey("MaDonHang");
@@ -40,12 +37,8 @@ public sealed class DonHangConfiguration : IEntityTypeConfiguration<DonHang>
         b.Property(x => x.TenNguoiNhan).HasColumnType("nvarchar(120)");
         b.Property(x => x.DienThoaiNguoiNhan).HasColumnType("varchar(20)");
         b.Property(x => x.DiaChiGiaoDaChot).HasColumnType("nvarchar(500)");
-        b.Property(x => x.ViDo).HasColumnType("decimal(9,6)");
-        b.Property(x => x.KinhDo).HasColumnType("decimal(9,6)");
         b.Property(x => x.ThoiDiemHenNhan).HasColumnType("datetime2(3)");
-        b.Property(x => x.KhoangCachGiaoKm).HasColumnType("decimal(10,3)");
         b.Property(x => x.ChinhSachGiaoHangDaChotJson).HasColumnType("nvarchar(max)");
-        b.Property(x => x.HanBaoPhi).HasColumnType("datetime2(3)");
         b.Property(x => x.PhiGiaoHangBanDau).HasColumnType("decimal(18,0)").IsRequired();
         b.Property(x => x.PhiGiaoHangHienTai).HasColumnType("decimal(18,0)").IsRequired();
         b.Property(x => x.TrangThai).HasColumnType("varchar(25)").IsRequired();

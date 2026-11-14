@@ -25,17 +25,17 @@ public sealed class PosCheckoutTests
             total+=(v["giaBan"]!.GetValue<decimal>()+(top?["giaMoiPhan"]?.GetValue<decimal>()??0))*2;
             items.Add(Body(("MaCauHinhMon",v.Number("maCauHinhMon")),("SoLuong",2),("PhanTramDuong",pair.Number("phanTramDuong")),("PhanTramDa",pair.Number("phanTramDa")),("GhiChu","Pha theo cấu hình"),("Toppings",tops)));
         }
-        var input=Body(("MaThaoTac",NewId()),("HinhThuc","TAKEAWAY"),("PhuongThuc","CASH"),("TienKhachDua",total+10000),("TongTienDaChapNhan",total),("Items",items));
+        var input=Body(("MaThaoTac",NewId()),("HinhThuc","TAKEAWAY"),("PhuongThuc","CASH"),("TienKhachDua",total),("TongTienDaChapNhan",total),("Items",items));
         (await api.Send("POST","/api/pos/checkout",input)).Expect(401,"Ẩn danh không thu");
         (await api.Send("POST","/api/pos/checkout",input,admin)).Expect(403,"Admin không giả phiên ca");
         var receipt=(await api.Send("POST","/api/pos/checkout",input,staff)).Expect(200,"Thu CASH").Json;
-        Assert.Equal(10000,receipt.Number("tienThua"));var id=receipt.Number("maDonHang"); Assert.Equal("POS-"+id,receipt.Text("maDon")); Assert.Equal("POS-"+id,await api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={id}"));
+        Assert.Equal(0,receipt.Number("tienThua"));var id=receipt.Number("maDonHang"); Assert.Equal("POS-"+id,receipt.Text("maDon")); Assert.Equal("POS-"+id,await api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={id}"));
         var replay=(await api.Send("POST","/api/pos/checkout",input,staff)).Expect(200,"Replay không tạo đơn mới").Json;
         Assert.Equal(id,replay.Number("maDonHang"));Assert.Equal("VERIFIED",receipt.Text("trangThaiThanhToan"));
         Assert.Equal("2",await api.Sql($"SELECT COUNT(*) FROM dbo.ChiTietDonHang WHERE MaDonHang={id}"));
         Assert.Equal("1",await api.Sql($"SELECT COUNT(*) FROM dbo.HoaDon WHERE MaDonHang={id}"));
         Assert.Equal("0",await api.Sql($"SELECT COUNT(*) FROM dbo.BienDongKho b JOIN dbo.ChiTietDonHang d ON d.MaChiTietDonHang=b.MaChiTietDonHang WHERE d.MaDonHang={id}"));
-        Assert.True(int.Parse(await api.Sql($"SELECT COUNT(*) FROM dbo.GiuChoNguyenLieu g JOIN dbo.ChiTietDonHang d ON d.MaChiTietDonHang=g.MaChiTietDonHang WHERE d.MaDonHang={id}"))>0);
+        Assert.True(int.Parse(await api.Sql($"SELECT COUNT(*) FROM dbo.NguyenLieuChiTietDonHang g JOIN dbo.ChiTietDonHang d ON d.MaChiTietDonHang=g.MaChiTietDonHang WHERE d.MaDonHang={id}"))>0);
         var invalid=input.DeepClone()!.AsObject();invalid["MaThaoTac"]=NewId();invalid["TienKhachDua"]=total-1;
         (await api.Send("POST","/api/pos/checkout",invalid,staff)).Expect(400,"Thiếu tiền không ghi");
         invalid["TienKhachDua"]=total;invalid["TongTienDaChapNhan"]=total-1;

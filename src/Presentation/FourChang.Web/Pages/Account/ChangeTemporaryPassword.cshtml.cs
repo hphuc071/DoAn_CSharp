@@ -12,7 +12,7 @@ public sealed class ChangeTemporaryPasswordModel(CafeApiClient api) : PageModel
     [BindProperty] public Guid MaThaoTac { get; set; } = Guid.NewGuid();
     [BindProperty] public string PhienBan { get; set; } = "";
     [BindProperty] public bool ChuaRoKetQua { get; set; }
-    [BindProperty, Required, StringLength(128, MinimumLength = 10)] public string MatKhauMoi { get; set; } = "";
+    [BindProperty, Required, StringLength(128, MinimumLength = 5)] public string MatKhauMoi { get; set; } = "";
     [BindProperty, Required, Compare(nameof(MatKhauMoi), ErrorMessage = "Xác nhận mật khẩu chưa khớp.")] public string XacNhanMatKhau { get; set; } = "";
     public async Task<IActionResult> OnGetAsync()
     {

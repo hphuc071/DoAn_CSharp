@@ -9,7 +9,6 @@ public sealed class ThanhToan
     public string PhuongThuc { get; set; } = string.Empty;
     public decimal SoTienYeuCau { get; set; }
     public decimal SoTienDaXacMinh { get; set; }
-    public decimal? TienKhachDua { get; set; }
     public string? MaThamChieuChuyenKhoan { get; set; }
     public string? NoiDungQR { get; set; }
     public string TrangThai { get; set; } = string.Empty;

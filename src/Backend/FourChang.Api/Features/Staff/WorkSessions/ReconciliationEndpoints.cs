@@ -47,7 +47,6 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
         if (detail.TienMatDuKienHienTai < 0) throw new AdminRule(409, "Nguồn tiền đang bất thường. Cần đối chiếu thu/hoàn trước.");
         shift.TienMatThucDem = counted;
         shift.TienMatDuKienCuoiCa = detail.TienMatDuKienHienTai;
-        shift.LyDoChenhLech = input.LyDoChenhLech?.Trim();
         shift.TrangThai = "LOCKED";
         shift.ThoiDiemCapNhat = DateTime.UtcNow;
         await db.SaveChangesAsync();
@@ -73,7 +72,6 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
         if (detail.TienMatDuKienHienTai < 0) throw new AdminRule(409, "Nguồn tiền chưa hợp lệ.");
         shift.TienMatThucDem = counted;
         shift.TienMatDuKienCuoiCa = detail.TienMatDuKienHienTai;
-        shift.LyDoChenhLech = input.LyDoChenhLech?.Trim();
         shift.KetThucLuc = DateTime.UtcNow;
         shift.TrangThai = "CLOSED";
         shift.ThoiDiemCapNhat = DateTime.UtcNow;
@@ -83,7 +81,7 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
             // Báo cáo nằm trong cùng giao dịch/audit với đóng ca; gửi lặp trả đúng báo cáo cũ, không ghi tiền hai lần.
             ketQuaNghiemThu = new { tienDauCa = shift.TienMatDauCa, tienCuoiCa = counted, tienThuDuoc = detail.ThuTienMat - detail.HoanTienMat, thuTienMat = detail.ThuTienMat,
                 hoanTienMat = detail.HoanTienMat, tienDuKien = detail.TienMatDuKienHienTai,
-                tienThucDem = counted, chenhLech = counted - detail.TienMatDuKienHienTai, lyDo = shift.LyDoChenhLech },
+                tienThucDem = counted, chenhLech = counted - detail.TienMatDuKienHienTai, lyDo = (string?)null },
             message = "Đã gửi kết quả và kết thúc ca"
         };
     });

@@ -33,7 +33,7 @@ public sealed class AccessUiTests
             ["FOURCHANG_POS_CREDENTIALS_PATH"] = Path.Combine(api.Artifacts, "device.dpapi")
         };
         var admin = await api.AdminLogin();
-        await api.NewDevice(admin);
+        await api.NewPosClient(admin);
         await DesktopWorker.Run(api, "UC-ADM-02", values);
     }
 
@@ -78,7 +78,6 @@ public sealed class AccessUiTests
         {
             var original = Environment.GetEnvironmentVariable("FOURCHANG_TEST_ADMIN_PASSWORD")!;
             Login(original);
-            var stamp = Guid.NewGuid().ToString("N")[..10];
             using (var entry = new EntryForm("Admin", _ =>
             {
             }))
@@ -94,64 +93,15 @@ public sealed class AccessUiTests
                 shell.Navigate("access");
                 PumpUntil(() => All(shell).OfType<Label>().Any(x => x.Name == "AdminAccountInfo" && x.Text.Contains("quanly")));
                 var tabs = Field<TabControl>(shell, "AccessTabs");
-                Check(tabs.TabPages.Count == 3, "Đúng ba vùng tài khoản, thiết bị, phạm vi quyền");
-                Check(!All(shell).OfType<Button>().Any(x => x.Text.Contains("Thêm quản lý")), "Không có tạo Quản lý thứ hai");
+                Check(tabs.TabPages.Count == 2, "Tài khoản và phạm vi quyền; không còn tab thiết bị");
+                Check(!All(shell).OfType<Button>().Any(x => x.Name == "RegisterPosDevice"), "Không còn nút cấp máy");
+                Check(!All(shell).OfType<DataGridView>().Any(x => x.Name == "PosDevicesGrid"), "Không truy vấn bảng thiết bị đã bỏ");
                 Capture(shell, "access-account");
                 tabs.SelectedIndex = 1;
                 Pump(250);
-                Capture(shell, "access-devices");
-                Check(Field<DataGridView>(shell, "PosDevicesGrid").Rows.Count > 0, "Thiết bị thực được tải từ API");
-                tabs.SelectedIndex = 2;
-                Pump(250);
                 Capture(shell, "access-permissions");
-                Check(All(tabs.TabPages[2]).OfType<DataGridView>().All(x => x.ReadOnly), "Ma trận quyền chỉ đọc");
+                Check(All(tabs.TabPages[1]).OfType<DataGridView>().All(x => x.ReadOnly), "Ma trận quyền chỉ đọc");
                 shell.Close();
-            }
-
-            var machine = "UI-" + stamp.ToUpperInvariant();
-            using (var form = new PosDeviceForm())
-            {
-                Show(form);
-                Field<TextBox>(form, "PosDeviceMachine").Text = machine;
-                Field<TextBox>(form, "PosDeviceName").Text = "Máy kiểm tra giao diện";
-                Check(Field<TextBox>(form, "PosDeviceKey").UseSystemPasswordChar, "Khóa thiết bị được che");
-                Check(!All(form).OfType<CheckBox>().Single(x => x.Text.StartsWith("Cấu hình POS")).Enabled, "Không lưu cấu hình máy khác lên Windows hiện tại");
-                Field<TextBox>(form, "PosDeviceReason").Text = "Kiểm tra cấp cấu hình từ WinForms";
-                Capture(form, "device-register");
-                Field<Button>(form, "PosDeviceSave").PerformClick();
-                PumpUntil(() => !Field<Button>(form, "PosDeviceSave").Visible);
-                Check(Field<TextBox>(form, "PosDeviceKey").ReadOnly, "Sau cấp giữ khóa để bàn giao, không sửa yêu cầu đã chốt");
-                form.Close();
-                Check(form.DialogResult == DialogResult.OK, "Đóng form sau cấp báo cần tải lại danh sách");
-            }
-
-            var device = Wait(LiveSession.Api.GetPosDevicesAsync()).Single(x => x.MaMay == machine);
-            Check(device.TrangThai == "ACTIVE", "Cấp máy từ giao diện lưu vào database");
-            using (var revoke = new PosDeviceForm(device, true))
-            {
-                Show(revoke);
-                Field<TextBox>(revoke, "PosDeviceReason").Text = "Kết thúc kiểm tra giao diện";
-                Capture(revoke, "device-revoke");
-                Field<Button>(revoke, "PosDeviceSave").PerformClick();
-                PumpUntil(() => !revoke.Visible);
-                Check(revoke.DialogResult == DialogResult.OK, "Thu hồi từ giao diện hoàn tất");
-            }
-
-            Check(Wait(LiveSession.Api.GetPosDevicesAsync()).Single(x => x.MaMay == machine).TrangThai == "REVOKED", "Trạng thái máy thu hồi được cập nhật trên API");
-            var protectedPath = Path.Combine(output, "credential-test.json");
-            var before = Environment.GetEnvironmentVariable("FOURCHANG_POS_CREDENTIALS_PATH");
-            try
-            {
-                Environment.SetEnvironmentVariable("FOURCHANG_POS_CREDENTIALS_PATH", protectedPath);
-                var key = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-                PosDeviceCredentials.Save(Environment.MachineName, key);
-                Check(PosDeviceCredentials.Load()?.KhoaThietBi == key, "DPAPI đọc lại được cấu hình của đúng người dùng Windows");
-                Check(!File.ReadAllText(protectedPath).Contains(key), "File cấu hình không chứa khóa dạng rõ");
-                File.Delete(protectedPath);
-            }
-            finally
-            {
-                Environment.SetEnvironmentVariable("FOURCHANG_POS_CREDENTIALS_PATH", before);
             }
 
             var next = "Ui-" + Guid.NewGuid().ToString("N") + "!";
@@ -180,8 +130,8 @@ public sealed class AccessUiTests
             Wait(LiveSession.Api.LogoutAsync());
             LiveSession.Api.Token = null;
             LiveSession.Current = null;
-            Console.WriteLine($"UI QA PASSED: {passed} checks, 8 screenshots.");
-            File.WriteAllText(Path.Combine(output, "result.json"), System.Text.Json.JsonSerializer.Serialize(new { passed, screenshots = 8 }));
+            Console.WriteLine($"UI QA PASSED: {passed} checks, 5 screenshots.");
+            File.WriteAllText(Path.Combine(output, "result.json"), System.Text.Json.JsonSerializer.Serialize(new { passed, screenshots = 5 }));
             return 0;
         }
         catch (Exception ex)

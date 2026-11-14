@@ -36,16 +36,7 @@ public static class ShiftSessionCodec
         long id;
         var restricted = false;
         var ticket = Guid.Empty;
-        if (token.StartsWith("pos.", StringComparison.Ordinal))
-        {
-            // Tương thích client cũ còn dùng thiết bị; luồng mới staff/recon không phụ thuộc thiết bị.
-            var old = PosAccess.Validate(token);
-            if (old is null) return null;
-            var device = await db.ThietBiPOS.AsNoTracking().SingleOrDefaultAsync(x => x.MaThietBiPOS == old.Device && x.TrangThai == "ACTIVE");
-            if (device is null || Convert.ToHexString(device.PhienBanDuLieu) != old.Version) return null;
-            id = old.Shift;
-            if (!await db.CaLamViec.AnyAsync(x => x.MaCaLamViec == id && x.MaMay == device.MaMay)) return null;
-        }
+        if (token.StartsWith("pos.", StringComparison.Ordinal)) return null;
         else
         {
             var parts = token.Split('.');

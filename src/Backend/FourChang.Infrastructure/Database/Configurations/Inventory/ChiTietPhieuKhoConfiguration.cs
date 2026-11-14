@@ -11,7 +11,6 @@ public sealed class ChiTietPhieuKhoConfiguration : IEntityTypeConfiguration<ChiT
         b.ToTable("ChiTietPhieuKho", "dbo", table =>
         {
             table.UseSqlOutputClause(false);
-            table.HasCheckConstraint("CK_ChiTietPhieuKho_1", "HeSoQuyDoiDaChot > 0");
             table.HasCheckConstraint("CK_ChiTietPhieuKho_2", "SoLuongTheoDonViNhap >= 0");
             table.HasCheckConstraint("CK_ChiTietPhieuKho_3", "DonGiaNhap IS NULL OR DonGiaNhap >= 0");
             table.HasCheckConstraint("CK_ChiTietPhieuKho_4", "TonSoDaChot IS NULL OR TonSoDaChot >= 0");
@@ -22,9 +21,7 @@ public sealed class ChiTietPhieuKhoConfiguration : IEntityTypeConfiguration<ChiT
         b.Property(x => x.MaDongPhieuKho).HasColumnType("bigint").IsRequired();
         b.Property(x => x.MaPhieuKho).HasColumnType("bigint").IsRequired();
         b.Property(x => x.MaNguyenLieu).HasColumnType("bigint").IsRequired();
-        b.Property(x => x.MaDonViNhap).HasColumnType("bigint").IsRequired();
         b.Property(x => x.DonViNhapDaChot).HasColumnType("nvarchar(60)").IsRequired();
-        b.Property(x => x.HeSoQuyDoiDaChot).HasColumnType("decimal(18,6)").IsRequired();
         b.Property(x => x.SoLuongTheoDonViNhap).HasColumnType("decimal(18,4)").IsRequired();
         b.Property(x => x.ChenhLechDonViCoSo).HasColumnType("decimal(18,4)").IsRequired();
         b.Property(x => x.DonGiaNhap).HasColumnType("decimal(18,2)");
@@ -38,6 +35,5 @@ public sealed class ChiTietPhieuKhoConfiguration : IEntityTypeConfiguration<ChiT
         b.HasIndex(new[] { "MaPhieuKho", "MaNguyenLieu" }).IsUnique().HasDatabaseName("UQ_ChiTietPhieuKho_1");
         b.HasOne<PhieuKho>().WithMany().HasForeignKey("MaPhieuKho").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<NguyenLieu>().WithMany().HasForeignKey("MaNguyenLieu").OnDelete(DeleteBehavior.NoAction);
-        b.HasOne<DonViTinh>().WithMany().HasForeignKey("MaDonViNhap").OnDelete(DeleteBehavior.NoAction);
     }
 }

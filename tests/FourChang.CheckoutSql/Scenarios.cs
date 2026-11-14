@@ -20,14 +20,14 @@ static partial class ConsentRun
 SELECT (SELECT COUNT_BIG(*) FROM DonHang) orders,(SELECT COUNT_BIG(*) FROM ThanhToan) payments,
 (SELECT COUNT_BIG(*) FROM NhatKyHeThong WHERE HanhDong='CREATE_CUSTOMER_ORDER') audits,
 (SELECT COUNT_BIG(*) FROM NhatKyHeThong WHERE HanhDong='CREATE_CUSTOMER_ORDER' AND JSON_VALUE(DuLieuSauJson,'$.outbox.Kind')='order.created') outbox,
-(SELECT COUNT_BIG(*) FROM GiuChoNguyenLieu) holds,(SELECT COUNT_BIG(*) FROM NguyenLieuChiTietDonHang) bom,
+(SELECT COUNT_BIG(*) FROM NguyenLieuChiTietDonHang) holds,(SELECT COUNT_BIG(*) FROM NguyenLieuChiTietDonHang) bom,
 (SELECT SUM(TongGiuCho) FROM TonKho) held,(SELECT SUM(TonThucTe) FROM TonKho) physical,
 (SELECT MaDonHang,MaDonHienThi,TrangThai,HetHanLuc,PhiGiaoHangBanDau FROM DonHang ORDER BY MaDonHang FOR JSON PATH) orderRows,
 (SELECT MaThanhToan,MaDonHang,SoTienYeuCau,SoTienDaXacMinh,TrangThai,HetHanLuc FROM ThanhToan ORDER BY MaThanhToan FOR JSON PATH) paymentRows,
 (SELECT MaChiTietDonHang,MaDonHang,GiaMonDaChot,SoLuongDat,SoLuongDaHuy FROM ChiTietDonHang ORDER BY MaChiTietDonHang FOR JSON PATH) lineRows,
 (SELECT MaChiTietDonHang,MaMonThem,GiaMoiPhanDaChot,SoPhanMoiLy FROM MonThemChiTietDonHang ORDER BY MaChiTietDonHang,MaMonThem FOR JSON PATH) toppingRows,
 (SELECT MaChiTietDonHang,MaNguyenLieu,DinhMucMoiLy FROM NguyenLieuChiTietDonHang ORDER BY MaChiTietDonHang,MaNguyenLieu FOR JSON PATH) bomRows,
-(SELECT MaChiTietDonHang,MaNguyenLieu,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai FROM GiuChoNguyenLieu ORDER BY MaChiTietDonHang,MaNguyenLieu FOR JSON PATH) holdRows,
+(SELECT MaChiTietDonHang,MaNguyenLieu,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai FROM NguyenLieuChiTietDonHang ORDER BY MaChiTietDonHang,MaNguyenLieu FOR JSON PATH) holdRows,
 (SELECT MaThaoTac,MaDoiTuong,MaBamYeuCau,KetQuaDaChotJson,DuLieuSauJson FROM NhatKyHeThong WHERE HanhDong='CREATE_CUSTOMER_ORDER' ORDER BY MaThaoTac FOR JSON PATH) auditRows,
 (SELECT COUNT(*) FROM GiaoDichNganHang) banks,(SELECT COUNT(*) FROM HoSoHoanTien) refunds,(SELECT COUNT(*) FROM LanChiHoanTien) payouts
 """);
@@ -45,7 +45,7 @@ SELECT (SELECT COUNT_BIG(*) FROM DonHang) orders,(SELECT COUNT_BIG(*) FROM Thanh
   var line=await db.ChiTietDonHang.AsNoTracking().SingleAsync(x=>x.MaDonHang==order.MaDonHang);
   var payment=await db.ThanhToan.AsNoTracking().SingleAsync(x=>x.MaDonHang==order.MaDonHang);
   var topping=await db.MonThemChiTietDonHang.AsNoTracking().Where(x=>x.MaChiTietDonHang==line.MaChiTietDonHang).ToListAsync();
-  var hold=await db.GiuChoNguyenLieu.AsNoTracking().SingleAsync(x=>x.MaChiTietDonHang==line.MaChiTietDonHang);
+  var hold=await db.NguyenLieuChiTietDonHang.AsNoTracking().SingleAsync(x=>x.MaChiTietDonHang==line.MaChiTietDonHang);
   var bom=await db.NguyenLieuChiTietDonHang.AsNoTracking().SingleAsync(x=>x.MaChiTietDonHang==line.MaChiTietDonHang);
   Check(order.TrangThai=="PENDING_PAYMENT"&&payment.TrangThai=="PENDING"&&payment.SoTienDaXacMinh==0,"Pending order/payment not PAID");
   Check(line.GiaMonDaChot==basePrice&&line.SoLuongDat==qty&&topping.Count==tops&&topping.All(t=>t.GiaMoiPhanDaChot==2000&&t.SoPhanMoiLy==1),"Price/topping/quantity snapshots consistent");

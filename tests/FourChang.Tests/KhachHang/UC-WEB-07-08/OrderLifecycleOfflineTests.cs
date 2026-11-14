@@ -21,7 +21,7 @@ public sealed class OrderLifecycleOfflineTests
         var detail = OrderReadTests.Snapshot(status);
         detail = detail with { Payments = [detail.Payments[0] with { Verified = verified,
             Status = verified == 60000 ? "VERIFIED" : verified > 0 ? "PARTIAL" : "PENDING" }] };
-        return new(6, "WEB", detail, [new GiuChoNguyenLieu { MaChiTietDonHang = 1, MaNguyenLieu = 11,
+        return new(6, "WEB", detail, [new FourChang.Domain.Entities.Orders.NguyenLieuChiTietDonHang { MaChiTietDonHang = 1, MaNguyenLieu = 11,
             SoLuongGiuCho = 20, SoLuongDaGiaiPhong = 2, TrangThai = "PARTIAL" }],
             [new TonKho { MaNguyenLieu = 11, TonThucTe = 1000, TongGiuCho = 30 }], true);
     }

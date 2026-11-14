@@ -23,7 +23,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
         var payment = await db.ThanhToan.AsNoTracking().SingleAsync(x => x.MaDonHang == id);
         var invoice = await db.HoaDon.AsNoTracking().Where(x => x.MaDonHang == id && x.LoaiHoaDon == "ORIGINAL").Select(x => (long?)x.MaHoaDon).SingleOrDefaultAsync();
         return new(id, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), payment.MaThanhToan, payment.SoTienYeuCau,
-            payment.PhuongThuc == "CASH" ? (payment.TienKhachDua ?? 0) - payment.SoTienDaXacMinh : 0, payment.TrangThai, invoice);
+            0, payment.TrangThai, invoice);
     }
 
     /// <summary>Chống lặp bằng audit; kiểm tra lại ca, menu, giá, lựa chọn, tồn tổng trước mọi ghi. Không tin giá UI.</summary>
@@ -43,7 +43,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
         try { price = await OrderPricingService.CalculateOrderTotalAsync(db, "TAKEAWAY", null, input.Items, CancellationToken.None); }
         catch (OrderQuoteValidationException ex) { throw new AdminRule(400, ex.Message); }
         if (price.TongCong != input.TongTienDaChapNhan) throw new AdminRule(409, "Giá đã thay đổi. Kiểm tra lại món và xác nhận tổng mới.");
-        if (input.PhuongThuc == "CASH" && (input.TienKhachDua is not { } tender || tender < price.TongCong || tender > 999999999999999999m || tender != decimal.Truncate(tender)))
+        if (input.PhuongThuc == "CASH" && (input.TienKhachDua is not { } tender || tender != price.TongCong || tender > 999999999999999999m || tender != decimal.Truncate(tender)))
             throw new AdminRule(400, "Tiền khách đưa phải đủ tổng tiền và là số đồng nguyên.");
         var now = DateTime.UtcNow;
         var timeout = config.GetValue<int?>("Orders:PendingPaymentTimeoutMinutes");
@@ -70,8 +70,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             .ToDictionary(r => r.MaMonThem!.Value);
         var ingredientsMap = await (
             from n in db.NguyenLieu.AsNoTracking()
-            join d in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals d.MaDonVi
-            select new { n.MaNguyenLieu, n.TenNguyenLieu, d.KyHieu, n.TonAnToan, n.DangSuDung }
+            select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, n.TonAnToan, n.DangSuDung }
         ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
 
         var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
@@ -207,16 +206,10 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
                     MaChiTietDonHang = detail.MaChiTietDonHang,
                     MaNguyenLieu = ingId,
                     TenNguyenLieuDaChot = ing.TenNguyenLieu,
-                    DonViCoSoDaChot = ing.KyHieu,
+                    DonViCoSoDaChot = ing.DonViCoSo,
                     // Snapshot column is decimal(18,4); the authoritative allocated
-                    // total for stock is GiuChoNguyenLieu.SoLuongGiuCho below.
+                    // total for stock is NguyenLieuChiTietDonHang.SoLuongGiuCho below.
                     DinhMucMoiLy = OrderBomAllocation.RoundUp4(perCup),
-                    ThoiDiemTao = now
-                });
-                db.GiuChoNguyenLieu.Add(new GiuChoNguyenLieu
-                {
-                    MaChiTietDonHang = detail.MaChiTietDonHang,
-                    MaNguyenLieu = ingId,
                     SoLuongGiuCho = reservedQty,
                     SoLuongDaTieuHao = 0m,
                     SoLuongDaGiaiPhong = 0m,
@@ -232,7 +225,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
 
         var payment = new ThanhToan { MaThanhToanHienThi = "PAY-POS-" + order.MaDonHang, MaDonHang = order.MaDonHang, MaCaLamViec = grant.Shift,
             PhuongThuc = input.PhuongThuc, SoTienYeuCau = price.TongCong, SoTienDaXacMinh = input.PhuongThuc == "CASH" ? price.TongCong : 0,
-            TienKhachDua = input.PhuongThuc == "CASH" ? input.TienKhachDua : null, TrangThai = input.PhuongThuc == "CASH" ? "VERIFIED" : "PENDING",
+            TrangThai = input.PhuongThuc == "CASH" ? "VERIFIED" : "PENDING",
             XacMinhLuc = input.PhuongThuc == "CASH" ? now : null, HetHanLuc = expiresAt, MaThaoTac = input.MaThaoTac,
             MaThamChieuChuyenKhoan = input.PhuongThuc == "BANK_TRANSFER" ? "POS" + order.MaDonHang : null, ThoiDiemTao = now, ThoiDiemCapNhat = now };
         db.ThanhToan.Add(payment); await db.SaveChangesAsync();

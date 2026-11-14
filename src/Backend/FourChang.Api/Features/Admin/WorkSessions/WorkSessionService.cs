@@ -21,7 +21,7 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         name ??= (await db.NhanVien.Where(x => x.MaNhanVien == shift.MaNhanVien).Select(x => x.HoTen).SingleAsync()) + " (hồ sơ hiện tại)";
         return new(shift.MaCaLamViec, shift.MaCaHienThi, shift.MaNhanVien, name, shift.TenCa, shift.MaMay, shift.BatDauLuc,
             shift.KetThucLuc, shift.TrangThai, shift.TienMatDauCa, shift.TienMatDuKienCuoiCa, shift.TienMatThucDem,
-            shift.LyDoChenhLech, shift.MaCaBanGiaoTruoc, shift.MaQuanLyDuyet, shift.PhienBanDuLieu);
+            null, shift.MaCaBanGiaoTruoc, shift.MaQuanLyDuyet, shift.PhienBanDuLieu);
     }
 
     /// <summary>Lọc theo khóa nhân viên, ngày UTC, tên ca, trạng thái, máy và phân trang ổn định.</summary>
@@ -116,7 +116,7 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         var before = JsonSerializer.Serialize(detail.Ca);
         Finish(shift, "CLOSED", detail.TienMatDuKienHienTai, context);
         await db.SaveChangesAsync();
-        return (id, (object)await View(shift), before, shift.LyDoChenhLech);
+        return (id, (object)await View(shift), before, null);
     });
 
     /// <summary>Bàn giao có biên bản giữ nguyên chủ ca/giao dịch nguồn; ca nhận chỉ được tạo khi nhân viên mở POS.</summary>

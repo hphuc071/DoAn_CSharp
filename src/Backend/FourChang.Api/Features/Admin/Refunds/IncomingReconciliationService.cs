@@ -49,7 +49,7 @@ public sealed class IncomingReconciliationService(CafeDbContext db, OrderFinanci
                 else if (order.HetHanLuc <= DateTime.UtcNow)
                 {
                     var ids = await db.ChiTietDonHang.Where(x => x.MaDonHang == order.MaDonHang).Select(x => x.MaChiTietDonHang).ToListAsync();
-                    var holds = await db.GiuChoNguyenLieu.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync();
+                    var holds = await db.NguyenLieuChiTietDonHang.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync();
                     var releaseError = await FourChang.Api.Features.Customer.Orders.OrderInventoryRelease.ReleaseAllUnconsumedAsync(db, holds, "EXPIRED", DateTime.UtcNow, CancellationToken.None);
                     if (releaseError is not null) throw new AdminRule(409, releaseError);
                     order.TrangThai = "EXPIRED"; order.MaXuLyNgoaiLe = "PAYMENT_TIMEOUT"; order.PhiGiaoHangHienTai = 0;

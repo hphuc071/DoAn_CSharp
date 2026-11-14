@@ -17,7 +17,7 @@ public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
         Assert.Equal(id, (await fixture.Send("POST", "/api/admin/ingredients", input)).Number("ma"));
         await fixture.Send("POST", "/api/admin/ingredients", input with { TenNguyenLieu = "Nội dung khác" }, 409);
         var item = (await fixture.Ingredients()).NguyenLieu.Single(x => x.MaNguyenLieu == id);
-        Assert.Single(item.QuyDoi); Assert.Equal(1, item.QuyDoi[0].HeSoVeDonViCoSo);
+        Assert.Empty(item.QuyDoi); Assert.Equal(unit.MaDonVi, item.MaDonViCoSo);
         var edit = input with { TonAnToan = 2, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() };
         await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit);
         await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit with { MaThaoTac = Guid.NewGuid() }, 409);
@@ -83,13 +83,7 @@ public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
         var input = new IngredientInput("Chặn quy đổi " + Guid.NewGuid().ToString("N")[..8], gram.MaDonVi, 0, 1, null, true, [new(gram.MaDonVi, 2)], null, Guid.NewGuid());
         await fixture.Send("POST", "/api/admin/ingredients", input, 400);
         await fixture.Send("POST", "/api/admin/ingredients", input with { QuyDoi = [new(ml.MaDonVi, 1)], MaThaoTac = Guid.NewGuid() }, 400);
-        // Mô phỏng metadata cũ trên database test, không chỉnh danh mục đơn vị thật.
-        var kg = long.Parse(await fixture.Api.Sql("INSERT dbo.DonViTinh(KyHieu,TenDonVi,DangSuDung) VALUES('kg',N'Kilôgam kiểm thử',1); SELECT CONVERT(bigint,SCOPE_IDENTITY())"));
-        try
-        {
-            await fixture.Send("POST", "/api/admin/ingredients", input with { MaDonViCoSo = kg, QuyDoi = [], MaThaoTac = Guid.NewGuid() }, 400);
-            Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.NguyenLieu WHERE MaDonViCoSo={kg}"));
-        }
-        finally { await fixture.Api.Sql($"DELETE dbo.DonViTinh WHERE MaDonVi={kg}"); }
+        await fixture.Send("POST", "/api/admin/ingredients", input with { MaDonViCoSo = 999, QuyDoi = [], MaThaoTac = Guid.NewGuid() }, 400);
+        Assert.Equal("0", await fixture.Api.Sql("SELECT COUNT(*) FROM dbo.NguyenLieu WHERE DonViCoSo NOT IN ('g','ml')"));
     }
 }

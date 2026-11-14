@@ -15,15 +15,10 @@ public static class DataEndpoints
         app.MapGet("/api/admin/data/DiaChiKhachHang", async(CafeDbContext db) => await TableReader.Read(db.DiaChiKhachHang)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/NhanVien", async(CafeDbContext db) => await TableReader.Read(db.NhanVien)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/CaLamViec", async(CafeDbContext db) => await TableReader.Read(db.CaLamViec)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/DanhMucMon", async(CafeDbContext db) => await TableReader.Read(db.DanhMucMon)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/Mon", async(CafeDbContext db) => await TableReader.Read(db.Mon)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/CauHinhMon", async(CafeDbContext db) => await TableReader.Read(db.CauHinhMon)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/MonThem", async(CafeDbContext db) => await TableReader.Read(db.MonThem)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/CauHinhMonThem", async(CafeDbContext db) => await TableReader.Read(db.CauHinhMonThem)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/TuyChonPhaCheHopLe", async(CafeDbContext db) => await TableReader.Read(db.TuyChonPhaCheHopLe)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/NguyenLieu", async(CafeDbContext db) => await TableReader.Read(db.NguyenLieu)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/DonViTinh", async(CafeDbContext db) => await TableReader.Read(db.DonViTinh)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/QuyDoiDonViNguyenLieu", async(CafeDbContext db) => await TableReader.Read(db.QuyDoiDonViNguyenLieu)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/CongThuc", async(CafeDbContext db) => await TableReader.Read(db.CongThuc)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/ChiTietCongThuc", async(CafeDbContext db) => await TableReader.Read(db.ChiTietCongThuc)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/Ban", async(CafeDbContext db) => await TableReader.Read(db.Ban)).RequireAuthorization("Admin");
@@ -40,7 +35,6 @@ public static class DataEndpoints
         app.MapGet("/api/admin/data/PhieuKho", async(CafeDbContext db) => await TableReader.Read(db.PhieuKho)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/ChiTietPhieuKho", async(CafeDbContext db) => await TableReader.Read(db.ChiTietPhieuKho)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/TonKho", async(CafeDbContext db) => await TableReader.Read(db.TonKho)).RequireAuthorization("Admin");
-        app.MapGet("/api/admin/data/GiuChoNguyenLieu", async(CafeDbContext db) => await TableReader.Read(db.GiuChoNguyenLieu)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/BienDongKho", async(CafeDbContext db) => await TableReader.Read(db.BienDongKho)).RequireAuthorization("Admin");
         app.MapGet("/api/admin/data/NhatKyHeThong", async(CafeDbContext db, FourChang.Api.Features.Admin.Reports.ReportPermissions permissions) => { permissions.Demand("AuditRead"); return await TableReader.Read(db.NhatKyHeThong.OrderByDescending(x=>x.PhatSinhLuc).ThenByDescending(x=>x.MaNhatKy)); }).RequireAuthorization("Admin");
         app.MapGet("/api/admin/dashboard",async(CafeDbContext db, FourChang.Api.Features.Admin.Reports.ReportPermissions permissions)=>

@@ -163,8 +163,7 @@ public static class CustomerOrdersEndpoints
             .ToDictionary(r => r.MaMonThem!.Value);
         var ingredientsMap = await (
             from n in db.NguyenLieu.AsNoTracking()
-            join d in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals d.MaDonVi
-            select new { n.MaNguyenLieu, n.TenNguyenLieu, d.KyHieu, n.TonAnToan, n.DangSuDung }
+            select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, n.TonAnToan, n.DangSuDung }
         ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
 
         var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
@@ -260,7 +259,6 @@ public static class CustomerOrdersEndpoints
             TenNguoiNhan = req.TenNguoiNhan,
             DienThoaiNguoiNhan = req.DienThoaiNguoiNhan,
             DiaChiGiaoDaChot = req.DiaChiGiao,
-            KhoangCachGiaoKm = req.KhoangCachKm,
             ChinhSachGiaoHangDaChotJson = req.HinhThucNhanMon == "TAKEAWAY" ? null :
                 System.Text.Json.JsonSerializer.Serialize(new { mode = "SIMULATION", version = "FLAT-15000-V1", fee = priceSummary.PhiGiaoHang }),
             PhiGiaoHangBanDau = priceSummary.PhiGiaoHang,
@@ -327,16 +325,10 @@ public static class CustomerOrdersEndpoints
                     MaChiTietDonHang = detail.MaChiTietDonHang,
                     MaNguyenLieu = ingId,
                     TenNguyenLieuDaChot = ing.TenNguyenLieu,
-                    DonViCoSoDaChot = ing.KyHieu,
+                    DonViCoSoDaChot = ing.DonViCoSo,
                     // Snapshot column is decimal(18,4); the authoritative allocated
-                    // total for stock is GiuChoNguyenLieu.SoLuongGiuCho below.
+                    // total for stock is NguyenLieuChiTietDonHang.SoLuongGiuCho below.
                     DinhMucMoiLy = OrderBomAllocation.RoundUp4(perCup),
-                    ThoiDiemTao = now
-                });
-                db.GiuChoNguyenLieu.Add(new GiuChoNguyenLieu
-                {
-                    MaChiTietDonHang = detail.MaChiTietDonHang,
-                    MaNguyenLieu = ingId,
                     SoLuongGiuCho = reservedQty,
                     SoLuongDaTieuHao = 0m,
                     SoLuongDaGiaiPhong = 0m,

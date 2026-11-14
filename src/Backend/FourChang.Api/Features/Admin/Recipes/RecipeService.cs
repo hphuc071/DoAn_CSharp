@@ -1,3 +1,4 @@
+using FourChang.Domain.Shared;
 using System.Text.Json;
 using System.Security.Claims;
 using FourChang.Api.Features.Admin.Menu;
@@ -18,8 +19,7 @@ public sealed class RecipeService(CafeDbContext db)
         var recipes = await db.CongThuc.AsNoTracking().OrderByDescending(x => x.MaCongThuc).ToListAsync();
         var lines = await (from l in db.ChiTietCongThuc.AsNoTracking()
                            join n in db.NguyenLieu.AsNoTracking() on l.MaNguyenLieu equals n.MaNguyenLieu
-                           join u in db.DonViTinh.AsNoTracking() on n.MaDonViCoSo equals u.MaDonVi
-                           select new { l.MaCongThuc, Line = new RecipeLineView(l.MaNguyenLieu, n.TenNguyenLieu, u.KyHieu, l.DinhMucCoSo, l.LoaiDinhMuc, l.TyLeHaoHut) }).ToListAsync();
+                           select new { l.MaCongThuc, Line = new RecipeLineView(l.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, l.DinhMucCoSo, l.LoaiDinhMuc, l.TyLeHaoHut) }).ToListAsync();
         return recipes.Select(r => new RecipeView(r.MaCongThuc, r.MaCauHinhMon, r.MaMonThem, r.SoPhienBan, r.TenCongThuc,
             r.TrangThai, r.HieuLucTu, r.HieuLucDen, r.GhiChu, r.PhienBanDuLieu, lines.Where(l => l.MaCongThuc == r.MaCongThuc).Select(l => l.Line).ToList())).ToList();
     }
@@ -145,7 +145,7 @@ public sealed class RecipeService(CafeDbContext db)
         if (input.SoLy is < 1 or > 999 || !new[] { 0, 25, 50, 75, 100 }.Contains(input.PhanTramDuong) || !new[] { 0, 25, 50, 75, 100 }.Contains(input.PhanTramDa))
             throw new AdminRule(400, "Số ly hoặc mức đường/đá không hợp lệ.");
         var recipe = await Required(input.MaCongThuc);
-        if (recipe.MaCauHinhMon is not null && !await db.TuyChonPhaCheHopLe.AnyAsync(x => x.MaCauHinhMon == recipe.MaCauHinhMon && x.DangSuDung && x.PhanTramDuong == input.PhanTramDuong && x.PhanTramDa == input.PhanTramDa))
+        if (recipe.MaCauHinhMon is not null && !CafeOptions.ValidBrew((await db.CauHinhMon.SingleAsync(x => x.MaCauHinhMon == recipe.MaCauHinhMon)).NhietDo, input.PhanTramDuong, input.PhanTramDa))
             throw new AdminRule(400, "Cặp đường/đá không thuộc cấu hình; món nóng không tự được thêm đá.");
         var totals = new Dictionary<long, decimal>();
         await AddDemand(recipe.MaCongThuc, input.SoLy, input.PhanTramDuong, input.PhanTramDa, totals);
@@ -153,24 +153,22 @@ public sealed class RecipeService(CafeDbContext db)
         foreach (var topping in input.MonThem)
         {
             if (recipe.MaCauHinhMon is null) throw new AdminRule(400, "Chỉ mô phỏng thêm topping khi chọn công thức cấu hình món.");
-            var link = await db.CauHinhMonThem.AsNoTracking().SingleOrDefaultAsync(x => x.MaCauHinhMon == recipe.MaCauHinhMon && x.MaMonThem == topping.MaMonThem && x.DangSuDung);
             var top = await db.MonThem.AsNoTracking().SingleOrDefaultAsync(x => x.MaMonThem == topping.MaMonThem && x.DangSuDung);
-            if (link is null || top is null || topping.SoPhanMoiLy < 1 || topping.SoPhanMoiLy > Math.Min(link.GioiHanMoiLy, top.GioiHanMacDinhMoiLy)) throw new AdminRule(400, "Topping không hỗ trợ hoặc vượt số phần mỗi ly.");
+            if (top is null || topping.SoPhanMoiLy < 1 || topping.SoPhanMoiLy > top.GioiHanMacDinhMoiLy) throw new AdminRule(400, "Topping không hỗ trợ hoặc vượt số phần mỗi ly.");
             var now = DateTime.UtcNow;
             var topRecipe = await db.CongThuc.AsNoTracking().SingleOrDefaultAsync(x => x.MaMonThem == topping.MaMonThem && x.TrangThai == "ACTIVE" && x.HieuLucTu <= now && (x.HieuLucDen == null || x.HieuLucDen > now))
                 ?? throw new AdminRule(409, "Topping thiếu công thức hiệu lực.");
             await AddDemand(topRecipe.MaCongThuc, input.SoLy * topping.SoPhanMoiLy, input.PhanTramDuong, input.PhanTramDa, totals);
         }
         var data = await (from n in db.NguyenLieu.AsNoTracking()
-                          join u in db.DonViTinh on n.MaDonViCoSo equals u.MaDonVi
                           join t in db.TonKho on n.MaNguyenLieu equals t.MaNguyenLieu into balance
                           from t in balance.DefaultIfEmpty()
-                          select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DangSuDung, u.KyHieu, Available = t == null ? (decimal?)null : t.TonThucTe - t.TongGiuCho - n.TonAnToan }).ToListAsync();
+                          select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DangSuDung, n.DonViCoSo, Available = t == null ? (decimal?)null : t.TonThucTe - t.TongGiuCho - n.TonAnToan }).ToListAsync();
         return totals.Select(x =>
         {
             var n = data.Single(y => y.MaNguyenLieu == x.Key);
             var amount = decimal.Ceiling(x.Value * 10000m) / 10000m;
-            return new RecipeDemand(x.Key, n.TenNguyenLieu, n.KyHieu, amount, n.Available, amount == 0 || n.DangSuDung && n.Available >= amount);
+            return new RecipeDemand(x.Key, n.TenNguyenLieu, n.DonViCoSo, amount, n.Available, amount == 0 || n.DangSuDung && n.Available >= amount);
         }).ToList();
     }
 
@@ -186,7 +184,7 @@ public sealed class RecipeService(CafeDbContext db)
         }
     }
 
-    /// <summary>Quy đổi định mức sang cơ sở đã khai báo; khóa ghép gồm nguyên liệu và loại định mức.</summary>
+    /// <summary>Kiểm định mức nhập trực tiếp theo g/ml; khóa ghép gồm nguyên liệu và loại định mức.</summary>
     private async Task<List<ChiTietCongThuc>> Convert(IReadOnlyList<RecipeLineInput>? input)
     {
         if (input is null || input.Count > 200 || input.GroupBy(x => new { x.MaNguyenLieu, x.LoaiDinhMuc }).Any(g => g.Count() > 1)) throw new AdminRule(400, "Thành phần không hợp lệ hoặc trùng nguyên liệu/loại định mức.");
@@ -194,12 +192,11 @@ public sealed class RecipeService(CafeDbContext db)
         foreach (var line in input)
         {
             if (line.DinhMuc <= 0 || line.DinhMuc != decimal.Round(line.DinhMuc, 4) || line.TyLeHaoHut < 0 || line.TyLeHaoHut >= 1 || line.TyLeHaoHut != decimal.Round(line.TyLeHaoHut, 6) || line.LoaiDinhMuc is not ("FIXED" or "SUGAR" or "ICE")) throw new AdminRule(400, "Định mức dương, tối đa 4 số lẻ; hao hụt từ 0 đến dưới 1 và tối đa 6 số lẻ.");
-            if (!await db.NguyenLieu.AnyAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung) || !await db.DonViTinh.AnyAsync(x => x.MaDonVi == line.MaDonVi && x.DangSuDung)) throw new AdminRule(400, "Nguyên liệu/đơn vị không hoạt động.");
+            if (!await db.NguyenLieu.AnyAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung)) throw new AdminRule(400, "Nguyên liệu/đơn vị không hoạt động.");
             var ingredient = await db.NguyenLieu.AsNoTracking().SingleAsync(x => x.MaNguyenLieu == line.MaNguyenLieu);
-            if (line.MaDonVi != ingredient.MaDonViCoSo || !await db.DonViTinh.AnyAsync(x => x.MaDonVi == line.MaDonVi && (x.KyHieu == IngredientUnits.Gram || x.KyHieu == IngredientUnits.Milliliter)))
+            if (line.MaDonVi != ingredient.MaDonViCoSo)
                 throw new AdminRule(400, "Nhập định mức trực tiếp theo Gam/Mililit của nguyên liệu, không sử dụng đơn vị quy đổi.");
-            var conversion = await db.QuyDoiDonViNguyenLieu.AsNoTracking().SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.MaDonVi == line.MaDonVi) ?? throw new AdminRule(400, "Thiếu quy đổi cho nguyên liệu và đơn vị đã chọn.");
-            var amount = line.DinhMuc * conversion.HeSoVeDonViCoSo;
+            var amount = line.DinhMuc;
             if (amount <= 0 || amount > 99999999999999.9999m || amount != decimal.Round(amount, 4)) throw new AdminRule(400, "Định mức sau quy đổi vượt độ chính xác 4 số lẻ; hãy nhập theo đơn vị cơ sở.");
             result.Add(new() { MaNguyenLieu = line.MaNguyenLieu, LoaiDinhMuc = line.LoaiDinhMuc, DinhMucCoSo = amount, TyLeHaoHut = line.TyLeHaoHut });
         }
@@ -213,10 +210,8 @@ public sealed class RecipeService(CafeDbContext db)
         foreach (var line in lines)
         {
             var n = await db.NguyenLieu.AsNoTracking().SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung);
-            if (n is null || !await db.DonViTinh.AnyAsync(x => x.MaDonVi == n.MaDonViCoSo && x.DangSuDung) ||
-                !await db.QuyDoiDonViNguyenLieu.AnyAsync(x => x.MaNguyenLieu == n.MaNguyenLieu && x.MaDonVi == n.MaDonViCoSo && x.HeSoVeDonViCoSo == 1)) throw new AdminRule(409, "Nguyên liệu hoặc quy đổi cơ sở không hợp lệ.");
+            if (n is null || !IngredientUnits.IsSupported(n.DonViCoSo)) throw new AdminRule(409,"Nguyên liệu hoặc đơn vị cơ sở không hợp lệ.");
         }
-        if (recipe.MaCauHinhMon is not null && !await db.TuyChonPhaCheHopLe.AnyAsync(x => x.MaCauHinhMon == recipe.MaCauHinhMon && x.DangSuDung)) throw new AdminRule(409, "Cấu hình chưa có tập đường/đá hợp lệ.");
     }
 
     /// <summary>Đọc một công thức theo khóa; lỗi 404 là lỗi nghiệp vụ có thể hiển thị.</summary>

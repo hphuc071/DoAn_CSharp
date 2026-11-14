@@ -19,8 +19,8 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             AdminOperation.Version(input.PhienBanDuLieu, order.PhienBanDuLieu);
             var reason = input.LyDo;
             // Bước pha/bàn giao thường lệ không yêu cầu gõ lý do; nhật ký vẫn có nội dung rõ ràng.
-            if ((input.HanhDong is "ACCEPT" or "START" or "FINISH" or "COMPLETE") && string.IsNullOrWhiteSpace(reason))
-                reason = input.HanhDong switch { "ACCEPT" => "Tiếp nhận đơn hàng", "START" => "Bắt đầu pha theo đơn", "FINISH" => "Xác nhận pha xong theo đơn", _ => "Hoàn tất đơn hàng" };
+            if ((input.HanhDong is "ACCEPT" or "START" or "FINISH" or "DELIVER" or "COMPLETE") && string.IsNullOrWhiteSpace(reason))
+                reason = input.HanhDong switch { "ACCEPT" => "Tiếp nhận đơn hàng", "START" => "Bắt đầu pha theo đơn", "FINISH" => "Xác nhận pha xong theo đơn", "DELIVER" => "Bắt đầu giao hàng", _ => "Hoàn tất đơn hàng" };
             AdminOperation.Reason(reason);
             var admin = context.User.IsInRole("ADMIN");
             var actor = admin ? long.Parse(context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value) : (long?)null;
@@ -40,7 +40,7 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
                     Require(order.KenhDatHang == "WEB" && order.TrangThai == "PENDING_PAYMENT" && order.HetHanLuc <= now && financial.ConThu > 0,
                         "Chỉ chốt hết hạn đơn Web chờ thanh toán đã đến hạn và chưa thu đủ.");
                     Require(input.DaDoiChieuSaoKe && !string.IsNullOrWhiteSpace(input.ChungCu), "Cần Admin đối chiếu tiền đến hạn và chứng cứ sao kê, không suy thiếu tiền chỉ từ cache.");
-                    var holds = await db.GiuChoNguyenLieu.Where(x => lines.Select(l => l.MaChiTietDonHang).Contains(x.MaChiTietDonHang)).ToListAsync();
+                    var holds = await db.NguyenLieuChiTietDonHang.Where(x => lines.Select(l => l.MaChiTietDonHang).Contains(x.MaChiTietDonHang)).ToListAsync();
                     var error = await FourChang.Api.Features.Customer.Orders.OrderInventoryRelease.ReleaseAllUnconsumedAsync(db, holds, "EXPIRED", now, CancellationToken.None);
                     Require(error is null, error ?? "Không giải phóng được giữ chỗ.");
                     order.TrangThai = "EXPIRED"; order.MaXuLyNgoaiLe = "PAYMENT_TIMEOUT"; order.PhiGiaoHangHienTai = 0;
@@ -119,7 +119,7 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
         Require(input.SoLuong > 0 && input.SoLuong <= line.SoLuongDat - line.SoLuongBatDauPha - line.SoLuongDaHuy, "Chỉ hủy số ly chưa bắt đầu pha.");
         var unitPrice = line.GiaMonDaChot + await db.MonThemChiTietDonHang.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).SumAsync(x => (decimal?)x.GiaMoiPhanDaChot * x.SoPhanMoiLy) ?? line.GiaMonDaChot;
         var snapshots = await db.NguyenLieuChiTietDonHang.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).ToListAsync();
-        var holds = await db.GiuChoNguyenLieu.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).ToListAsync();
+        var holds = await db.NguyenLieuChiTietDonHang.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).ToListAsync();
         Require(snapshots.Count > 0 && snapshots.Count == holds.Count, "Thiếu snapshot/giữ chỗ; cần đối soát kho.");
         foreach (var h in holds)
         {
@@ -165,7 +165,7 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
     /// <summary>Trừ kho ở START từ lượng đang giữ đã chốt, không tính lại BOM menu và không trừ ở COMPLETE.</summary>
     private async Task Consume(ChiTietDonHang line, int quantity, Guid operation)
     {
-        var holds = await db.GiuChoNguyenLieu.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).ToListAsync();
+        var holds = await db.NguyenLieuChiTietDonHang.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).ToListAsync();
         Require(holds.Count > 0, "Thiếu giữ chỗ, cần đối soát trước pha.");
         foreach (var h in holds)
         {

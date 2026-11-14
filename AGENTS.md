@@ -1,6 +1,6 @@
 # Ghi nhớ dự án 4CHANG
 
-Cập nhật: 13/11/2026. Đây là ghi nhớ và hướng dẫn cho agent; code và git diff hiện tại là nguồn xác nhận cuối cùng.
+Cập nhật: 14/11/2026. Đây là ghi nhớ và hướng dẫn cho agent; code và git diff hiện tại là nguồn xác nhận cuối cùng. Mục Schema30 cuối file là trạng thái hiện hành; các mục cũ ghi lịch sử.
 
 ## Cách làm việc để giảm đọc lặp và token
 - Đọc file này trước; chỉ mở file của chức năng đang sửa và các phụ thuộc trực tiếp.
@@ -19,7 +19,7 @@ Cập nhật: 13/11/2026. Đây là ghi nhớ và hướng dẫn cho agent; code
 - src/Presentation/FourChang.Web: Razor, wwwroot/css, wwwroot/js.
 - src/Shared/FourChang.Presentation.Shared: DTO và API clients.
 - tests/FourChang.Tests: xUnit, SQL/API thật, WinForms worker STA, Playwright. Các test dùng DB GUID riêng.
-- Không xóa bảng/database/volume để sửa giao diện. Các thay đổi schema đã chốt nằm trong docs/database/37-bang.
+- Không xóa bảng/database/volume để sửa giao diện. Schema hiện hành nằm trong docs/database/30-bang; các thư mục34/35/37 chỉ để nâng cấp/lịch sử.
 
 ## Chạy local
 - API http://localhost:15881; Web http://localhost:15880/ (Menu có @page "/", /Menu không phải route trang chủ).
@@ -92,3 +92,20 @@ Cập nhật: 13/11/2026. Đây là ghi nhớ và hướng dẫn cho agent; code
 - Kiểm thử quy tắc ca mỗi ngày: daily-distinct-shifts.trx 6/6 đạt (ba ca khác tên, ca đã đóng, máy khác, cạnh tranh hai yêu cầu, replay, ngày UTC+07 mới, danh tính và kết ca); daily-shift-picker-ui.trx đạt sau bổ sung assert dropdown chỉ còn Chiều/Tối với nhân viên đã làm Sáng, nhân viên khác vẫn đủ 3 ca. Ảnh staff-remaining-shifts.png. Build không lỗi.
 
 - Đối chiếu 13 UC Khách/Nhân viên và BR gốc: docs/CUSTOMER-STAFF-CHANGES.md (13/11/2026). GitHub main = HEAD 7431df1 nhưng working tree chưa commit/push; nhánh feat/thai-web-cart-order phân kỳ 8 ahead/3 behind. Phát hiện Register.cshtml.cs và ChangeTemporaryPassword.cshtml.cs còn MinimumLength=10 dù yêu cầu/HTML là 5; chưa sửa trong lượt tổng hợp. SHIFT-DAILY-RULE.md và POS-WEB-PAYMENT-DELIVERY.md có đoạn cũ đã bị thay thế. Báo cáo nêu giới hạn QR mô phỏng, địa chỉ hóa đơn và hủy một phần/chi quầy; không khẳng định tất cả hoàn tất hoặc đã đồng bộ.
+
+- Đặc tả Word 14/11/2026 đã tạo tại C:/Users/gauba/OneDrive/Documents/ChatGPT/C#/Dac-ta-Khach-hang-Nhan-vien-tru-WEB07.docx: 12 UC (WEB01-06, WEB08, POS01-05), 30 BR liên quan, phụ lục chênh lệch code/yêu cầu. Giữ mẫu 11 hàng bảng UC và style từ D:/8.tailieu/dac-25-Uc.docx; không sửa bản gốc, không đặc tả WEB07 hoặc ADM. Đã xuất bằng Word ẩn, kiểm đủ 24 trang và kiểm liên kết BR/cấu trúc ZIP. Chỉ viết tài liệu, chưa sửa các lỗi mật khẩu/chi quầy một phần nêu ở phụ lục.
+
+- Git 14/11/2026: xử lý pull bị chặn bằng stash include-untracked (backup-before-sync-main-2026-11-14), fast-forward main tới CSharp/main 4cdc61b; khôi phục AGENTS.md local. Code local trùng bản remote, chỉ AGENTS.md khác. Giữ stash dự phòng, chưa push; chỉ kiểm tra Git, không build/test.
+
+
+## Schema30 hiện hành — hoàn tất14/11/2026
+- Database thật FourChangDb đã nâng37→30, 64FK/11trigger; EF30 entity. main4cdc61b, thay đổi local chưa commit. Không khôi phục stash cũ.
+- docs/database/30-bang: schema.sql, model.json, 008-simplify-to-30.sql, từ điển và KET-QUA-KIEM-THU.md. Bootstrap nhận diện30 trước legacy34; tự native backup+checksum+verify trước nâng37. Giữ sysdiagrams, không tạo __EFMigrationsHistory/view giả bảng.
+- Bỏ ThietBiPOS, DanhMucMon, DonViTinh, QuyDoiDonViNguyenLieu, CauHinhMonThem, TuyChonPhaCheHopLe; gộp GiuChoNguyenLieu vào NguyenLieuChiTietDonHang. Snapshot trigger giữ công thức bất biến, chỉ cập nhật lượng xử lý. Topping chung; mức đường/đá cố định; Domain/Shared/CafeOptions.cs là nguồn quy tắc.
+- Bỏ cột tọa độ địa chỉ/đơn, khoảng cách/hạn báo phí đơn, QR bàn, lý do chênh lệch ca, tiền khách đưa, mã đơn vị/hệ số phiếu. Mã lựa chọn DTO danh mục/đơn vị là [NotMapped], dữ liệu lưu LoaiMon và DonViCoSo. Các snapshot tiền/kho, audit, rowversion và lịch/banner có chức năng thật vẫn giữ.
+- Desktop LiveSession không nạp khóa máy nữa. Route thiết bị trả410, header/token thiết bị cũ401. Phiên staff/recon vẫn bắt buộc. UI bỏ tab thiết bị/CRUD danh mục và cấu hình đường đá/topping riêng. Form đổi địa chỉ không hỏi tọa độ/km, DTO các trường cũ nullable. Web metadata mật khẩu min5.
+- Backup host: artifacts/backups/schema30-20261114/FourChang_before30_final.bak; checksum trong backup-final.json. Bản thử FourChang_Migration30_20261114 đã phục hồi rồi chuyển30. So từng cột giữ lại/giữ chỗ với nguồn37 và so30 bảng sau nâng thật đều khớp, trước worker chạy. Không xóa/reset dữ liệu.
+- Build FourChang.sln0warning0error; hai harness ngoài solution CheckoutSql/IntegrationClosure cũng build. 76test riêng biệt đạt trong schema30-final-api.trx(56), schema30-ui-migration.trx(13), schema30-address-reconcile.trx(9);2migration trùng đã loại. Check-db/test-db trên database thật đạt. Các lượt lỗi ban đầu đã sửa, không lấy chúng làm bằng chứng thành công.
+- API/Web đã chạy lại15881/15880. Người dùng cần đóng/mở lại Desktop. Không push GitHub. Công cụ SQL bảo trì tạm nằm ngoài repo trong thư mục Codex migration30-work, không thêm project sản phẩm mới.
+
+- 14/11/2026: Bỏ ô lý do ở hành động DELIVER (Bắt đầu giao hàng) trong OrdersWorkspacePage dùng chung Admin/POS; dialog gọn và tiêu đề tiếng Việt. OrderWorkflowService cho phép LyDo rỗng ở DELIVER, tự ghi audit “Bắt đầu giao hàng”; vẫn kiểm READY/DELIVERY/đã thu đủ, version và replay. 8/8 test đạt (deliver-without-reason.trx), gồm Staff gửi DELIVER rỗng và gửi lặp không ghi đôi. Backend đã khởi động lại; người dùng đóng/mở POS/Admin bằng launcher để nhận DLL mới. Không thay database.

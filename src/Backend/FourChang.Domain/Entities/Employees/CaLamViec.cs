@@ -13,7 +13,6 @@ public sealed class CaLamViec
     public decimal TienMatDauCa { get; set; }
     public decimal? TienMatDuKienCuoiCa { get; set; }
     public decimal? TienMatThucDem { get; set; }
-    public string? LyDoChenhLech { get; set; }
     public long? MaCaBanGiaoTruoc { get; set; }
     public long? MaQuanLyDuyet { get; set; }
     public string? GhiChu { get; set; }

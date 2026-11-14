@@ -23,7 +23,7 @@ src/
 │       └── DesktopLauncher.cs
 ├── Backend/
 │   ├── FourChang.Api/                    Endpoint và nghiệp vụ theo actor
-│   ├── FourChang.Domain/                 37 thực thể đã chốt (gồm Banner và SuKienDongBo)
+│   ├── FourChang.Domain/                 30 thực thể hiện hành (xem docs/database/30-bang)
 │   └── FourChang.Infrastructure/         EF Core, khởi tạo và kiểm tra database
 └── Shared/
     └── FourChang.Presentation.Shared/
@@ -61,7 +61,7 @@ dotnet run --project src/Presentation/FourChang.Admin
 dotnet run --project src/Presentation/FourChang.Pos
 ```
 
-Các lệnh chạy từng ứng dụng ở terminal riêng; các file Chay-*.cmd cũng đã cập nhật đường dẫn. Kiểm tra: dotnet build FourChang.sln và dotnet test FourChang.sln. Không thay 26 UC hoặc schema 35 bảng khi di chuyển mã nguồn.
+Các lệnh chạy từng ứng dụng ở terminal riêng; các file Chay-*.cmd cũng đã cập nhật đường dẫn. Kiểm tra: dotnet build FourChang.sln và dotnet test FourChang.sln. Database hiện hành là30 bảng, chi tiết tại docs/database/30-bang/README.md.
 
 ## ADM-01 đến ADM-05
 

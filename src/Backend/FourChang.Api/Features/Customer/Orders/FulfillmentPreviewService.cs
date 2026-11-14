@@ -24,15 +24,11 @@ public interface ITableQrLookup
 {
     Task<QrTable?> FindAsync(byte[] digest, CancellationToken ct);
 }
-public sealed class SqlTableQrLookup(CafeDbContext db) : ITableQrLookup
+public sealed class SqlTableQrLookup : ITableQrLookup
 {
-    public async Task<QrTable?> FindAsync(byte[] digest, CancellationToken ct)
-    {
-        var row = await db.Ban.AsNoTracking().SingleOrDefaultAsync(x => x.MaBamQR == digest, ct);
-        return row is null ? null : new(row.MaBan, row.MaBanHienThi, row.PhienBanQR,
-            row.DangSuDung, row.QRHetHanLuc is { } expiry
-                ? new DateTimeOffset(DateTime.SpecifyKind(expiry, DateTimeKind.Utc)) : null, row.MaBamQR);
-    }
+    /// <summary>Quán chọn bàn từ danh sách; không còn phát hành hoặc xác thực QR bàn.</summary>
+    public Task<QrTable?> FindAsync(byte[] digest, CancellationToken ct) => Task.FromResult<QrTable?>(null);
+
 }
 
 // Implementations must use a configured store origin + road-routing source, not straight-line

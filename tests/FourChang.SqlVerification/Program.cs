@@ -64,7 +64,7 @@ try
             await using var fixtureSql=new SqlConnection(FixtureSqlGuard.Connection(admin:true));await fixtureSql.OpenAsync();
             evidence["tableRows"]=await FixtureProvisioner.ReadRows(fixtureSql,"SELECT t.name,SUM(p.rows) AS rows FROM sys.tables t JOIN sys.partitions p ON p.object_id=t.object_id AND p.index_id IN(0,1) WHERE t.is_ms_shipped=0 GROUP BY t.name ORDER BY t.name");
             evidence["adminIdentity"]=await FixtureProvisioner.ReadRows(fixtureSql,"SELECT name,last_value FROM sys.identity_columns WHERE object_id=OBJECT_ID(N'dbo.TaiKhoanQuanLy')");
-            evidence["exactCounts"]=await FixtureProvisioner.ReadRows(fixtureSql,"SELECT (SELECT COUNT_BIG(*) FROM dbo.TaiKhoanKhachHang) AS customers,(SELECT COUNT_BIG(*) FROM dbo.TaiKhoanQuanLy) AS admins,(SELECT COUNT_BIG(*) FROM dbo.DonHang) AS orders,(SELECT COUNT_BIG(*) FROM dbo.ThanhToan) AS payments,(SELECT COUNT_BIG(*) FROM dbo.NhatKyHeThong) AS audits,(SELECT COUNT_BIG(*) FROM dbo.GiaoDichNganHang) AS bankRows,(SELECT COUNT_BIG(*) FROM dbo.HoSoHoanTien) AS refunds,(SELECT COUNT_BIG(*) FROM dbo.GiuChoNguyenLieu) AS holds,(SELECT COUNT_BIG(*) FROM dbo.TonKho) AS stock,(SELECT COUNT_BIG(*) FROM dbo.DonViTinh) AS units,(SELECT COUNT_BIG(*) FROM dbo.DanhMucMon) AS categories");
+            evidence["exactCounts"]=await FixtureProvisioner.ReadRows(fixtureSql,"SELECT (SELECT COUNT_BIG(*) FROM dbo.TaiKhoanKhachHang) AS customers,(SELECT COUNT_BIG(*) FROM dbo.TaiKhoanQuanLy) AS admins,(SELECT COUNT_BIG(*) FROM dbo.DonHang) AS orders,(SELECT COUNT_BIG(*) FROM dbo.ThanhToan) AS payments,(SELECT COUNT_BIG(*) FROM dbo.NhatKyHeThong) AS audits,(SELECT COUNT_BIG(*) FROM dbo.GiaoDichNganHang) AS bankRows,(SELECT COUNT_BIG(*) FROM dbo.HoSoHoanTien) AS refunds,(SELECT COUNT_BIG(*) FROM dbo.NguyenLieuChiTietDonHang) AS holds,(SELECT COUNT_BIG(*) FROM dbo.TonKho) AS stock,(SELECT COUNT(DISTINCT DonViCoSo) FROM dbo.NguyenLieu) AS units,(SELECT COUNT(DISTINCT LoaiMon) FROM dbo.Mon) AS categories");
             evidence["seedConstraints"]=await FixtureProvisioner.ReadRows(fixtureSql,"SELECT name,definition,is_disabled,is_not_trusted FROM sys.check_constraints WHERE name IN('CK_TaiKhoanKhachHang_3','CK_TaiKhoanQuanLy_1') ORDER BY name");
         }
         evidence["status"]="PASS_IDENTITY_READONLY";
@@ -173,7 +173,7 @@ sealed class SqlSuite(string connection, Fixture fixture, Dictionary<string, obj
             var detail=await new CustomerOrderReader(db).DetailAsync(fixture.CustomerId,id,default);
             Check(detail is not null && detail.CurrentTotal==requests[0].SoTienYeuCau && detail.Lines.Count>0, "Fixture price snapshot mismatch");
         }
-        var holds=await db.GiuChoNguyenLieu.AsNoTracking().ToListAsync();
+        var holds=await db.NguyenLieuChiTietDonHang.AsNoTracking().ToListAsync();
         var lines=await db.ChiTietDonHang.AsNoTracking().ToListAsync();
         var bom=await db.NguyenLieuChiTietDonHang.AsNoTracking().ToListAsync();
         Check(holds.Count>0 && holds.All(x=>x.SoLuongGiuCho>0 && x.SoLuongDaGiaiPhong==0 && x.SoLuongDaTieuHao==0 && x.TrangThai=="RESERVED") &&
@@ -369,7 +369,7 @@ sealed class SqlSuite(string connection, Fixture fixture, Dictionary<string, obj
         Check((await db.DonHang.SingleAsync(x=>x.MaDonHang==id)).TrangThai=="CANCELLED","Cancellation state missing");
         var lines=await db.ChiTietDonHang.Where(x=>x.MaDonHang==id).ToListAsync();
         Check(lines.All(x=>x.SoLuongDaHuy==x.SoLuongDat),"Cancelled quantities mismatch");
-        var ids=lines.Select(x=>x.MaChiTietDonHang).ToArray(); var holds=await db.GiuChoNguyenLieu.Where(x=>ids.Contains(x.MaChiTietDonHang)).ToListAsync();
+        var ids=lines.Select(x=>x.MaChiTietDonHang).ToArray(); var holds=await db.NguyenLieuChiTietDonHang.Where(x=>ids.Contains(x.MaChiTietDonHang)).ToListAsync();
         Check(holds.Count>0 && holds.All(x=>x.SoLuongDaGiaiPhong==x.SoLuongGiuCho && x.SoLuongDaTieuHao==0 && x.TrangThai=="RELEASED"),"Release quantities mismatch");
         var paid=await db.ThanhToan.SingleAsync(x=>x.MaDonHang==id); var refunds=await db.HoSoHoanTien.Where(x=>x.MaDonHang==id).ToListAsync();
         Check(refunds.Count==1 && refunds[0].TrangThai=="REQUESTED" && refunds[0].SoTienYeuCau==paid.SoTienDaXacMinh,"Refund obligation mismatch");
@@ -381,7 +381,7 @@ sealed class SqlSuite(string connection, Fixture fixture, Dictionary<string, obj
     {
         await using var db=Db(); var id=fixture.Orders["cancel"];
         var ids=await db.ChiTietDonHang.Where(x=>x.MaDonHang==id).Select(x=>x.MaChiTietDonHang).ToArrayAsync();
-        var holds=await db.GiuChoNguyenLieu.AsNoTracking().Where(x=>ids.Contains(x.MaChiTietDonHang)).ToListAsync();
+        var holds=await db.NguyenLieuChiTietDonHang.AsNoTracking().Where(x=>ids.Contains(x.MaChiTietDonHang)).ToListAsync();
         return (await db.TonKho.AsNoTracking().ToListAsync()).ToDictionary(x=>x.MaNguyenLieu,
             x=>(x.TonThucTe,x.TongGiuCho,holds.Where(h=>h.MaNguyenLieu==x.MaNguyenLieu).Sum(h=>h.SoLuongGiuCho-h.SoLuongDaGiaiPhong)));
     }
@@ -411,7 +411,7 @@ sealed class SqlSuite(string connection, Fixture fixture, Dictionary<string, obj
             payments=await db.ThanhToan.AsNoTracking().OrderBy(x=>x.MaThanhToan).Select(x=>new{x.MaThanhToan,x.TrangThai,x.SoTienDaXacMinh,x.HetHanLuc,x.PhienBanDuLieu}).ToListAsync(),
             lines=await db.ChiTietDonHang.AsNoTracking().OrderBy(x=>x.MaChiTietDonHang).Select(x=>new{x.MaChiTietDonHang,x.SoLuongDaHuy,x.PhienBanDuLieu}).ToListAsync(),
             bom=await db.NguyenLieuChiTietDonHang.AsNoTracking().OrderBy(x=>x.MaChiTietDonHang).ThenBy(x=>x.MaNguyenLieu).Select(x=>new{x.MaChiTietDonHang,x.MaNguyenLieu,x.DinhMucMoiLy,x.DonViCoSoDaChot}).ToListAsync(),
-            holds=await db.GiuChoNguyenLieu.AsNoTracking().OrderBy(x=>x.MaChiTietDonHang).ThenBy(x=>x.MaNguyenLieu).Select(x=>new{x.MaChiTietDonHang,x.MaNguyenLieu,x.SoLuongGiuCho,x.SoLuongDaGiaiPhong,x.SoLuongDaTieuHao,x.TrangThai,x.PhienBanDuLieu}).ToListAsync(),
+            holds=await db.NguyenLieuChiTietDonHang.AsNoTracking().OrderBy(x=>x.MaChiTietDonHang).ThenBy(x=>x.MaNguyenLieu).Select(x=>new{x.MaChiTietDonHang,x.MaNguyenLieu,x.SoLuongGiuCho,x.SoLuongDaGiaiPhong,x.SoLuongDaTieuHao,x.TrangThai,x.PhienBanDuLieu}).ToListAsync(),
             stock=await db.TonKho.AsNoTracking().OrderBy(x=>x.MaNguyenLieu).Select(x=>new{x.MaNguyenLieu,x.TonThucTe,x.TongGiuCho,x.PhienBanDuLieu}).ToListAsync(),
             audit=await db.NhatKyHeThong.AsNoTracking().OrderBy(x=>x.MaNhatKy).Select(x=>new{x.MaNhatKy,x.MaThaoTac,x.HanhDong,x.MaBamYeuCau,x.KetQuaDaChotJson}).ToListAsync(),
             banks=await db.GiaoDichNganHang.AsNoTracking().OrderBy(x=>x.MaGiaoDichNganHang).Select(x=>new{x.MaGiaoDichNganHang,x.MaGiaoDichBenNgoai,x.SoTien,x.MaThanhToan,x.TrangThaiXacMinh,x.MaBamNoiDung}).ToListAsync(),

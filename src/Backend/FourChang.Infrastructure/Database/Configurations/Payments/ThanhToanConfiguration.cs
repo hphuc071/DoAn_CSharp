@@ -17,7 +17,6 @@ public sealed class ThanhToanConfiguration : IEntityTypeConfiguration<ThanhToan>
             table.HasCheckConstraint("CK_ThanhToan_1", "PhuongThuc IN ('CASH','BANK_TRANSFER')");
             table.HasCheckConstraint("CK_ThanhToan_2", "SoTienYeuCau >= 0 AND SoTienDaXacMinh >= 0");
             table.HasCheckConstraint("CK_ThanhToan_3", "PhuongThuc <> 'CASH' OR MaCaLamViec IS NOT NULL");
-            table.HasCheckConstraint("CK_ThanhToan_4", "TienKhachDua IS NULL OR TienKhachDua >= SoTienDaXacMinh");
             table.HasCheckConstraint("CK_ThanhToan_5", "TrangThai IN ('PENDING','PARTIAL','VERIFIED','EXPIRED','FAILED','RECONCILING')");
         });
         b.HasKey("MaThanhToan");
@@ -29,7 +28,6 @@ public sealed class ThanhToanConfiguration : IEntityTypeConfiguration<ThanhToan>
         b.Property(x => x.PhuongThuc).HasColumnType("varchar(15)").IsRequired();
         b.Property(x => x.SoTienYeuCau).HasColumnType("decimal(18,0)").IsRequired();
         b.Property(x => x.SoTienDaXacMinh).HasColumnType("decimal(18,0)").IsRequired();
-        b.Property(x => x.TienKhachDua).HasColumnType("decimal(18,0)");
         b.Property(x => x.MaThamChieuChuyenKhoan).HasColumnType("varchar(100)");
         b.Property(x => x.NoiDungQR).HasColumnType("nvarchar(max)");
         b.Property(x => x.TrangThai).HasColumnType("varchar(20)").IsRequired();

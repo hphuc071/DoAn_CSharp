@@ -26,13 +26,13 @@ public sealed class MenuAdministrationTests
         await using var api = await TestApi.Start("ADM03-Permissions");
         var admin = await api.AdminLogin();
         (await api.Send("GET", "/api/admin/menu")).Expect(401, "Chưa xác thực");
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         var employee = await api.Employee(admin);
         var staff = TestApi.Bearer((await api.Send("POST", "/api/pos/shifts", api.OpenBody(employee, device), device.Headers)).Expect(200, "Mở ca").Json);
         (await api.Send("GET", "/api/admin/menu", headers: staff)).Expect(403, "Staff không có quyền Admin");
         var input = new MenuCategoryInput("Nhóm bị chặn", null, 1, false, true, false, null, Guid.NewGuid());
         (await api.Send("POST", "/api/admin/menu/categories", Json(input), staff)).Expect(403, "Staff không tạo nhóm");
-        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM dbo.DanhMucMon WHERE TenDanhMuc=N'Nhóm bị chặn'"));
+        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE name='DanhMucMon'"));
         (await api.Send("GET", "/api/catalog")).Expect(200, "Catalog công khai");
     }
 
@@ -40,53 +40,25 @@ public sealed class MenuAdministrationTests
     [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-02")]
     public async Task CRUD_DanhMuc_Mon_CauHinh_Version_VaThamChieu()
     {
-        await using var api = await TestApi.Start("ADM03-CRUD");
+        await using var api = await TestApi.Start("Menu30-FixedCategories");
         var admin = await api.AdminLogin();
-        var cat = new MenuCategoryInput("Nhóm thử", null, 4, true, true, false, null, Guid.NewGuid());
-        var receipt = (await api.Send("POST", "/api/admin/menu/categories", Json(cat), admin)).Expect(200, "Thêm danh mục").Json;
-        var repeated = (await api.Send("POST", "/api/admin/menu/categories", Json(cat), admin)).Expect(200, "Gửi lại mã cũ").Json;
-        Assert.Equal(receipt.Number("ma"), repeated.Number("ma"));
-        var catId = receipt.Number("ma");
-        (await api.Send("POST", "/api/admin/menu/categories", Json(cat with
-        {
-            MaThaoTac = Guid.NewGuid()
-        }), admin)).Expect(400, "Chặn trùng tên");
-        var dish = new MenuDishInput(catId, "Món thử", null, "sprite:1", 0, false, true, null, null, Guid.NewGuid());
-        var saved = (await api.Send("POST", "/api/admin/menu/dishes", Json(dish), admin)).Expect(200, "Lưu món nháp").Json;
-        var id = saved.Number("ma");
-        var v = new MenuVariantInput(id, "M", "ICED", 40000, true, true, [new(50, 50, true)], [], null, Guid.NewGuid());
-        var vr = (await api.Send("POST", "/api/admin/menu/variants", Json(v), admin)).Expect(200, "Lưu cấu hình nháp").Json;
-        (await api.Send("POST", "/api/admin/menu/variants", Json(v with
-        {
-            MaThaoTac = Guid.NewGuid()
-        }), admin)).Expect(400, "Không trùng size/nhiệt");
-        var snap = await Snapshot(api, admin);
-        var m = snap.Mon.Single(x => x.MaMon == id);
-        var c = snap.DanhMuc.Single(x => x.MaDanhMuc == catId);
-        (await api.Send("PUT", $"/api/admin/menu/dishes/{id}", Json(Dish(m, true)), admin)).Expect(400, "Thiếu BOM không công bố");
-        var hide = cat with
-        {
-            DaCongBo = false,
-            PhienBanDuLieu = c.PhienBanDuLieu,
-            MaThaoTac = Guid.NewGuid()
-        };
-        (await api.Send("PUT", $"/api/admin/menu/categories/{catId}", Json(hide), admin)).Expect(409, "Cần xác nhận tác động");
-        (await api.Send("PUT", $"/api/admin/menu/categories/{catId}", Json(hide with
-        {
-            XacNhanTacDong = true,
-            MaThaoTac = Guid.NewGuid()
-        }), admin)).Expect(200, "Ẩn có xác nhận");
-        (await api.Send("PUT", $"/api/admin/menu/categories/{catId}", Json(hide with
-        {
-            XacNhanTacDong = true,
-            MaThaoTac = Guid.NewGuid()
-        }), admin)).Expect(409, "Chặn version cũ");
-        snap = await Snapshot(api, admin);
-        c = snap.DanhMuc.Single(x => x.MaDanhMuc == catId);
-        (await api.Send("POST", $"/api/admin/menu/categories/{catId}/delete", Json(new MenuDeleteInput(c.PhienBanDuLieu, Guid.NewGuid())), admin)).Expect(409, "Chặn danh mục có món");
-        (await api.Send("POST", $"/api/admin/menu/variants/{vr.Number("ma")}/delete", Json(new MenuDeleteInput(snap.CauHinh.Single(x => x.MaCauHinhMon == vr.Number("ma")).PhienBanDuLieu, Guid.NewGuid())), admin)).Expect(200, "Xóa cấu hình chưa dùng");
-        (await api.Send("POST", $"/api/admin/menu/dishes/{id}/delete", Json(new MenuDeleteInput(m.PhienBanDuLieu, Guid.NewGuid())), admin)).Expect(200, "Xóa món chưa dùng");
-        (await api.Send("POST", $"/api/admin/menu/categories/{catId}/delete", Json(new MenuDeleteInput(c.PhienBanDuLieu, Guid.NewGuid())), admin)).Expect(200, "Xóa danh mục rỗng");
+        var snapshot = await Snapshot(api, admin);
+        Assert.Equal(new[] { "Cà phê", "Trà", "Đá xay" }, snapshot.DanhMuc.Select(x => x.TenDanhMuc));
+        var category = new MenuCategoryInput("Nhóm thử", null, 0, true, true, false, null, Guid.NewGuid());
+        (await api.Send("POST", "/api/admin/menu/categories", Json(category), admin)).Expect(409, "Loại món cố định");
+        var input = new MenuDishInput(1, "Món thử", null, null, 0, false, true, null, null, Guid.NewGuid());
+        var saved = (await api.Send("POST", "/api/admin/menu/dishes", Json(input), admin)).Expect(200, "Tạo món nháp").Json;
+        var replay = (await api.Send("POST", "/api/admin/menu/dishes", Json(input), admin)).Expect(200, "Replay").Json;
+        Assert.Equal(saved.Number("ma"), replay.Number("ma"));
+        (await api.Send("POST", "/api/admin/menu/dishes", Json(input with { MaDanhMuc = 99, MaThaoTac = Guid.NewGuid() }), admin)).Expect(400, "Loại món không hợp lệ");
+        (await api.Send("POST", "/api/admin/menu/dishes", Json(input with { MaThaoTac = Guid.NewGuid() }), admin)).Expect(400, "Không trùng tên cùng loại");
+        var dish = (await Snapshot(api, admin)).Mon.Single(x => x.MaMon == saved.Number("ma"));
+        var edit = Dish(dish) with { TenMon = "Món đã sửa" };
+        (await api.Send("PUT", $"/api/admin/menu/dishes/{dish.MaMon}", Json(edit), admin)).Expect(200, "Sửa nháp");
+        (await api.Send("PUT", $"/api/admin/menu/dishes/{dish.MaMon}", Json(edit with { MaThaoTac = Guid.NewGuid() }), admin)).Expect(409, "Version cũ");
+        dish = (await Snapshot(api, admin)).Mon.Single(x => x.MaMon == dish.MaMon);
+        (await api.Send("POST", $"/api/admin/menu/dishes/{dish.MaMon}/delete", Json(new MenuDeleteInput(dish.PhienBanDuLieu, Guid.NewGuid())), admin)).Expect(200, "Xóa nháp chưa dùng");
+        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE name='DanhMucMon'"));
     }
 
     /// <summary>Giá/ID thống nhất catalog, old endpoint; dữ liệu sai không làm đổi bản đã công bố.</summary>
@@ -175,14 +147,14 @@ public sealed class MenuAdministrationTests
     {
         await using var api = await TestApi.Start("ADM03-Rollback");
         var admin = await api.AdminLogin();
-        var input = new MenuCategoryInput("Không được lưu", null, 1, false, true, false, null, Guid.NewGuid());
+        var input = new MenuDishInput(1, "Không được lưu", null, null, 1, false, true, null, null, Guid.NewGuid());
         await api.Sql("DENY INSERT ON dbo.NhatKyHeThong TO fourchang_app");
         try
         {
-            Assert.True((await api.Send("POST", "/api/admin/menu/categories", Json(input), admin)).Status >= 400);
+            Assert.True((await api.Send("POST", "/api/admin/menu/dishes", Json(input), admin)).Status >= 400);
         }
         finally { await api.Sql("REVOKE INSERT ON dbo.NhatKyHeThong FROM fourchang_app"); }
-        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM dbo.DanhMucMon WHERE TenDanhMuc=N'Không được lưu'"));
+        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM dbo.Mon WHERE TenMon=N'Không được lưu'"));
         Assert.Equal("0", await api.Sql($"SELECT COUNT(*) FROM dbo.SuKienDongBo WHERE MaThaoTac='{input.MaThaoTac}'"));
     }
 
@@ -192,11 +164,11 @@ public sealed class MenuAdministrationTests
     {
         await using var api = await TestApi.Start("ADM03-Outbox");
         var admin = await api.AdminLogin();
-        var input = new MenuCategoryInput("Sự kiện chờ", null, 1, false, true, false, null, Guid.NewGuid());
+        var input = new MenuDishInput(1, "Sự kiện chờ", null, null, 1, false, true, null, null, Guid.NewGuid());
         await api.Sql("DENY UPDATE ON dbo.SuKienDongBo TO fourchang_app");
         try
         {
-            (await api.Send("POST", "/api/admin/menu/categories", Json(input), admin)).Expect(200, "Commit không phụ thuộc phát sự kiện");
+            (await api.Send("POST", "/api/admin/menu/dishes", Json(input), admin)).Expect(200, "Commit không phụ thuộc phát sự kiện");
             await Task.Delay(1500);
             Assert.Equal("1", await api.Sql($"SELECT COUNT(*) FROM dbo.SuKienDongBo WHERE MaThaoTac='{input.MaThaoTac}' AND XuLyXongLuc IS NULL"));
             await api.Sql($"UPDATE dbo.SuKienDongBo SET MaLanXuLy=NEWID(),KhoaDenLuc=DATEADD(second,-1,SYSUTCDATETIME()) WHERE MaThaoTac='{input.MaThaoTac}'");
@@ -219,16 +191,16 @@ public sealed class MenuAdministrationTests
         await using var proxy = new NetworkFaultProxy(api.Url);
         using var http = new HttpClient { BaseAddress = new(proxy.Url), Timeout = TimeSpan.FromSeconds(5) };
         var client = new CafeApiClient(http) { Token = admin["Authorization"][7..] };
-        var input = new MenuCategoryInput("Nhóm lỗi mạng", null, 1, false, true, false, null, Guid.NewGuid());
+        var input = new MenuDishInput(1, "Nhóm lỗi mạng", null, null, 1, false, true, null, null, Guid.NewGuid());
         proxy.DropMenu = true;
-        await Assert.ThrowsAsync<CafeApiException>(() => client.SaveMenuAsync("categories", null, input));
+        await Assert.ThrowsAsync<CafeApiException>(() => client.SaveMenuAsync("dishes", null, input));
         var receipt = await client.MenuReceiptAsync(input.MaThaoTac);
-        var repeated = await client.SaveMenuAsync("categories", null, input);
+        var repeated = await client.SaveMenuAsync("dishes", null, input);
         Assert.Equal(receipt.Ma, repeated.Ma);
         Assert.Equal("1", await api.Sql($"SELECT COUNT(*) FROM dbo.SuKienDongBo WHERE MaThaoTac='{input.MaThaoTac}'"));
         proxy.Offline = true;
-        await Assert.ThrowsAsync<CafeApiException>(() => client.SaveMenuAsync("categories", null, input with { TenDanhMuc = "Không lưu offline", MaThaoTac = Guid.NewGuid() }));
-        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM dbo.DanhMucMon WHERE TenDanhMuc=N'Không lưu offline'"));
+        await Assert.ThrowsAsync<CafeApiException>(() => client.SaveMenuAsync("dishes", null, input with { TenMon = "Không lưu offline", MaThaoTac = Guid.NewGuid() }));
+        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM dbo.Mon WHERE TenMon=N'Không lưu offline'"));
     }
 
     /// <summary>Đơn cũ có snapshot món/topping/BOM thật, sửa giá gốc không làm thay đổi các trường đã chốt.</summary>
@@ -238,7 +210,7 @@ public sealed class MenuAdministrationTests
         await using var api = await TestApi.Start("ADM03-Snapshots");
         var admin = await api.AdminLogin();
         var employee = await api.Employee(admin);
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         (await api.Send("POST", "/api/pos/shifts", api.OpenBody(employee, device), device.Headers)).Expect(200, "Mở ca nguồn đơn");
         var snapshot = await Snapshot(api, admin);
         var v = snapshot.CauHinh.First(x => x.LaMacDinh);

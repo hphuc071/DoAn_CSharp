@@ -1,3 +1,4 @@
+using FourChang.Domain.Entities.Orders;
 using System.Security.Cryptography;
 using System.Text.Json;
 using FourChang.Domain.Entities.Inventory;
@@ -7,7 +8,7 @@ namespace FourChang.Api.Features.Customer.Orders;
 
 // Internal service contracts, not public HTTP DTOs. No SQL adapter or runtime registration exists.
 public sealed record OrderLifecycleSnapshot(long CustomerId, string Channel, CustomerOrderDetail Detail,
-    IReadOnlyList<GiuChoNguyenLieu> Holds, IReadOnlyList<TonKho> Stocks,
+    IReadOnlyList<NguyenLieuChiTietDonHang> Holds, IReadOnlyList<TonKho> Stocks,
     bool BankReconciledThroughDeadline);
 public sealed record CancelOrderIntent(long CustomerId, long OrderId, Guid Operation,
     string ExpectedVersion, string Reason);

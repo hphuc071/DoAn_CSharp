@@ -38,7 +38,7 @@ dotnet run --project src/Presentation/FourChang.Admin
 
 Hoặc mở `Chay-Web.cmd`, `Chay-NhanVien.cmd`, `Chay-QuanLy.cmd` bằng File Explorer. Shortcut `NhanVien` / `QuanLy` trỏ tới executable tên mới sau khi build. Trong VS Code vẫn dùng Run Task → Web preview / POS preview / Admin preview, hoặc F5 chọn ứng dụng.
 
-Không dùng tên cũ `MocCafe.sln` và các lệnh `src/MocCafe.*` nữa. Giao diện, dữ liệu demo và chức năng không đổi do việc đổi tên này. Database hiện tại có đúng 37 bảng; Web và WinForms kết nối qua FourChang.Api (cổng 15881). Chạy ChuanBi-Database.ps1 trước khi mở ứng dụng. Xem [hướng dẫn database](HUONG-DAN-DATABASE.md) và [schema hiện tại](docs/database/37-bang/schema.sql). Tài liệu database cũ chỉ để tham khảo lịch sử.
+Không dùng tên cũ `MocCafe.sln` và các lệnh `src/MocCafe.*` nữa. Giao diện, dữ liệu demo và chức năng không đổi do việc đổi tên này. Database hiện tại có đúng 30 bảng; Web và WinForms kết nối qua FourChang.Api (cổng 15881). Chạy ChuanBi-Database.ps1 trước khi mở ứng dụng. Xem [hướng dẫn database](HUONG-DAN-DATABASE.md) và [schema hiện tại](docs/database/30-bang/schema.sql). Tài liệu database cũ chỉ để tham khảo lịch sử.
 
 ## Cổng local đã thống nhất
 

@@ -28,10 +28,10 @@ public sealed class EntryUiTests
         var name = "Nhân viên trùng tên kiểm thử";
         var first = await api.Employee(admin, name);
         var second = await api.Employee(admin, name);
-        var device = await api.NewDevice(admin, Environment.MachineName.ToUpperInvariant());
+        var device = await api.NewPosClient(admin, Environment.MachineName.ToUpperInvariant());
         var previous = (await api.Send("POST", "/api/pos/shifts", api.OpenBody(first, device), device.Headers)).Expect(200, "Ca Sáng đã làm của nhân viên thứ nhất").Json;
         (await api.Send("POST", "/api/pos/shifts/current/close", FourChang.Tests.Shared.TestData.Body(("TienMatThucDem", 500000), ("MaThaoTac", Guid.NewGuid().ToString())), TestApi.Bearer(previous))).Expect(200, "Kết ca Sáng fixture");
-        values["FOURCHANG_TEST_POS_KEY"] = device.Input.Text("KhoaThietBi");
+        values["FOURCHANG_TEST_POS_KEY"] = null;
         values["FOURCHANG_TEST_EMPLOYEE_ID"] = first.Number("maNhanVien").ToString();
         values["FOURCHANG_TEST_SECOND_EMPLOYEE_ID"] = second.Number("maNhanVien").ToString();
         values["FOURCHANG_TEST_EMPLOYEE_NAME"] = name;

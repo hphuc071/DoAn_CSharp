@@ -16,6 +16,7 @@ public sealed class StaffOrderWorkflowTests(AdminFeatureFixture fixture)
     public async Task NhanVien_XacNhan_CapNhatDungTienTrinh_VaChongTrung()
     {
         var scenario = await OperationsScenarioSeed.Create(fixture);
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET HinhThucNhanMon='DELIVERY',DiaChiGiaoDaChot=N'12 Nguyễn Trãi, TP. Hồ Chí Minh' WHERE MaDonHang={scenario.Order}");
         var session = await OpenSession(); var staff = TestApi.Bearer(session);
         var read = (await fixture.Api.Send("GET", "/api/pos/orders", headers: staff)).Expect(200, "Staff tra đơn").Json;
         Assert.True(read.Number("tongSo") > 0);
@@ -29,7 +30,7 @@ public sealed class StaffOrderWorkflowTests(AdminFeatureFixture fixture)
         var other = await Open();
         (await fixture.Api.Send("GET", $"/api/pos/orders/operations/{accept.MaThaoTac}", headers: other)).Expect(404, "Ca khác không tra được biên nhận");
         await Send(scenario.Order, accept with { MaThaoTac = Guid.NewGuid() }, staff, 409);
-        foreach (var action in new[] { "START", "FINISH", "COMPLETE" })
+        foreach (var action in new[] { "START", "FINISH", "DELIVER", "COMPLETE" })
         {
             current = await Detail(scenario.Order, staff);
             var input = new OrderActionInput(action, "", current.Don.PhienBanDuLieu, Guid.NewGuid(), scenario.Line, 2);
@@ -37,6 +38,7 @@ public sealed class StaffOrderWorkflowTests(AdminFeatureFixture fixture)
             await Send(scenario.Order, input, staff);
         }
         Assert.Equal("COMPLETED", (await Detail(scenario.Order, staff)).Don.TrangThai);
+        Assert.Equal("1", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.NhatKyHeThong WHERE HanhDong='ORDER_DELIVER' AND MaDoiTuong='{scenario.Order}' AND LyDo=N'Bắt đầu giao hàng'"));
         var finishing=(await fixture.Api.Send("GET",$"/api/admin/work-sessions/{session.Number("shiftId")}",headers:fixture.Admin)).Expect(200,"Ca thực sự hoàn thành").Json;
         Assert.Equal(1,finishing.Number("soDonHoanThanh"));Assert.Equal(scenario.Total,finishing["tongTienDonHoanThanh"]!.GetValue<decimal>());
         Assert.Equal(0,finishing.Number("tienMatDuKienHienTai")); // Tiền đã thu ở ca nguồn, không cộng lại ca làm xong.
@@ -52,6 +54,7 @@ public sealed class StaffOrderWorkflowTests(AdminFeatureFixture fixture)
     public async Task PhanQuyen_KhongVuotTrangThai_KhongXuLySauKhiKetThucCa()
     {
         var scenario = await OperationsScenarioSeed.Create(fixture);
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET HinhThucNhanMon='DELIVERY',DiaChiGiaoDaChot=N'12 Nguyễn Trãi, TP. Hồ Chí Minh' WHERE MaDonHang={scenario.Order}");
         var staff = await Open();
         var current = await Detail(scenario.Order, staff);
         await Send(scenario.Order, new("COMPLETE", "Không được nhảy bước", current.Don.PhienBanDuLieu, Guid.NewGuid()), staff, 409);

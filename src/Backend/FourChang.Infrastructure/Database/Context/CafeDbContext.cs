@@ -12,22 +12,16 @@ public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbC
 {
     public DbSet<Banner> Banner => Set<Banner>();
     public DbSet<SuKienDongBo> SuKienDongBo => Set<SuKienDongBo>();
-    public DbSet<ThietBiPOS> ThietBiPOS => Set<ThietBiPOS>();
     public DbSet<TaiKhoanKhachHang> TaiKhoanKhachHang => Set<TaiKhoanKhachHang>();
     public DbSet<TaiKhoanQuanLy> TaiKhoanQuanLy => Set<TaiKhoanQuanLy>();
     public DbSet<PhienDangNhap> PhienDangNhap => Set<PhienDangNhap>();
     public DbSet<DiaChiKhachHang> DiaChiKhachHang => Set<DiaChiKhachHang>();
     public DbSet<NhanVien> NhanVien => Set<NhanVien>();
     public DbSet<CaLamViec> CaLamViec => Set<CaLamViec>();
-    public DbSet<DanhMucMon> DanhMucMon => Set<DanhMucMon>();
     public DbSet<Mon> Mon => Set<Mon>();
     public DbSet<CauHinhMon> CauHinhMon => Set<CauHinhMon>();
     public DbSet<MonThem> MonThem => Set<MonThem>();
-    public DbSet<CauHinhMonThem> CauHinhMonThem => Set<CauHinhMonThem>();
-    public DbSet<TuyChonPhaCheHopLe> TuyChonPhaCheHopLe => Set<TuyChonPhaCheHopLe>();
     public DbSet<NguyenLieu> NguyenLieu => Set<NguyenLieu>();
-    public DbSet<DonViTinh> DonViTinh => Set<DonViTinh>();
-    public DbSet<QuyDoiDonViNguyenLieu> QuyDoiDonViNguyenLieu => Set<QuyDoiDonViNguyenLieu>();
     public DbSet<CongThuc> CongThuc => Set<CongThuc>();
     public DbSet<ChiTietCongThuc> ChiTietCongThuc => Set<ChiTietCongThuc>();
     public DbSet<Ban> Ban => Set<Ban>();
@@ -44,7 +38,6 @@ public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbC
     public DbSet<PhieuKho> PhieuKho => Set<PhieuKho>();
     public DbSet<ChiTietPhieuKho> ChiTietPhieuKho => Set<ChiTietPhieuKho>();
     public DbSet<TonKho> TonKho => Set<TonKho>();
-    public DbSet<GiuChoNguyenLieu> GiuChoNguyenLieu => Set<GiuChoNguyenLieu>();
     public DbSet<BienDongKho> BienDongKho => Set<BienDongKho>();
     public DbSet<NhatKyHeThong> NhatKyHeThong => Set<NhatKyHeThong>();
     /// <summary>Nạp cấu hình entity theo từng nhóm nghiệp vụ để mapping và ràng buộc không dồn vào DbContext.</summary>

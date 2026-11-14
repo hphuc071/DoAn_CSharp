@@ -1,12 +1,11 @@
-# Database hiện tại: 35 bảng
+# Database hiện hành: 30 bảng
 
-Giữ nguyên 34 bảng đã chốt, bổ sung duy nhất **ThietBiPOS** cho UC-ADM-02 theo xác nhận của người dùng. `dbo.sysdiagrams` của SSMS được giữ nguyên và không tính vào 35 bảng nghiệp vụ.
+Thiết kế và mã nguồn hiện dùng [schema 30 bảng](30-bang/README.md), 64 khóa ngoại và 11 trigger. `sysdiagrams` của SSMS được giữ riêng, không tính là bảng nghiệp vụ.
 
-- [Thiết kế và nâng cấp hiện hành](35-bang/README.md)
-- [Schema khởi tạo 35 bảng](35-bang/schema.sql)
-- [Manifest mô hình 35 bảng](35-bang/model.json)
-- [Migration chỉ thêm thiết bị POS](35-bang/001-add-ThietBiPOS.sql)
-- [Từ điển 34 bảng gốc, không thay đổi](34-bang/TU-DIEN-DU-LIEU.md)
-- [Hướng dẫn khởi tạo, chạy và kiểm tra](../../HUONG-DAN-DATABASE.md)
+- [Schema tạo mới](30-bang/schema.sql)
+- [Manifest](30-bang/model.json)
+- [Migration từ37](30-bang/008-simplify-to-30.sql)
+- [Từ điển dữ liệu](30-bang/TU-DIEN-DU-LIEU.md)
+- [Hướng dẫn chạy](../../HUONG-DAN-DATABASE.md)
 
-Các phiên bản 34 bảng, schema 42 bảng và thiết kế cũ được giữ để đối chiếu. Không dùng schema cũ để khởi tạo database hiện hành. Test xUnit `tests/FourChang.Tests/TichHop/DatabaseTests.cs` (`dotnet test FourChang.sln --filter "UseCase=DatabaseUpgrade"`) dựng schema 34 thật và kiểm tra nâng cấp, bảo toàn sơ đồ SSMS trên database tạm.
+Các thư mục 34/35/37 giữ lại cho nâng cấp và đối chiếu lịch sử. Không chạy schema cũ để khởi tạo môi trường hiện hành.

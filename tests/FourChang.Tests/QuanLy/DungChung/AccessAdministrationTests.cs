@@ -42,7 +42,7 @@ public sealed class AccessAdministrationTests
         var stale = await PasswordBody(original, next);
         stale["PhienBanDuLieu"] = Convert.ToBase64String([0, 0, 0, 0, 0, 0, 0, 1]);
         (await api.Send("POST", "/api/auth/admin/password", stale, admin)).Expect(409, "Version cũ");
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         var employee = (await api.Send("GET", "/api/pos/employees", headers: device.Headers)).Expect(200, "Nhân viên fixture").Json[0]!;
         var staff = TestApi.Bearer((await api.Send("POST", "/api/pos/shifts", api.OpenBody(employee, device), device.Headers)).Expect(200, "Ca độc lập").Json);
         (await api.Send("GET", "/api/admin/access/account", headers: staff)).Expect(403, "Staff không xem Admin");
@@ -101,96 +101,19 @@ public sealed class AccessAdministrationTests
     [Fact, Trait("Actor", "QuanLy"), Trait("UseCase", "COMMON-ADMIN-AUTH"), Trait("Layer", "API")]
     public async Task CapThuHoiCapLaiMay_ChotCa_Version_VaAuditNguyenTu()
     {
-        await using var api = await TestApi.Start("UC-ADM-02-Device");
+        await using var api = await TestApi.Start("Removed-Device-Access");
         var admin = await api.AdminLogin();
-        var input = Body(("MaThaoTac", NewId()), ("MaMay", "POS-UCADM02"), ("TenMay", "Quầy kiểm thử"), ("KhoaThietBi", "Device-" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N")), ("LyDo", "Đăng ký kiểm thử"));
-        var noReason = input.Copy();
-        noReason["MaThaoTac"] = NewId();
-        noReason["LyDo"] = "";
-        (await api.Send("POST", "/api/admin/access/devices", noReason, admin)).Expect(400, "Cấp máy cần lý do");
-        var record = (await api.Send("POST", "/api/admin/access/devices", input, admin)).Expect(200, "Cấp máy").Json["device"]!;
-        var id = record.Number("maThietBiPOS");
-        var replay = (await api.Send("POST", "/api/admin/access/devices", input, admin)).Expect(200, "Cấp lặp").Json;
-        Assert.Equal(id, replay["device"]!.Number("maThietBiPOS"));
-        var changed = input.Copy();
-        changed["TenMay"] = "Nội dung khác";
-        (await api.Send("POST", "/api/admin/access/devices", changed, admin)).Expect(409, "Cùng mã khác nội dung");
-        var list = (await api.Send("GET", "/api/admin/access/devices", headers: admin)).Expect(200, "Danh sách máy");
-        Check(!list.Content.Contains(input.Text("KhoaThietBi")) && !list.Content.Contains("MaBamKhoa") && !list.Content.Contains("MatKhauBam"), "Không lộ khóa/hash");
-        var unknown = new Dictionary<string, string>
-        {
-            {
-                "X-POS-Key",
-                api.Settings["FOURCHANG_POS_KEY"]
-            },
-            {
-                "X-POS-Machine",
-                "CHUA-DANG-KY"
-            }
-        };
-        (await api.Send("GET", "/api/pos/employees", headers: unknown)).Expect(401, "Khóa toàn cục không mở máy lạ");
-        var headers = new Dictionary<string, string>
-        {
-            {
-                "X-POS-Key",
-                input.Text("KhoaThietBi")
-            },
-            {
-                "X-POS-Machine",
-                input.Text("MaMay")
-            }
-        };
-        var device = new Device(input, record, headers);
-        var employee = (await api.Send("GET", "/api/pos/employees", headers: headers)).Expect(200, "Máy được đọc nhân viên").Json[0]!;
-        var open = api.OpenBody(employee, device);
-        open["MaMay"] = "MAY-KHAC";
-        (await api.Send("POST", "/api/pos/shifts", open, headers)).Expect(403, "Khóa gắn mã máy");
-        open["MaMay"] = input.Text("MaMay");
-        var shift = (await api.Send("POST", "/api/pos/shifts", open, headers)).Expect(200, "Mở ca tên/mã").Json;
-        var shiftId = shift.Number("shiftId");
-        var staff = TestApi.Bearer(shift);
-        var revoke = TestApi.Action(record);
-        record = (await api.Send("POST", $"/api/admin/access/devices/{id}/revoke", revoke, admin)).Expect(200, "Thu hồi khi còn ca").Json["device"]!;
-        Assert.Equal(1, record.Number("soCaChuaKetThuc"));
-        (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(401, "Chặn token ca ngay");
-        (await api.Send("GET", "/api/pos/employees", headers: headers)).Expect(401, "Chặn khóa đã thu hồi");
-        var grant = input.Copy();
-        grant["MaThaoTac"] = NewId();
-        grant["PhienBanDuLieu"] = record.Text("phienBanDuLieu");
-        grant["KhoaThietBi"] = "Device-" + Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N");
-        (await api.Send("POST", "/api/admin/access/devices", grant, admin)).Expect(409, "Chưa chốt ca không cấp lại");
-        var shifts = (await api.Send("GET", $"/api/admin/access/devices/{id}/shifts", headers: admin)).Expect(200, "Ca cần xử lý").Json;
-        Assert.Equal(500000, shifts[0]!.Number("tienMatDuKien"));
-        await api.Sql($"INSERT dbo.DonHang(MaDonHienThi,MaCaLamViec,KenhDatHang,HinhThucNhanMon,PhiGiaoHangBanDau,PhiGiaoHangHienTai,TrangThai) VALUES('UCADM02-PENDING',{shiftId},'POS','TAKEAWAY',0,0,'ACCEPTED')");
-        var close = Body(("MaThaoTac", NewId()), ("PhienBanDuLieu", shifts[0]!.Text("phienBanDuLieu")), ("TienMatThucDem", 500000), ("LyDo", "Đối chiếu ca máy thu hồi"));
-        (await api.Send("POST", $"/api/admin/access/devices/{id}/shifts/{shiftId}/close", close, admin)).Expect(409, "Còn đơn chưa xử lý");
-        await api.Sql("UPDATE dbo.DonHang SET TrangThai='CANCELLED' WHERE MaDonHienThi='UCADM02-PENDING'");
-        close["MaThaoTac"] = NewId();
-        (await api.Send("POST", $"/api/admin/access/devices/{id}/shifts/{shiftId}/close", close, admin)).Expect(200, "Chốt khi đủ điều kiện");
-        Assert.Equal("1", await api.Sql($"SELECT COUNT(*) FROM dbo.CaLamViec WHERE MaCaLamViec={shiftId} AND TrangThai='CLOSED' AND MaQuanLyDuyet=1 AND TienMatThucDem=500000"));
-        grant["MaThaoTac"] = NewId();
-        (await api.Send("POST", "/api/admin/access/devices", grant, admin)).Expect(200, "Cấp lại sau chốt");
-        (await api.Send("GET", "/api/pos/employees", headers: headers)).Expect(401, "Khóa cũ không sống lại");
-        headers["X-POS-Key"] = grant.Text("KhoaThietBi");
-        (await api.Send("GET", "/api/pos/employees", headers: headers)).Expect(200, "Khóa mới hợp lệ");
-        record = (await api.Send("GET", "/api/admin/access/devices", headers: admin)).Json[0]!;
-        var stale = revoke.Copy();
-        stale["MaThaoTac"] = NewId();
-        (await api.Send("POST", $"/api/admin/access/devices/{id}/revoke", stale, admin)).Expect(409, "Version cũ");
-        var atomic = TestApi.Action(record);
-        await api.Sql("DENY INSERT ON OBJECT::dbo.NhatKyHeThong TO fourchang_app");
-        try
-        {
-            Check((await api.Send("POST", $"/api/admin/access/devices/{id}/revoke", atomic, admin)).Status != 200, "Audit lỗi không thu hồi");
-        }
-        finally
-        {
-            await api.Sql("REVOKE INSERT ON OBJECT::dbo.NhatKyHeThong FROM fourchang_app");
-        }
-
-        (await api.Send("GET", "/api/pos/employees", headers: headers)).Expect(200, "Rollback trạng thái máy");
-        (await api.Send("GET", "/api/admin/access/devices/operations/" + atomic.Text("MaThaoTac"), headers: admin)).Expect(404, "Không receipt giả");
-        var audit = await api.Sql("SELECT CONCAT(COALESCE(DuLieuTruocJson,''),COALESCE(DuLieuSauJson,''),COALESCE(KetQuaDaChotJson,'')) FROM dbo.NhatKyHeThong");
-        Check(!audit.Contains(input.Text("KhoaThietBi")) && !audit.Contains(grant.Text("KhoaThietBi")) && !audit.Contains("MaBamKhoa") && !audit.Contains("MatKhauBam"), "Audit không lưu khóa/hash");
+        var input = Body(("MaThaoTac", NewId()), ("MaMay", "POS-LEGACY"), ("TenMay", "Máy cũ"), ("KhoaThietBi", "unused-legacy-key"), ("LyDo", "Kiểm thử route đã bỏ"));
+        (await api.Send("GET", "/api/admin/access/devices", headers: admin)).Expect(410, "Không còn danh sách thiết bị");
+        (await api.Send("POST", "/api/admin/access/devices", input, admin)).Expect(410, "Không cấp thiết bị");
+        var oldHeader = new Dictionary<string,string> { ["X-POS-Key"] = "unused-legacy-key" };
+        (await api.Send("GET", "/api/pos/employees", headers: oldHeader)).Expect(401, "Khóa máy cũ không xác thực");
+        var client = await api.NewPosClient(admin);
+        var employee = await api.Employee(admin);
+        var staff = TestApi.Bearer((await api.Send("POST", "/api/pos/shifts", api.OpenBody(employee, client))).Expect(200, "Mở ca không đăng ký máy").Json);
+        (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(200, "Chữ ký ca cấp quyền Staff");
+        (await api.Send("GET", "/api/admin/access/account", headers: staff)).Expect(403, "Không cấp quyền Admin");
+        (await api.Send("GET", "/api/pos/data/DonHang", headers: new() { ["Authorization"] = "Bearer pos.invalid" })).Expect(401, "Token pos cũ bị từ chối");
+        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE name='ThietBiPOS'"));
     }
 }

@@ -74,7 +74,7 @@ public sealed class CustomerAdministrationTests
         Assert.Equal(20, page1["items"]!.AsArray().Count);
         Check(page2["items"]!.AsArray().Count > 0, "Trang hai có khách");
         Assert.Empty(page1["items"]!.AsArray().Select(x => x!.Number("maKhachHang")).Intersect(page2["items"]!.AsArray().Select(x => x!.Number("maKhachHang"))));
-        var device = await api.NewDevice(admin);
+        var device = await api.NewPosClient(admin);
         var employee = (await api.Send("GET", "/api/pos/employees", headers: device.Headers)).Expect(200, "Fixture nhân viên").Json[0]!;
         var open = api.OpenBody(employee, device);
         open["TienMatDauCa"] = 0;

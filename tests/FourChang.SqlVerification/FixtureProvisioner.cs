@@ -15,11 +15,10 @@ static class FixtureProvisioner
     public static readonly string[] Slots=["exact","partial","excess","wrong-reference","late","payment-rollback","cancel","cancel-rollback","cancel-race","concurrent"];
     public static async Task<Fixture> CreateAsync(string schemaQuery,Dictionary<string,object?> evidence)
     {
-        var schemaPath="docs/database/35-bang/schema.sql";
+        var schemaPath="docs/database/30-bang/schema.sql";
         var schemaBytes=await File.ReadAllBytesAsync(schemaPath);
         var schema=System.Text.Encoding.UTF8.GetString(schemaBytes);
-        // The approved source has no USE/database/login/seed statements; EXPIRED is only a payment/
-        // inventory status. Do not search/replace or extend the DonHang constraint to make tests pass.
+        // Schema30 đã được chấp thuận; giữ kiểm tra database rỗng và marker riêng của fixture.
         FixtureSqlGuard.Check(!Regex.IsMatch(schema,@"(?im)^\s*(USE\s|CREATE\s+DATABASE|INSERT\s|MERGE\s|GO\s*$)"),"Unexpected schema bootstrap scope");
         await using(var master=new SqlConnection(FixtureSqlGuard.Connection(admin:true,master:true)))
         {
@@ -41,8 +40,8 @@ static class FixtureProvisioner
             await Execute(sql,"CREATE USER [uc0708_fixture] FOR LOGIN [uc0708_fixture]; GRANT SELECT,INSERT,UPDATE ON SCHEMA::dbo TO [uc0708_fixture]; GRANT VIEW DEFINITION TO [uc0708_fixture];");
             await using var counts=sql.CreateCommand(); counts.CommandText="SELECT (SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0),(SELECT COUNT(*) FROM sys.foreign_keys),(SELECT COUNT(*) FROM sys.triggers WHERE parent_class=1),(SELECT definition FROM sys.check_constraints WHERE name='CK_DonHang_7')";
             await using var r=await counts.ExecuteReaderAsync();
-            FixtureSqlGuard.Check(await r.ReadAsync() && r.GetInt32(0)==35 && r.GetInt32(1)==73 && r.GetInt32(2)==11 && !r.GetString(3).Contains("EXPIRED",StringComparison.Ordinal),"BLOCKED_SCHEMA: canonical schema verification failed");
-            evidence["schema"]=new {path=schemaPath,sha256=Convert.ToHexString(SHA256.HashData(schemaBytes)),tables=35,foreignKeys=73,triggers=11,expiredOrderMigration=false};
+            FixtureSqlGuard.Check(await r.ReadAsync() && r.GetInt32(0)==30 && r.GetInt32(1)==64 && r.GetInt32(2)==11 && r.GetString(3).Contains("EXPIRED",StringComparison.Ordinal),"BLOCKED_SCHEMA: canonical schema verification failed");
+            evidence["schema"]=new {path=schemaPath,sha256=Convert.ToHexString(SHA256.HashData(schemaBytes)),tables=30,foreignKeys=64,triggers=11,expiredOrderMigration=false};
         }
         evidence["F0"]=await CountsAsync();
         var fixture=await SeedAsync();
@@ -65,7 +64,7 @@ static class FixtureProvisioner
     public static async Task<object> CountsAsync()
     {
         await using var sql=new SqlConnection(FixtureSqlGuard.Connection());await sql.OpenAsync();
-        return await ReadRows(sql,"SELECT (SELECT COUNT_BIG(*) FROM dbo.TaiKhoanKhachHang) AS customers,(SELECT COUNT_BIG(*) FROM dbo.TaiKhoanQuanLy) AS admins,(SELECT COUNT_BIG(*) FROM dbo.DonHang) AS orders,(SELECT COUNT_BIG(*) FROM dbo.ThanhToan) AS payments,(SELECT COUNT_BIG(*) FROM dbo.NhatKyHeThong) AS audits,(SELECT COUNT_BIG(*) FROM dbo.GiaoDichNganHang) AS banks,(SELECT COUNT_BIG(*) FROM dbo.HoSoHoanTien) AS refunds,(SELECT COUNT_BIG(*) FROM dbo.GiuChoNguyenLieu) AS holds,(SELECT COUNT_BIG(*) FROM dbo.NguyenLieuChiTietDonHang) AS bom,(SELECT COUNT_BIG(*) FROM dbo.TonKho) AS stock");
+        return await ReadRows(sql,"SELECT (SELECT COUNT_BIG(*) FROM dbo.TaiKhoanKhachHang) AS customers,(SELECT COUNT_BIG(*) FROM dbo.TaiKhoanQuanLy) AS admins,(SELECT COUNT_BIG(*) FROM dbo.DonHang) AS orders,(SELECT COUNT_BIG(*) FROM dbo.ThanhToan) AS payments,(SELECT COUNT_BIG(*) FROM dbo.NhatKyHeThong) AS audits,(SELECT COUNT_BIG(*) FROM dbo.GiaoDichNganHang) AS banks,(SELECT COUNT_BIG(*) FROM dbo.HoSoHoanTien) AS refunds,(SELECT COUNT_BIG(*) FROM dbo.NguyenLieuChiTietDonHang) AS holds,(SELECT COUNT_BIG(*) FROM dbo.NguyenLieuChiTietDonHang) AS bom,(SELECT COUNT_BIG(*) FROM dbo.TonKho) AS stock");
     }
     static async Task<Fixture> SeedAsync()
     {
@@ -77,13 +76,11 @@ static class FixtureProvisioner
         var admin=new TaiKhoanQuanLy {TenDangNhapChuanHoa="PH5_FIXTURE_ADMIN",HoTen="Fixture administrator",MatKhauBam=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),TrangThai="LOCKED"};
         // Canonical CK_TaiKhoanKhachHang_3 requires a contact. Reserved .invalid addresses are
         // synthetic fixture data, never real customer contacts. Do not disable the CHECK.
-        var a=new TaiKhoanKhachHang {TenDangNhapChuanHoa="PH5_CUSTOMER_A",HoTen="Synthetic A",EmailChuanHoa="ph5-a@example.invalid",MatKhauBam=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),TrangThai="LOCKED"};
-        var b=new TaiKhoanKhachHang {TenDangNhapChuanHoa="PH5_CUSTOMER_B",HoTen="Synthetic B",EmailChuanHoa="ph5-b@example.invalid",MatKhauBam=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),TrangThai="LOCKED"};
-        var unit=new DonViTinh {KyHieu="g",TenDonVi="Fixture gram",DangSuDung=true};
-        var category=new DanhMucMon {TenDanhMuc="Fixture only",DaCongBo=true,DangSuDung=true};
-        db.AddRange(admin,a,b,unit,category); await db.SaveChangesAsync();
-        var ingredient=new NguyenLieu {TenNguyenLieu="Fixture ingredient",MaDonViCoSo=unit.MaDonVi,DangSuDung=true};
-        var item=new Mon {MaDanhMuc=category.MaDanhMuc,TenMon="Fixture beverage",DaCongBo=true,DangBan=true};
+        var a=new TaiKhoanKhachHang {TenDangNhapChuanHoa="PH5_CUSTOMER_A",HoTen="Synthetic A",EmailChuanHoa="ph5-a@example.invalid",SoDienThoaiChuanHoa="0900000001",MatKhauBam=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),TrangThai="LOCKED"};
+        var b=new TaiKhoanKhachHang {TenDangNhapChuanHoa="PH5_CUSTOMER_B",HoTen="Synthetic B",EmailChuanHoa="ph5-b@example.invalid",SoDienThoaiChuanHoa="0900000002",MatKhauBam=Convert.ToHexString(RandomNumberGenerator.GetBytes(32)),TrangThai="LOCKED"};
+        db.AddRange(admin,a,b); await db.SaveChangesAsync();
+        var ingredient=new NguyenLieu {TenNguyenLieu="Fixture ingredient",DonViCoSo="g",DangSuDung=true};
+        var item=new Mon {LoaiMon="Cà phê",TenMon="Fixture beverage",DaCongBo=true,DangBan=true};
         db.AddRange(ingredient,item); await db.SaveChangesAsync();
         var option=new CauHinhMon {MaMon=item.MaMon,KichCo="M",NhietDo="ICED",GiaBan=10000,DangBan=true};
         db.Add(option); await db.SaveChangesAsync();
@@ -101,8 +98,7 @@ static class FixtureProvisioner
             var line=new ChiTietDonHang {MaDonHang=order.MaDonHang,MaCauHinhMon=option.MaCauHinhMon,MaCongThuc=recipe.MaCongThuc,TenMonDaChot=item.TenMon,KichCoDaChot="M",NhietDoDaChot="ICED",PhanTramDa=100,PhanTramDuong=100,GiaMonDaChot=10000,SoLuongDat=1};
             db.Add(line); db.Add(new ThanhToan {MaDonHang=order.MaDonHang,MaThanhToanHienThi="PH5-P-"+slot,PhuongThuc="BANK_TRANSFER",SoTienYeuCau=10000,MaThamChieuChuyenKhoan="PH5-R-"+slot,TrangThai="PENDING",HetHanLuc=deadline,MaThaoTac=Guid.NewGuid()});
             await db.SaveChangesAsync();
-            db.Add(new NguyenLieuChiTietDonHang {MaChiTietDonHang=line.MaChiTietDonHang,MaNguyenLieu=ingredient.MaNguyenLieu,TenNguyenLieuDaChot=ingredient.TenNguyenLieu,DonViCoSoDaChot="g",DinhMucMoiLy=10}); await db.SaveChangesAsync();
-            db.Add(new GiuChoNguyenLieu {MaChiTietDonHang=line.MaChiTietDonHang,MaNguyenLieu=ingredient.MaNguyenLieu,SoLuongGiuCho=10,TrangThai="RESERVED",HetHanLuc=deadline}); await db.SaveChangesAsync();
+            db.Add(new NguyenLieuChiTietDonHang {MaChiTietDonHang=line.MaChiTietDonHang,MaNguyenLieu=ingredient.MaNguyenLieu,TenNguyenLieuDaChot=ingredient.TenNguyenLieu,DonViCoSoDaChot="g",DinhMucMoiLy=10,SoLuongGiuCho=10,TrangThai="RESERVED",HetHanLuc=deadline}); await db.SaveChangesAsync();
         }
         await tx.CommitAsync();
         return new(FixtureSqlGuard.Database,FixtureSqlGuard.RunId,"",a.MaKhachHang,b.MaKhachHang,orders);

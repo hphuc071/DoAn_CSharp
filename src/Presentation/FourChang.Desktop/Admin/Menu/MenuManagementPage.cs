@@ -30,7 +30,7 @@ public sealed class MenuManagementPage : UserControl
         Height = 680;
         BackColor = CafeTheme.Cream;
         DoubleBuffered = true;
-        var definitions = new[] { ("dishes", "Món", "Danh sách món", "Quản lý thông tin và trạng thái hiển thị của món."), ("variants", "Cấu hình món", "Cấu hình và giá bán", "Size, nóng/lạnh và lựa chọn pha chế dùng chung Web/POS."), ("categories", "Danh mục", "Danh mục thực đơn", "Sắp xếp nhóm món và nội dung hiển thị trên thực đơn."), ("toppings", "Topping", "Topping và giá mỗi phần", "Quản lý giá, giới hạn và trạng thái sử dụng."), ("banners", "Banner", "Nội dung công bố", "Quản lý hình ảnh và thời gian hiển thị banner.") };
+        var definitions = new[] { ("dishes", "Món", "Danh sách món", "Quản lý thông tin và trạng thái hiển thị của món."), ("variants", "Cấu hình món", "Cấu hình và giá bán", "Size, nóng/lạnh và lựa chọn pha chế dùng chung Web/POS."), ("toppings", "Topping", "Topping và giá mỗi phần", "Quản lý giá, giới hạn và trạng thái sử dụng."), ("banners", "Banner", "Nội dung công bố", "Quản lý hình ảnh và thời gian hiển thị banner.") };
         var navigation = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty, Padding = new Padding(0, 0, 0, 12), Name = "MenuNavigation" };
         foreach (var (kind, caption, title, description) in definitions)
         {
@@ -149,8 +149,8 @@ public sealed class MenuManagementPage : UserControl
         };
         var columns = kind switch
         {
-            "categories" => new[] { "Mã", "Danh mục", "Thứ tự", "Số món", "Công bố", "Sử dụng" },
-            "dishes" => ["Mã", "Tên món", "Danh mục", "Công bố", "Bán", "Công bố từ"],
+            "categories" => new[] { "Mã", "Loại món", "Thứ tự", "Số món", "Công bố", "Sử dụng" },
+            "dishes" => ["Mã", "Tên món", "Loại món", "Công bố", "Bán", "Công bố từ"],
             "variants" => ["Mã", "Món", "Size", "Nhiệt độ", "Giá (đ)", "Bán", "Mặc định"],
             "toppings" => ["Mã", "Topping", "Giá/phần (đ)", "Giới hạn/ly", "Trạng thái"],
             _ => ["Mã", "Banner", "Bắt đầu", "Kết thúc", "Trạng thái"]

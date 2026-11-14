@@ -18,7 +18,7 @@ public sealed class EmployeeIdentityTests
         var name = "Nhân viên trùng tên kiểm thử";
         var first = await api.Employee(admin, name);
         var second = await api.Employee(admin, name);
-        var device = await api.NewDevice(admin, Environment.MachineName.ToUpperInvariant());
+        var device = await api.NewPosClient(admin, Environment.MachineName.ToUpperInvariant());
         var lookup = Body(("MaNhanVien", first.Number("maNhanVien")), ("HoTen", name));
         (await api.Send("POST", "/api/pos/employees/verify", lookup)).Expect(200, "Mã và tên hợp lệ không yêu cầu đăng ký máy");
         var r = (await api.Send("POST", "/api/pos/employees/verify", lookup, device.Headers)).Expect(200, "Mã và tên đúng");

@@ -71,7 +71,7 @@ internal static class OrderExpiryReview
                 .ToListAsync(ct);
 
             var detailIds = details.Select(d => d.MaChiTietDonHang).ToArray();
-            var holds = await db.GiuChoNguyenLieu.AsNoTracking()
+            var holds = await db.NguyenLieuChiTietDonHang.AsNoTracking()
                 .Where(h => detailIds.Contains(h.MaChiTietDonHang))
                 .Select(h => new
                 {

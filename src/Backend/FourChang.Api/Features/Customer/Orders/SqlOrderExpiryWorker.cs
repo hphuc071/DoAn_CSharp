@@ -1,3 +1,4 @@
+using FourChang.Domain.Entities.Orders;
 using System.Data;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -80,7 +81,7 @@ public sealed class SqlOrderExpiryWorker(CafeDbContext db, IConfiguration config
             if (lines.Count == 0 || lines.Any(x => x.SoLuongDat <= 0 || x.SoLuongDaHuy != 0 || x.SoLuongBatDauPha != 0 || x.SoLuongPhaXong != 0))
             { results.Add("EXPIRY_ITEM_REVIEW_REQUIRED"); break; }
             var ids = lines.Select(x => x.MaChiTietDonHang).ToArray();
-            var holds = await db.GiuChoNguyenLieu.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync(ct);
+            var holds = await db.NguyenLieuChiTietDonHang.Where(x => ids.Contains(x.MaChiTietDonHang)).ToListAsync(ct);
             if (holds.Count == 0 || ids.Any(id => !holds.Any(x => x.MaChiTietDonHang == id)))
             { results.Add("EXPIRY_HOLDS_REQUIRED"); break; }
             // SQL CHECKs bound quantities but do not tie terminal hold status to released
@@ -103,7 +104,7 @@ public sealed class SqlOrderExpiryWorker(CafeDbContext db, IConfiguration config
         return results;
     }
 
-    internal static bool HoldReady(GiuChoNguyenLieu hold) =>
+    internal static bool HoldReady(NguyenLieuChiTietDonHang hold) =>
         hold.SoLuongGiuCho >= 0m && hold.SoLuongDaTieuHao == 0m &&
         hold.SoLuongDaGiaiPhong >= 0m && hold.SoLuongDaGiaiPhong <= hold.SoLuongGiuCho &&
         (hold.TrangThai is "RESERVED" or "PARTIAL" or "RELEASED" or "EXPIRED") &&

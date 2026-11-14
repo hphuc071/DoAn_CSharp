@@ -13,10 +13,10 @@ public static class DatabaseViews
     {
         ["customers"] = ["TaiKhoanKhachHang", "DiaChiKhachHang"],
         ["access"] = ["TaiKhoanQuanLy", "CaLamViec"],
-        ["menu"] = ["Mon", "CauHinhMon", "DanhMucMon", "MonThem", "CauHinhMonThem", "TuyChonPhaCheHopLe"],
-        ["ingredients"] = ["NguyenLieu", "DonViTinh", "QuyDoiDonViNguyenLieu"],
+        ["menu"] = ["Mon", "CauHinhMon", "MonThem"],
+        ["ingredients"] = ["NguyenLieu"],
         ["recipes"] = ["CongThuc", "ChiTietCongThuc"],
-        ["inventory"] = ["TonKho", "GiuChoNguyenLieu", "BienDongKho"],
+        ["inventory"] = ["TonKho", "NguyenLieuChiTietDonHang", "BienDongKho"],
         ["stock"] = ["PhieuKho", "ChiTietPhieuKho"],
         ["manage-orders"] = ["DonHang", "ChiTietDonHang", "MonThemChiTietDonHang", "NguyenLieuChiTietDonHang", "HuyMon", "Ban"],
         ["invoices"] = ["HoaDon", "ThanhToan", "GiaoDichNganHang"],

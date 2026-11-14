@@ -27,7 +27,7 @@ public sealed class CustomerSelfService(CafeDbContext db)
     {
         var u = await db.TaiKhoanKhachHang.AsNoTracking().SingleAsync(x => x.MaKhachHang == id);
         var addresses = await db.DiaChiKhachHang.AsNoTracking().Where(x => x.MaKhachHang == id && x.DangSuDung).OrderByDescending(x => x.LaDiaChiMacDinh).ThenBy(x => x.MaDiaChi)
-            .Select(x => new CustomerAddress(x.MaDiaChi, x.NhanDiaChi, x.TenNguoiNhan, x.DienThoaiNguoiNhan, x.DiaChiChiTiet, x.ViDo, x.KinhDo, x.GhiChuGiaoHang, x.LaDiaChiMacDinh, x.PhienBanDuLieu)).ToListAsync();
+            .Select(x => new CustomerAddress(x.MaDiaChi, x.NhanDiaChi, x.TenNguoiNhan, x.DienThoaiNguoiNhan, x.DiaChiChiTiet, null, null, x.GhiChuGiaoHang, x.LaDiaChiMacDinh, x.PhienBanDuLieu)).ToListAsync();
         return new(u.MaKhachHang, u.TenDangNhapChuanHoa, u.HoTen, u.EmailChuanHoa, u.SoDienThoaiChuanHoa, u.PhienBanDuLieu, addresses);
     }
     /// <summary>Trả hồ sơ của Customer hiện tại qua DTO an toàn.</summary>
@@ -55,7 +55,7 @@ public sealed class CustomerSelfService(CafeDbContext db)
             var previous = await db.DiaChiKhachHang.Where(x => x.MaKhachHang == u.MaKhachHang && x.DangSuDung && x.LaDiaChiMacDinh && x.MaDiaChi != a.MaDiaChi).ToListAsync();
             foreach (var item in previous) item.LaDiaChiMacDinh = false; await db.SaveChangesAsync();
         }
-        a.NhanDiaChi = CustomerRules.Normalize(input.NhanDiaChi); a.TenNguoiNhan = input.TenNguoiNhan.Trim(); a.DienThoaiNguoiNhan = input.DienThoaiNguoiNhan.Trim(); a.DiaChiChiTiet = input.DiaChiChiTiet.Trim(); a.ViDo = input.ViDo; a.KinhDo = input.KinhDo; a.GhiChuGiaoHang = CustomerRules.Normalize(input.GhiChuGiaoHang); a.LaDiaChiMacDinh = setAsDefault;
+        a.NhanDiaChi = CustomerRules.Normalize(input.NhanDiaChi); a.TenNguoiNhan = input.TenNguoiNhan.Trim(); a.DienThoaiNguoiNhan = input.DienThoaiNguoiNhan.Trim(); a.DiaChiChiTiet = input.DiaChiChiTiet.Trim(); a.GhiChuGiaoHang = CustomerRules.Normalize(input.GhiChuGiaoHang); a.LaDiaChiMacDinh = setAsDefault;
         if (id is null) db.DiaChiKhachHang.Add(a);
     });
     /// <summary>Ngừng địa chỉ thuộc đúng khách mà không sửa địa chỉ snapshot của đơn đã đặt.</summary>
