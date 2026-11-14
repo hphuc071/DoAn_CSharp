@@ -51,20 +51,33 @@
             @if(order.Order.Status == "EXPIRED") { <p class="notice">Đơn hết hạn. Không chuyển khoản; cần đối soát theo thu/hoàn thực tế.</p> }
             <details class="commerce-help"><summary>Thông tin đối soát</summary><p>Tổng ban đầu: @order.OriginalTotal.ToString("N0") đ</p><p>Đã hoàn thành công: @order.Refunded.ToString("N0") đ</p><p>Nghĩa vụ hoàn theo số dư: @order.RefundObligation.ToString("N0") đ</p><p>Phí giao ban đầu: @order.OriginalShippingFee.ToString("N0") đ</p>
                 @foreach(var payment in order.Payments) { <p>@payment.Code · @CommerceLabels.State(payment.Status) · Đã xác nhận @payment.Verified.ToString("N0") đ</p> }
-                <p>Mốc dữ liệu UTC: @order.SnapshotUtc.ToString("dd/MM/yyyy HH:mm:ss"). Tải lại để xem thay đổi mới nhất.</p>
             </details>
         </aside>
     </div>
+    @if (TempData["CancellationNotice"] is string notice) { <p class="notice" role="status">@notice</p> }
+    @if (order.YeuCauHuy is { } request) {
+        <section class="commerce-cancellation" role="status"><h2>Yêu cầu hủy đang chờ xử lý</h2>
+        <p>@(request.TrangThai == "FORWARDED" ? "Nhân viên đã chuyển yêu cầu, đang chờ Quản lý duyệt." : "Đã nhận yêu cầu, đang chờ Nhân viên chuyển Quản lý.")</p>
+        <p>Lý do: @request.LyDo</p><p>Đơn chưa bị hủy và chưa thực hiện hoàn tiền.</p></section>
+    }
+    @if (order.KetQuaYeuCauHuy is { TrangThai: "REJECTED" } rejected) {
+        <p class="notice" role="status">Quản lý đã từ chối yêu cầu hủy. Lý do: @rejected.LyDo. Đơn tiếp tục được xử lý theo trạng thái hiện tại.</p>
+    }
+    @if (order.Order.Status == "CANCELLED" && order.Collected > order.Refunded && order.Refunds.Any(x => x.Method == "CASH" && x.Status is "APPROVED" or "PARTIALLY_REFUNDED")) {
+        <p class="notice" role="status">Đơn đã được hủy. Vui lòng đến quầy và cung cấp mã đơn để Nhân viên kiểm tra khoản hoàn đã được Quản lý duyệt.</p>
+    }
     @if (order.CancellationEligible) { <details class="commerce-cancellation"><summary>Hỗ trợ hủy đơn</summary>        @if (order.CancellationEligible)
         {
             
             <p>Số đã thu chưa hoàn để đối soát khi hủy: @Math.Max(0, order.Collected - order.Refunded).ToString("N0") đ. Chưa phải cam kết chi hoàn.</p>
             <form method="post" asp-page-handler="Cancel">
                 <input type="hidden" name="orderId" value="@order.Order.Id" />
+                <input type="hidden" name="expectedVersion" value="@order.Version" />
+                <input type="hidden" name="operation" value="@Guid.NewGuid()" />
                 <label>Lý do (bắt buộc, 3–400 ký tự)<textarea name="reason" required minlength="3" maxlength="400"></textarea></label>
-                <button type="submit" class="button secondary" disabled>Yêu cầu hủy đang khóa</button>
+                <button type="submit" class="button secondary">Gửi yêu cầu hủy</button>
             </form>
-            <p role="status">Hủy trực tuyến hiện chưa khả dụng. Vui lòng liên hệ quán để được hỗ trợ kiểm tra đơn và khoản hoàn nếu có.</p>
+            <p role="status">Đơn chỉ hủy sau khi Quản lý duyệt. Khoản hoàn được duyệt sẽ nhận tại quầy; gửi yêu cầu không đồng nghĩa đã hoàn tiền.</p>
         }
 </details> }
 </div>

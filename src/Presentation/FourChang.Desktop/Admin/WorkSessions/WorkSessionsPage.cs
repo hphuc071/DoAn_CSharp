@@ -29,6 +29,7 @@ public sealed class WorkSessionsPage : UserControl
     /// <summary>Ngày nhập trực tiếp không có checkbox; lịch sử hồ sơ dùng sẵn khóa nhân viên.</summary>
     public WorkSessionsPage(long? employeeId = null)
     {
+        message.Visible = false; message.TextChanged += (_, _) => message.Visible = !string.IsNullOrWhiteSpace(message.Text);
         Name = "WorkSessionsPage"; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Dock = DockStyle.Top; BackColor = CafeTheme.Cream; Padding = new Padding(16);
         employee.Text = employeeId?.ToString() ?? "";
         if (employeeId is not null) from.Value = DateTime.Today.AddYears(-1);
@@ -91,9 +92,9 @@ public sealed class WorkSessionsPage : UserControl
             if (IsDisposed) return;
             grid.DataSource = data.Items.ToList(); total = data.Total; loaded = DateTime.Now;
             counter.Text = $"Trang {page}/{Math.Max(1, (total + 19) / 20)} · {total} ca";
-            message.Text = "Cập nhật " + loaded.Value.ToString("HH:mm:ss");
+            message.Text = "";
         }
-        catch (CafeApiException ex) { message.Text = ex.Message + (loaded is null ? " Chưa tải được ca." : " · Dữ liệu cũ lúc " + loaded.Value.ToString("HH:mm:ss")); }
+        catch (CafeApiException ex) { message.Text = ex.Message + (loaded is null ? " Chưa tải được ca." : " · Đang hiển thị dữ liệu đã tải trước đó."); }
     }
     /// <summary>Thay bộ lọc đưa về trang đầu.</summary>
     private async Task Find() { page = 1; await LoadPage(); }

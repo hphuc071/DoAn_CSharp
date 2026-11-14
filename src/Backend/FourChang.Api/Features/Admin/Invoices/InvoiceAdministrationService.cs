@@ -16,13 +16,35 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
     {
         if (page < 1 || from > to) throw new AdminRule(400, "Bộ lọc hóa đơn không hợp lệ.");
         var q = db.HoaDon.AsNoTracking().AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search)) q = q.Where(x => x.SoHoaDon.Contains(search) || x.MaDonHang.ToString() == search || x.TenNguoiMua != null && x.TenNguoiMua.Contains(search));
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            var shortCode = FourChang.Presentation.Shared.Contracts.Common.OrderCode.TryParse(term, out var channel, out var orderId);
+            var matchingOrders = db.DonHang.Where(x => shortCode && x.MaDonHang == orderId && x.KenhDatHang == channel ||
+                x.MaDonHienThi.Contains(term) || x.TenNguoiNhan != null && x.TenNguoiNhan.Contains(term)).Select(x => x.MaDonHang);
+            q = q.Where(x => x.SoHoaDon.Contains(term) || x.MaDonHang.ToString() == term ||
+                x.TenNguoiMua != null && x.TenNguoiMua.Contains(term) || matchingOrders.Contains(x.MaDonHang));
+        }
         if (from is { } start) q = q.Where(x => x.PhatHanhLuc >= start);
         if (to is { } end) q = q.Where(x => x.PhatHanhLuc < end);
         if (shift is { } id) q = q.Where(x => x.MaCaLamViec == id);
         var total = await q.CountAsync();
         var list = await q.OrderByDescending(x => x.MaHoaDon).Skip((page - 1) * 50).Take(50).ToListAsync();
-        return new(list.Select(View).ToList(), total, page, 50, DateTime.UtcNow);
+        var orderIds = list.Select(x => x.MaDonHang).Distinct().ToArray();
+        var orders = await db.DonHang.AsNoTracking().Where(x => orderIds.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang);
+        var rows = list.Select(x => View(x) with
+        {
+            MaDon = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, orders[x.MaDonHang].KenhDatHang),
+            NguoiMua = !string.IsNullOrWhiteSpace(x.TenNguoiMua) ? x.TenNguoiMua : orders[x.MaDonHang].TenNguoiNhan ?? "Khách lẻ"
+        }).ToList();
+        return new(rows, total, page, 50, DateTime.UtcNow);
+    }
+
+    /// <summary>POS chỉ đọc chứng từ và nội dung đã phát hành, không trả audit hay quyền điều chỉnh của Admin.</summary>
+    public async Task<FourChang.Presentation.Shared.Contracts.Staff.StaffInvoiceSnapshot> StaffDetails(long id)
+    {
+        var invoice = await db.HoaDon.AsNoTracking().SingleOrDefaultAsync(x => x.MaHoaDon == id) ?? throw new AdminRule(404, "Không tìm thấy hóa đơn.");
+        return new(View(invoice), invoice.NoiDungHoaDonDaChotJson);
     }
 
     /// <summary>Giữ nguyên JSON snapshot; tiền thu/hoàn hiển thị riêng, không dựng hóa đơn từ giá menu hiện hành.</summary>

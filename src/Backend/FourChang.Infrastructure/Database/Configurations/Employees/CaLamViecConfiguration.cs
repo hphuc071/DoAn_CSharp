@@ -40,8 +40,8 @@ public sealed class CaLamViecConfiguration : IEntityTypeConfiguration<CaLamViec>
         b.Property(x => x.ThoiDiemCapNhat).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.Property(x => x.PhienBanDuLieu).HasColumnType("rowversion").IsRequired().IsRowVersion();
         b.HasIndex(new[] { "MaCaHienThi" }).IsUnique().HasDatabaseName("UQ_CaLamViec_1");
-        b.HasIndex(new[] { "MaMay" }).IsUnique().HasDatabaseName("UX_Ca_MayDangMo").HasFilter("KetThucLuc IS NULL");
-        b.HasIndex(new[] { "MaNhanVien" }).IsUnique().HasDatabaseName("UX_Ca_NhanVienDangMo").HasFilter("KetThucLuc IS NULL");
+        b.HasIndex(new[] { "MaMay" }).HasDatabaseName("IX_Ca_MayDangMo").HasFilter("KetThucLuc IS NULL");
+        b.HasIndex(new[] { "MaNhanVien" }).HasDatabaseName("IX_Ca_NhanVienDangMo").HasFilter("KetThucLuc IS NULL");
         b.HasOne<NhanVien>().WithMany().HasForeignKey("MaNhanVien").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<CaLamViec>().WithMany().HasForeignKey("MaCaBanGiaoTruoc").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<TaiKhoanQuanLy>().WithMany().HasForeignKey("MaQuanLyDuyet").OnDelete(DeleteBehavior.NoAction);

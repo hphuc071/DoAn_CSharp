@@ -24,7 +24,7 @@ public static class CustomerOrderStates
 }
 
 public sealed record CustomerOrderSummary(long Id, string Code, string Status, string Fulfilment,
-    DateTime CreatedUtc, DateTime UpdatedUtc);
+    DateTime CreatedUtc, DateTime UpdatedUtc, bool CanReceiveCounterRefund = false);
 public sealed record CustomerOrderPage(IReadOnlyList<CustomerOrderSummary> Items, int Page, int PageSize,
     int TotalCount, DateTime SnapshotUtc);
 public sealed record CustomerOrderTopping(string Name, int Portions, decimal Price);
@@ -39,14 +39,14 @@ public sealed record CustomerOrderLine(long Id, string Name, string Size, string
 public sealed record CustomerPaymentSnapshot(long Id, string Code, string Method, string Status,
     decimal Requested, decimal Verified, string? Reference, DateTime? ExpiresUtc, DateTime? VerifiedUtc);
 public sealed record CustomerRefundSnapshot(long Id, string Code, string Status, decimal Requested,
-    decimal? Approved, decimal SuccessfullyDisbursed);
+    decimal? Approved, decimal SuccessfullyDisbursed, string? Method = null);
 public sealed record CustomerInvoiceSnapshot(long Id, string Number, string Kind, string Status,
     decimal Amount, DateTime? IssuedUtc);
 public sealed record CustomerOrderDetail(CustomerOrderSummary Order, string Version,
     DateTime? ExpiresUtc, DateTime? AcceptedUtc, DateTime? CompletedUtc,
     decimal OriginalShippingFee, decimal ShippingFee, IReadOnlyList<CustomerOrderLine> Lines,
     IReadOnlyList<CustomerPaymentSnapshot> Payments, IReadOnlyList<CustomerRefundSnapshot> Refunds,
-    IReadOnlyList<CustomerInvoiceSnapshot> Invoices, DateTime SnapshotUtc, decimal ApprovedServiceAdjustment = 0)
+    IReadOnlyList<CustomerInvoiceSnapshot> Invoices, DateTime SnapshotUtc, decimal ApprovedServiceAdjustment = 0, FourChang.Presentation.Shared.Contracts.Orders.CancellationInfo? YeuCauHuy = null, FourChang.Presentation.Shared.Contracts.Orders.CancellationInfo? KetQuaYeuCauHuy = null)
 {
     public decimal OriginalTotal => Lines.Sum(x => x.OriginalTotal) + OriginalShippingFee;
     public decimal CurrentTotal => Order.Status == "EXPIRED" ? 0 : Math.Max(0, Lines.Sum(x => x.CurrentTotal) + ShippingFee - ApprovedServiceAdjustment);
@@ -54,5 +54,5 @@ public sealed record CustomerOrderDetail(CustomerOrderSummary Order, string Vers
     public decimal Refunded => Refunds.Sum(x => x.SuccessfullyDisbursed);
     public decimal Remaining => Math.Max(0, CurrentTotal - Collected + Refunded);
     public decimal RefundObligation => Math.Max(0, Collected - Refunded - CurrentTotal);
-    public bool CancellationEligible => Order.Status == "PENDING_CONFIRMATION";
+    public bool CancellationEligible => Order.Status == "PENDING_CONFIRMATION" && YeuCauHuy is null;
 }

@@ -95,7 +95,8 @@ try
     builder.Services.AddHostedService<ReportExportWorker>();
     builder.Services.AddScoped<InvoicePdfService>();
     builder.Services.AddScoped<IncomingReconciliationService>();
-    var app = builder.Build();
+    builder.Services.AddScoped<FourChang.Api.Shared.Orders.CancellationWorkflow>();
+var app = builder.Build();
     app.Use(async (context, next) =>
     {
         try { await next(context); }
@@ -107,7 +108,8 @@ try
     });
     app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization();
     // Nhóm endpoint Admin tự kiểm tra quyền; không thay các API Web/POS đã được nhóm phát triển.
-    app.MapOrderAdministration(); app.MapRefundAdministration(); app.MapInvoiceAdministration(); app.MapReportAdministration(); app.MapStockDocuments(); app.MapAdminMenu(); app.MapAdminCustomerAddresses(); app.MapIngredients(); app.MapRecipes(); app.MapInventory();
+    app.MapOrderAdministration();
+FourChang.Api.Features.Staff.Orders.StaffOrderEndpoints.MapStaffOrders(app); app.MapRefundAdministration(); app.MapInvoiceAdministration(); app.MapReportAdministration(); app.MapStockDocuments(); app.MapAdminMenu(); app.MapAdminCustomerAddresses(); app.MapIngredients(); app.MapRecipes(); app.MapInventory();
     app.MapMenuEvents();
     app.MapGet("/api/catalog", async (CatalogReadService catalog) => Results.Ok(await catalog.Read()));
     app.MapCustomerOrderDetails();

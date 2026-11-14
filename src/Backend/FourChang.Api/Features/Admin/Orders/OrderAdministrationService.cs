@@ -12,22 +12,52 @@ namespace FourChang.Api.Features.Admin.Orders;
 public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials money, IConfiguration configuration)
 {
     /// <summary>Tìm/lọc và phân trang ở máy chủ; tiền của từng dòng được đọc trong cùng transaction.</summary>
-    public async Task<AdminPage<AdminOrderRow>> Read(AdminOrderFilter filter)
+    public async Task<AdminPage<AdminOrderRow>> Read(AdminOrderFilter filter, long? currentShift = null)
     {
         if (filter.Trang < 1 || filter.KichThuocTrang is < 1 or > 100 || filter.TuLuc > filter.DenLuc) throw new AdminRule(400, "Bộ lọc/khoảng ngày không hợp lệ.");
+        if (filter.NhomDon is not (null or "NORMAL" or "CANCELLATION" or "COUNTER_REFUND")) throw new AdminRule(400, "Nhóm đơn không hợp lệ.");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var query = db.DonHang.AsNoTracking().AsQueryable();
+        if(filter.PhamViCa is not (null or "CURRENT" or "PREVIOUS" or "ALL"))throw new AdminRule(400,"Nhóm ca không hợp lệ.");
+        var incoming=currentShift is {} active?await FourChang.Api.Shared.WorkSessions.HandoverLink.ForReceiver(db,active):null;
+        var received=incoming?.MaDonBanGiao??[];
+        if(currentShift is {} filterCa)
+        {
+            if(filter.PhamViCa=="CURRENT")query=query.Where(x=>x.MaCaLamViec==filterCa || x.MaCaLamViec==null&&x.KenhDatHang=="WEB"&&(x.TrangThai=="PENDING_CONFIRMATION"||x.TrangThai=="PENDING_PAYMENT"));
+            else if(filter.PhamViCa=="PREVIOUS")query=query.Where(x=>received.Contains(x.MaDonHang));
+        }
+        // Lọc nhóm TRƯỚC Count/Skip/Take: tổng số và phân trang không bị sai vì lọc lại một trang ở UI.
+        var waitingCancellation = from c in db.HuyMon join line in db.ChiTietDonHang on c.MaChiTietDonHang equals line.MaChiTietDonHang
+            where c.TrangThai == "REQUESTED" select line.MaDonHang;
+        if (filter.NhomDon == "CANCELLATION") query = query.Where(x => x.TrangThai == "CANCELLED" || waitingCancellation.Contains(x.MaDonHang));
+        if (filter.NhomDon == "COUNTER_REFUND")
+        {
+            var cashRefundOrders = db.HoSoHoanTien.Where(x => x.PhuongThucHoan == "CASH" && x.MaQuanLyDuyet != null &&
+                (x.TrangThai == "APPROVED" || x.TrangThai == "PARTIALLY_REFUNDED" || x.TrangThai == "REFUNDED")).Select(x => x.MaDonHang);
+            query = query.Where(x => x.TrangThai == "CANCELLED" && cashRefundOrders.Contains(x.MaDonHang));
+        }
+        if (filter.NhomDon == "NORMAL") query = query.Where(x => x.TrangThai != "CANCELLED" && !waitingCancellation.Contains(x.MaDonHang));
         if (!string.IsNullOrWhiteSpace(filter.Kenh)) query = query.Where(x => x.KenhDatHang == filter.Kenh);
         if (!string.IsNullOrWhiteSpace(filter.HinhThuc)) query = query.Where(x => x.HinhThucNhanMon == filter.HinhThuc);
         if (!string.IsNullOrWhiteSpace(filter.TrangThai)) query = query.Where(x => x.TrangThai == filter.TrangThai);
         if (filter.TuLuc is { } start) query = query.Where(x => x.ThoiDiemTao >= start);
         if (filter.DenLuc is { } end) query = query.Where(x => x.ThoiDiemTao < end);
         if (filter.MaCa is { } shift) query = query.Where(x => x.MaCaLamViec == shift);
-        if (!string.IsNullOrWhiteSpace(filter.TimKiem)) { var text = filter.TimKiem.Trim(); query = query.Where(x => x.MaDonHienThi.Contains(text) || x.TenNguoiNhan != null && x.TenNguoiNhan.Contains(text)); }
+        if (!string.IsNullOrWhiteSpace(filter.TimKiem))
+        {
+            var text = filter.TimKiem.Trim();
+            var shortCode = FourChang.Presentation.Shared.Contracts.Common.OrderCode.TryParse(text, out var channel, out var id);
+            query = query.Where(x => shortCode && x.MaDonHang == id && x.KenhDatHang == channel || x.MaDonHienThi.Contains(text) || x.TenNguoiNhan != null && x.TenNguoiNhan.Contains(text));
+        }
         var total = await query.CountAsync();
         var data = await query.OrderByDescending(x => x.MaDonHang).Skip((filter.Trang - 1) * filter.KichThuocTrang).Take(filter.KichThuocTrang).ToListAsync();
         var rows = new List<AdminOrderRow>();
-        foreach (var order in data) rows.Add(await Row(order));
+        foreach (var order in data)
+        {
+            var row=await Row(order);
+            if(currentShift is {} ca)row=row with {NguonCa=received.Contains(order.MaDonHang)?$"Bàn giao từ ca #{incoming!.MaCaNguon}":order.MaCaLamViec==ca?$"Ca này #{ca}":order.MaCaLamViec is {} other?$"Ca khác #{other}":"Đơn Web chờ nhận"};
+            rows.Add(row);
+        }
         var result = new AdminPage<AdminOrderRow>(rows, total, filter.Trang, filter.KichThuocTrang, DateTime.UtcNow);
         await tx.CommitAsync(); return result;
     }
@@ -55,9 +85,20 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
                 x.MaChiTietDonHang, null, id, order.MaCaLamViec, null, null, x.GhiChu)).ToListAsync();
         var history = await db.NhatKyHeThong.AsNoTracking().Where(x => x.LoaiDoiTuong == "DonHang" && x.MaDoiTuong == id.ToString())
             .OrderByDescending(x => x.PhatSinhLuc).ToListAsync();
+        // Đọc thông tin nhận món và thanh toán trong cùng snapshot, không suy từ menu hoặc sửa hồ sơ khách.
+        var table = order.MaBanDaChot;
+        if (string.IsNullOrWhiteSpace(table) && order.MaBan is { } tableId)
+            table = await db.Ban.AsNoTracking().Where(x => x.MaBan == tableId).Select(x => x.TenBan).SingleOrDefaultAsync();
+        var payments = await db.ThanhToan.AsNoTracking().Where(x => x.MaDonHang == id).OrderBy(x => x.MaThanhToan)
+            .Select(x => new AdminOrderPayment(x.PhuongThuc, x.TrangThai)).ToListAsync();
+        // Địa chỉ hồ sơ chỉ để tham khảo; không ghi đè địa chỉ giao đã chốt của đơn.
+        var customerAddress = order.MaKhachHang is { } customerId
+            ? await db.DiaChiKhachHang.AsNoTracking().Where(x => x.MaKhachHang == customerId && x.DangSuDung)
+                .OrderByDescending(x => x.LaDiaChiMacDinh).ThenBy(x => x.MaDiaChi).Select(x => x.DiaChiChiTiet).FirstOrDefaultAsync()
+            : null;
         var result = new AdminOrderDetail(await Row(order), rows, order.DiaChiGiaoDaChot, held, movements,
             history.Select(x => new AdminTraceRow(x.MaNhatKy, x.PhatSinhLuc, x.TenNguoiThucHienDaChot, x.MaCaLamViec, x.MaMayDaChot,
-                x.HanhDong, x.LyDo, x.KetQua, x.DuLieuTruocJson, x.DuLieuSauJson, x.MaLienKetXuLy)).ToList(), ingredientRows);
+                x.HanhDong, x.LyDo, x.KetQua, x.DuLieuTruocJson, x.DuLieuSauJson, x.MaLienKetXuLy)).ToList(), ingredientRows, order.TenNguoiNhan, order.DienThoaiNguoiNhan, table, payments, customerAddress);
         await tx.CommitAsync(); return result;
     }
 
@@ -86,8 +127,10 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
         var waitingLimit = double.TryParse(configuration["Operations:WaitingWarningMinutes"], out var minutes) && minutes > 0 ? (double?)minutes : null;
         var warning = order.TrangThai == "DELIVERY_FAILED" ? "Giao thất bại" : balance.PhaiHoan > 0 ? "Cần xử lý hoàn" : balance.ConThu > 0 ? "Chưa thu đủ" :
             order.TrangThai == "PENDING_CONFIRMATION" && waitingLimit is { } limit && DateTime.UtcNow - order.ThoiDiemTao > TimeSpan.FromMinutes(limit) ? "Chờ xác nhận lâu" : "";
-        return new(order.MaDonHang, order.MaDonHienThi, order.KenhDatHang, order.HinhThucNhanMon, order.TrangThai, order.MaKhachHang,
+        var pending = await CancellationWorkflow.Pending(db, order.MaDonHang);
+        if (pending is not null) warning = pending.TrangThai == "REQUESTED" ? "Khách yêu cầu hủy · chờ Nhân viên chuyển" : "Yêu cầu hủy · chờ Quản lý duyệt";
+        return new(order.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), order.KenhDatHang, order.HinhThucNhanMon, order.TrangThai, order.MaKhachHang,
             order.MaCaLamViec, employee?.HoTen, shift?.MaMay, order.ThoiDiemTao, order.HoanTatLuc, Math.Max(0, balance.NghiaVu - order.PhiGiaoHangHienTai),
-            order.PhiGiaoHangHienTai, balance, order.PhienBanDuLieu, warning);
+            order.PhiGiaoHangHienTai, balance, order.PhienBanDuLieu, warning, pending);
     }
 }

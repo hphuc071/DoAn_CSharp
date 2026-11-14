@@ -41,11 +41,16 @@ public sealed class MainForm:Form
         var links=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.TopDown,WrapContents=false,AutoScroll=true,Padding=new Padding(0,8,0,0)};
         void Add(string route,string caption)
         {
-            var navigationCaption=staffLayout?route switch {"sale"=>"Bán hàng","orders"=>"Đơn hàng","cancel"=>"Hủy món","payment"=>"Hóa đơn","shift"=>"Ca làm",_=>caption}:caption;
+            var navigationCaption=staffLayout?route switch {"sale"=>"Bán hàng","orders"=>"Đơn hàng","cancel"=>"Đơn hủy","payment"=>"Hóa đơn","shift"=>"Ca làm",_=>caption}:caption;
             var b=new NavigationButton(navigationCaption,route,staffLayout){Width=staffLayout?88:188,Height=staffLayout?78:40,Margin=new Padding(0,0,0,4)};b.Click+=(_,_)=>Navigate(route);navigation[route]=b;links.Controls.Add(b);
         }
         if(role=="Admin")Add("dashboard","Tổng quan");
-        foreach(var s in ScreenCatalog.All.Where(s=>s.Role==role).OrderBy(s=>role=="Staff" ? s.Route switch { "sale"=>0,"orders"=>1,"cancel"=>2,"payment"=>3,_=>4 } : 0))Add(s.Route,s.Name);
+        foreach(var s in ScreenCatalog.All.Where(s=>s.Role==role).OrderBy(s=>role=="Staff" ? s.Route switch { "sale"=>0,"orders"=>1,"cancel"=>2,"payment"=>3,_=>4 } : 0))
+        {
+            Add(s.Route,s.Name);
+            // Hai danh sách thuộc cùng chức năng đơn hàng, không tạo mã UC mới.
+            if (role == "Admin" && s.Route == "manage-orders") Add("cancelled-orders", "Đơn hàng hủy");
+        }
         var foot=new Label{Text=role=="Staff"?"POS":"4CHANG",Dock=DockStyle.Bottom,Height=38,Padding=new Padding(4,8,0,0),Font=CafeTheme.Body(8),ForeColor=Color.FromArgb(192,171,150)};
         side.Controls.Add(links);side.Controls.Add(foot);side.Controls.Add(brand);
         var main=new Panel{Dock=DockStyle.Fill};
@@ -76,7 +81,7 @@ public sealed class MainForm:Form
             (FourChang.Desktop.Shared.Session.LiveSession.ShiftLocked || FourChang.Desktop.Shared.Session.LiveSession.Current?.Role == "STAFF_RECONCILIATION")) route = "shift";
         foreach(var pair in navigation)pair.Value.BackColor=pair.Key==route?CafeTheme.Coffee:CafeTheme.Dark;
         var definition=ScreenCatalog.All.FirstOrDefault(s=>s.Role==role&&s.Route==route);
-        pageTitle.Text=definition?.Name??"Tổng quan hoạt động";
+        pageTitle.Text=route == "cancelled-orders" ? "Đơn hàng hủy" : definition?.Name??"Tổng quan hoạt động";
         Control body=!FourChang.Desktop.Shared.Session.LiveSession.Preview ? FourChang.Desktop.Shared.Database.DatabaseViews.Create(role,route) : route switch
         {
             "shift"=>ShiftView.Create(sessionName),"sale"=>SaleView.Create(),"orders"=>OrdersView.Create(),"cancel"=>CancelView.Create(),"payment"=>PaymentView.Create(),

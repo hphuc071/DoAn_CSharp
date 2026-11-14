@@ -16,7 +16,6 @@ public sealed class WorkSessionDetailsForm : Form
     private readonly Label message = Ui.Label("", 9, false, CafeTheme.Muted);
     private readonly Button closeShift;
     private readonly Button handover;
-    private readonly Button resume;
     private readonly Button recovery;
     private readonly Button reload;
     private readonly Button dismiss;
@@ -24,7 +23,6 @@ public sealed class WorkSessionDetailsForm : Form
     private int activeTab;
     private CloseWorkSessionInput? pendingClose;
     private HandoverWorkSessionInput? pendingHandover;
-    private ResumeWorkSessionInput? pendingResume;
     private IssueShiftRecoveryInput? pendingRecovery;
 
     /// <summary>Hiển thị thực đếm chưa nhập bằng chữ, không đổi NULL thành 0; nút nằm ngoài vùng cuộn.</summary>
@@ -35,13 +33,12 @@ public sealed class WorkSessionDetailsForm : Form
         BackColor = CafeTheme.Cream; Font = CafeTheme.Body(); AutoScaleMode = AutoScaleMode.Dpi;
         closeShift = Button("Xác nhận chốt", CloseShift, true); closeShift.Name = "AdminConfirmShift";
         handover = Button("Bàn giao", Handover); handover.Name = "AdminHandoverShift";
-        resume = Button("Cho tiếp tục ca", Resume); resume.Name = "AdminResumeShift";
         recovery = Button("Cấp mã phục hồi", IssueRecovery); recovery.Name = "AdminIssueShiftRecovery";
         reload = Button("Tải lại đối chiếu", Reload);
         dismiss = Ui.Button("Đóng", () => Close());
         var body = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(16) };
         body.Controls.Add(AdminListLayout.Column(snapshot, message));
-        AdminUi.Compose(this, body, closeShift, handover, resume, recovery, reload, dismiss);
+        AdminUi.Compose(this, body, closeShift, handover, recovery, reload, dismiss);
         ShowSnapshot();
         Shown += (_, _) => ResetViewport();
         FormClosing += (_, e) => { if (busy) e.Cancel = true; };
@@ -64,7 +61,7 @@ public sealed class WorkSessionDetailsForm : Form
     /// <summary>Ngăn đổi sang lệnh khác khi lần ghi trước chưa rõ kết quả; vẫn cho thử lại đúng lệnh và tải lại.</summary>
     private bool CanStart(string action)
     {
-        var waiting = pendingClose is not null ? "chốt" : pendingHandover is not null ? "bàn giao" : pendingResume is not null ? "tiếp tục" : pendingRecovery is not null ? "phục hồi" : null;
+        var waiting = pendingClose is not null ? "chốt" : pendingHandover is not null ? "bàn giao" : pendingRecovery is not null ? "phục hồi" : null;
         if (waiting is null || waiting == action) return true;
         message.Text = $"Lệnh {waiting} chưa rõ kết quả. Hãy thử lại đúng lệnh để tra receipt trước khi làm việc khác.";
         return false;
@@ -92,11 +89,13 @@ public sealed class WorkSessionDetailsForm : Form
         var status = ca.TrangThai switch { "OPEN" => "Đang mở", "CLOSED" => "Đã chốt", "HANDED_OVER" => "Đã bàn giao", _ => data.DangChoDoiChieu ? "Khóa chờ đối chiếu" : data.SuKienTrangThai == "SHIFT_TEMP_LOCKED" ? "Khóa tạm" : data.SuKienTrangThai == "SHIFT_RECOVERY_ISSUED" ? "Khóa phục hồi · chờ nhân viên gửi đối chiếu" : "Đang khóa · cần kiểm tra lịch sử" };
         var header = Ui.Panel($"{ca.HoTen} · Ca #{ca.MaCaLamViec}",
             Ui.Label($"Mã NV {ca.MaNhanVien} · Ca {ca.TenCa} · Máy (lịch sử): {ca.MaMay} · Bắt đầu {ca.BatDauLuc.ToLocalTime():dd/MM/yyyy HH:mm}", 10),
-            Ui.Label($"{status} · Cập nhật {data.DuLieuTaiLuc.ToLocalTime():dd/MM/yyyy HH:mm:ss}", 10, true));
+            Ui.Label(status, 10, true),
+            Ui.Label($"Đã hoàn thành: {data.SoDonHoanThanh} đơn · Tổng tiền: {data.TongTienDonHoanThanh:N0}đ", 12, true));
         var cash = Ui.Panel("Đối chiếu tiền mặt", MoneyGrid(("Tiền đầu ca", Money(ca.TienMatDauCa)), ("Thu đã xác minh", Money(data.ThuTienMat)),
             ("Hoàn thành công", Money(data.HoanTienMat)), ("Dự kiến", Money(data.TienMatDuKienHienTai)),
-            ("Thực đếm", ca.TienMatThucDem is { } amount ? Money(amount) : "Chưa gửi")),
-            Ui.Label($"Chênh lệch: {(data.ChenhLech is { } delta ? Money(delta) : "Chưa có thực đếm")} · Lý do: {ca.LyDoChenhLech ?? "Chưa có"}", 10, false, CafeTheme.Muted));
+            ("Tiền cuối ca", ca.TienMatThucDem is { } amount ? Money(amount) : "Chưa gửi"),
+            ("Tiền mặt thu được", data.TienThuDuoc is { } received ? Money(received) : "Chưa gửi")),
+            Ui.Label($"Chênh lệch: {(data.ChenhLech is { } delta ? Money(delta) : "Chưa có thực đếm")}", 10, false, CafeTheme.Muted));
         WrapCardLabels(header); WrapCardLabels(cash);
         var columns = new (string, string)[] { ("Loai", "Thu / hoàn"), ("Ma", "Mã nguồn"), ("MaDonHang", "Mã đơn"), ("ThamChieu", "Tham chiếu"), ("PhuongThuc", "Phương thức"), ("SoTien", "Số tiền"), ("TrangThai", "Trạng thái") };
         var cashGrid = Grid("ShiftCashTransactions", data.GiaoDich.Where(x => x.PhuongThuc == "CASH").ToList(), columns);
@@ -130,7 +129,7 @@ public sealed class WorkSessionDetailsForm : Form
             if (parent is ScrollableControl { AutoScroll: true } scroll) scroll.AutoScrollPosition = Point.Empty;
     }
 
-    /// <summary>Năm cột cố định theo tỷ lệ: tránh đo Flow lồng nhau làm card tiền mặt cao rỗng hàng trăm px.</summary>
+    /// <summary>Các cột chia theo tỷ lệ: tránh đo Flow lồng nhau làm card tiền mặt cao rỗng hàng trăm px.</summary>
     private static Control MoneyGrid(params (string Caption, string Value)[] values)
     {
         var row = new TableLayoutPanel { Dock = DockStyle.Top, Height = 110, ColumnCount = values.Length, RowCount = 1, Margin = Padding.Empty };
@@ -169,7 +168,6 @@ public sealed class WorkSessionDetailsForm : Form
         var active = data.Ca.KetThucLuc is null;
         closeShift.Enabled = !busy && (pendingClose is not null || active && data.DangChoDoiChieu && data.DonDangXuLy.Count == 0 && data.KhoanChuaRo.Count == 0);
         handover.Enabled = !busy && (pendingHandover is not null || active && data.DangChoDoiChieu);
-        resume.Enabled = !busy && (pendingResume is not null || active && data.Ca.TrangThai == "LOCKED" && !data.DangChoDoiChieu && data.CoYeuCauKhoiPhuc);
         recovery.Enabled = !busy && (pendingRecovery is not null || active);
         reload.Enabled = dismiss.Enabled = !busy;
     }
@@ -219,23 +217,6 @@ public sealed class WorkSessionDetailsForm : Form
             Ui.Label($"Bàn giao toàn bộ {data.DonDangXuLy.Count} đơn đang xử lý và {data.KhoanChuaRo.Count} khoản chưa rõ trong đối chiếu hiện tại.", 9, false, CafeTheme.Muted), error), confirm, Ui.Button("Hủy", () => form.Close()));
         return form.ShowDialog(this) == DialogResult.OK ? new((long)receiver.SelectedValue!, machine.Text, reason.Text,
             data.DonDangXuLy.Select(x => x.MaDonHang).ToArray(), data.KhoanChuaRo.ToArray(), data.Ca.PhienBanDuLieu, Guid.NewGuid(), data.MaDoiChieu) : null;
-    }
-
-    /// <summary>Khôi phục khóa tạm cần yêu cầu từ phiên POS còn hợp lệ; không mở lại ca chốt hoặc tự xóa thực đếm.</summary>
-    private async Task Resume()
-    {
-        if (!CanStart("tiếp tục")) return;
-        if (pendingResume is null)
-        {
-            var reason = WorkforceDialogs.Reason(this, "Cho tiếp tục ca khóa tạm", "POS phải còn giữ phiên hợp lệ và đã gửi yêu cầu tiếp tục. Ca chờ đối chiếu cần chốt/bàn giao.");
-            if (reason is null) return; pendingResume = new(reason, data.Ca.PhienBanDuLieu, Guid.NewGuid());
-        }
-        try
-        {
-            await AdminUi.Recover(() => LiveSession.Api.ResumeWorkSessionAsync(data.Ca.MaCaLamViec, pendingResume), () => LiveSession.Api.ReadWorkSessionReceiptAsync<WorkSessionInfo>(pendingResume.MaThaoTac));
-            pendingResume = null; await Reload(); message.Text = "Đã cho tiếp tục ca. Nhân viên tải lại tại POS bằng phiên đã lưu.";
-        }
-        catch (CafeApiException ex) { if (ex.StatusCode is not null && (int)ex.StatusCode < 500) pendingResume = null; throw; }
     }
 
     /// <summary>Mã chỉ hiển thị lần đầu, không lưu vào audit hoặc receipt. Sau timeout không đoán lại mã cũ.</summary>

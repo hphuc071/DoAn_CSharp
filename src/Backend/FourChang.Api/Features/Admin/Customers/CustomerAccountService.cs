@@ -49,7 +49,7 @@ public sealed class CustomerAccountService(CafeDbContext db)
         var references = await References(id);
         var orders = db.DonHang.AsNoTracking().Where(x => x.MaKhachHang == id);
         var recent = await orders.OrderByDescending(x => x.MaDonHang).Take(20)
-            .Select(x => new CustomerReference("Đơn hàng", x.MaDonHienThi, x.TrangThai)).ToListAsync();
+            .Select(x => new CustomerReference("Đơn hàng", FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TrangThai)).ToListAsync();
         recent.AddRange(await (from payment in db.ThanhToan.AsNoTracking() join order in orders on payment.MaDonHang equals order.MaDonHang
             orderby payment.MaThanhToan descending select new CustomerReference("Thanh toán", payment.MaThanhToanHienThi, payment.TrangThai)).Take(20).ToListAsync());
         recent.AddRange(await (from invoice in db.HoaDon.AsNoTracking() join order in orders on invoice.MaDonHang equals order.MaDonHang

@@ -15,7 +15,7 @@ public static class ScreenCatalog
         new("UC-POS-01", "Ca làm việc", "shift", "Staff", "Chọn hồ sơ nhân viên và ca làm; không đăng nhập nhân viên."),
         new("UC-POS-02", "Bán hàng", "sale", "Staff", "Đơn tại bàn/mang đi, cấu hình món và giỏ POS."),
         new("UC-POS-03", "Đơn hàng", "orders", "Staff", "Tiếp nhận/từ chối, pha từng phần, sẵn sàng, bàn giao và sự cố giao."),
-        new("UC-POS-04", "Hủy món", "cancel", "Staff", "Chọn số ly chưa pha, lý do bắt buộc và khoản hoàn dự kiến."),
+        new("UC-POS-04", "Đơn hàng hủy", "cancel", "Staff", "Yêu cầu hủy, chuyển Quản lý và hoàn tiền mặt được duyệt tại quầy."),
         new("UC-POS-05", "Thu tiền và hóa đơn", "payment", "Staff", "Tiền mặt/VietQR, tiền thừa, hóa đơn, in lại/xuất; Web không thu lại."),
         new("UC-ADM-01", "Khách hàng", "customers", "Admin", "Hồ sơ Customer, khóa/mở, mật khẩu tạm, lịch sử và xóa có điều kiện."),
         new("UC-ADM-12", "Ca làm việc", "work-sessions", "Admin", "Đối chiếu ca, chốt, bàn giao và khôi phục theo phiên; không quản trị thiết bị."),
@@ -32,5 +32,5 @@ public static class ScreenCatalog
         new("UC-ADM-10", "Báo cáo và nhật ký", "reports", "Admin", "Doanh thu TM/CK, tỷ lệ đơn, top món, cảnh báo kho và audit theo quyền riêng.")
     ];
     /// <summary>Tra định nghĩa màn hình theo vai trò/route; tài khoản Admin dùng chung không chiếm số UC nghiệp vụ.</summary>
-    public static ScreenDefinition Find(string role, string route) => route == "access" && role == "Admin" ? new("COMMON-ADMIN-AUTH", "Tài khoản quản lý", "access", "Admin", "Đăng nhập, đăng xuất và đổi mật khẩu Quản lý.") : All.First(s => s.Role == role && s.Route == route);
+    public static ScreenDefinition Find(string role, string route) => role == "Admin" && route == "cancelled-orders" ? new("UC-ADM-07", "Đơn hàng hủy", route, role, "Yêu cầu chờ duyệt và đơn đã hủy.") : route == "access" && role == "Admin" ? new("COMMON-ADMIN-AUTH", "Tài khoản quản lý", "access", "Admin", "Đăng nhập, đăng xuất và đổi mật khẩu Quản lý.") : All.First(s => s.Role == role && s.Route == route);
 }

@@ -29,6 +29,7 @@ public sealed class EmployeesPage : UserControl
     /// <summary>Dựng khung đồng bộ các trang quản lý đã tinh chỉnh, giữ mã nội bộ làm khóa chọn dòng.</summary>
     public EmployeesPage()
     {
+        message.Visible = false; message.TextChanged += (_, _) => message.Visible = !string.IsNullOrWhiteSpace(message.Text);
         Name = "EmployeesPage"; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Dock = DockStyle.Top; Padding = new Padding(16); BackColor = CafeTheme.Cream;
         search.Name = "EmployeeSearch"; status.Name = "EmployeeStatusFilter"; grid.Name = "EmployeesGrid";
         foreach (var (property, caption, weight) in new[] { ("MaNhanVien", "Mã", 45f), ("HoTen", "Họ tên", 150f), ("SoDienThoai", "Điện thoại", 100f),
@@ -90,9 +91,9 @@ public sealed class EmployeesPage : UserControl
             grid.DataSource = data.Items.ToList();
             loaded = DateTime.Now;
             counter.Text = $"Trang {page}/{Math.Max(1, (total + 19) / 20)} · {total} nhân viên";
-            message.Text = "Cập nhật " + loaded.Value.ToString("HH:mm:ss");
+            message.Text = "";
         }
-        catch (CafeApiException ex) { message.Text = ex.Message + (loaded is null ? " Chưa tải được hồ sơ." : " · Dữ liệu cũ lúc " + loaded.Value.ToString("HH:mm:ss")); }
+        catch (CafeApiException ex) { message.Text = ex.Message + (loaded is null ? " Chưa tải được hồ sơ." : " · Đang hiển thị dữ liệu đã tải trước đó."); }
     }
 
     /// <summary>Bộ lọc mới luôn bắt đầu trang đầu.</summary>

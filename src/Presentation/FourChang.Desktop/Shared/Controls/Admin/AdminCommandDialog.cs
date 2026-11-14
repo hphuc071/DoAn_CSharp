@@ -38,6 +38,11 @@ internal sealed class AdminCommandDialog<T> : Form where T : class
         var input = Ui.Input(label, value ?? "", 620); input.MaxLength = max;
         fields.Controls.Add(Ui.Field(label, input)); return input;
     }
+    /// <summary>Đưa hướng dẫn chỉ đọc vào đúng vùng cuộn; không dựng input hoặc nhãn không dùng.</summary>
+    internal void Info(string text)
+    {
+        var label = Ui.Label(text, 10, false, CafeTheme.Muted); label.MaximumSize = new Size(620, 0); label.Margin = new Padding(0, 8, 0, 12); fields.Controls.Add(label);
+    }
     /// <summary>Thêm số decimal chính xác, không dùng float hoặc parse text theo vùng.</summary>
     internal NumericUpDown NumberField(string label, decimal value = 0, int decimals = 0)
     {

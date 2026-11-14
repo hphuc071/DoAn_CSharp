@@ -212,13 +212,13 @@ public sealed class OrderReadTests
 
     [Theory]
     [InlineData("customer-a")] [InlineData("customer-b")]
-    public async Task No_customer_can_cancel_any_order_through_web_while_write_is_locked(string token)
+    public async Task Missing_version_and_operation_never_reach_cancellation_backend(string token)
     {
         var stub = new Stub(_ => throw new InvalidOperationException("No outbound request allowed"));
         var index = Page(new OrdersPage(Client(stub)), token);
         var detail = Page(new DetailsModel(Client(stub)), token);
         Assert.Equal(503, Assert.IsType<ObjectResult>(await index.OnPostCancelAsync(7, "Đổi ý", default)).StatusCode);
-        Assert.Equal(503, Assert.IsType<ObjectResult>(await detail.OnPostCancelAsync(7, "Đổi ý", default)).StatusCode);
+        Assert.IsType<BadRequestObjectResult>(await detail.OnPostCancelAsync(7, "Đổi ý", default));
         Assert.Equal(0, stub.Calls);
     }
 

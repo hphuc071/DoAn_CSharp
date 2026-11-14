@@ -56,13 +56,13 @@ public static class DashboardPage
                 if (IsDisposed) return;
                 Render(await totals, await menu, await stock, await audit);
                 loadedAt = DateTime.Now;
-                sync.Text = "Toàn bộ dữ liệu hiện tại · Cập nhật " + loadedAt.Value.ToString("HH:mm:ss");
+                sync.Text = "";
                 sync.ForeColor = CafeTheme.Muted;
             }
             catch (CafeApiException error)
             {
                 if (IsDisposed) return;
-                sync.Text = error.Message + (loadedAt is null ? " Chưa tải được số liệu." : " · Đang giữ dữ liệu lúc " + loadedAt.Value.ToString("HH:mm:ss"));
+                sync.Text = error.Message + (loadedAt is null ? " Chưa tải được số liệu." : " · Đang hiển thị dữ liệu đã tải trước đó.");
                 sync.ForeColor = CafeTheme.Danger;
             }
             finally { loading = false; if (!reload.IsDisposed) reload.Enabled = true; }

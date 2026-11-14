@@ -567,14 +567,14 @@
       ],
       "indexes": [
         [
-          "UX_Ca_MayDangMo",
+          "IX_Ca_MayDangMo",
           [
             "MaMay"
           ],
           "KetThucLuc IS NULL"
         ],
         [
-          "UX_Ca_NhanVienDangMo",
+          "IX_Ca_NhanVienDangMo",
           [
             "MaNhanVien"
           ],

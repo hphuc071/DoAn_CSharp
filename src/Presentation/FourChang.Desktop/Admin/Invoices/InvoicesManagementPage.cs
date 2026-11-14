@@ -1,6 +1,7 @@
 using System.Drawing.Printing;
 using System.Text.Json;
 using FourChang.Desktop.Admin.Orders;
+using FourChang.Desktop.Shared.Invoices;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
@@ -46,13 +47,8 @@ public sealed class InvoicesManagementPage : AdminWorkspacePage<AdminInvoiceView
     {
         var selected = Selected(); if (selected is null) return;
         var data = await LiveSession.Api.GetAdminInvoiceAsync(selected.MaHoaDon);
-        using var form = AdminUi.Dialog("Hóa đơn " + selected.SoHoaDon, 1080, 750);
-        var snapshot = new RichTextBox { ReadOnly = true, Dock = DockStyle.Fill, Height = 440, BackColor = CafeTheme.Surface, Font = CafeTheme.Body(), Text = SnapshotText(data) };
-        form.Controls.Add(Ui.Panel(selected.SoHoaDon,
-            Ui.Row(new MetricCard("Giá trị chứng từ",$"{selected.SoTien:N0}đ","Theo hóa đơn đã phát hành",0){Width=285,Height=112},
-                new MetricCard("Đã thu",$"{data.TaiChinh.DaThu:N0}đ","Theo giao dịch đã xác nhận",1){Width=285,Height=112},
-                new MetricCard("Đã hoàn",$"{data.TaiChinh.DaHoan:N0}đ","Chỉ các lần chi thành công",2){Width=285,Height=112}),
-            Ui.Tabs(("Nội dung đã phát hành", snapshot), ("Chứng từ điều chỉnh", OrdersManagementPage.DataGrid(data.DieuChinh)), ("Lịch sử in/phát hành", OrdersManagementPage.DataGrid(data.LichSu)))));
+        var order = await LiveSession.Api.GetAdminOrderAsync(selected.MaDonHang);
+        using var form = new InvoiceDetailsForm(data.HoaDon, data.SnapshotJson, order);
         form.ShowDialog(FindForm());
     }
     /// <summary>Chọn nguồn hủy hoặc hoàn khiếu nại đã duyệt; hoàn thừa/muộn không được giảm hóa đơn.</summary>

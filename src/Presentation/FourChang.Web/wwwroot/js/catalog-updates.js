@@ -22,7 +22,7 @@
 
   /** Đổi phần hiển thị giá/còn hết, giữ nguyên ID để giỏ tiếp tục dùng mã cấu hình server. */
   function updateCard(card, dish) {
-    const variant = dish.cauHinh.find(x => x.laMacDinh) ?? dish.cauHinh[0];
+    const variant = dish.cauHinh.find(x => x.laMacDinh && x.conHang) ?? dish.cauHinh.find(x => x.conHang) ?? dish.cauHinh.find(x => x.laMacDinh) ?? dish.cauHinh[0];
     const available = dish.dangBan && dish.cauHinh.some(x => x.conHang);
     Object.assign(card.dataset, { mamon: String(dish.maMon), name: dish.tenMon, category: dish.tenDanhMuc, price: String(variant.giaBan), available: String(available) });
     card.classList.toggle("sold-out", !available);

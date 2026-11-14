@@ -86,7 +86,7 @@ internal static class WorkforceUiChecks
         {
             using var detail = new WorkSessionDetailsForm(await LiveSession.Api.GetWorkSessionAsync(id)) { StartPosition = FormStartPosition.Manual, Location = new Point(-12000, -12000) };
             detail.Show(); await Task.Delay(150);
-            var countedLabel = Descendants(detail).OfType<Label>().Single(x => x.Text == "Chưa gửi");
+            var countedLabel = Descendants(detail).OfType<Label>().First(x => x.Text == "Chưa gửi");
             var countedBounds = detail.RectangleToClient(countedLabel.RectangleToScreen(countedLabel.ClientRectangle));
             Assert.True(countedBounds.Top >= 0 && countedBounds.Bottom <= detail.ClientSize.Height - 60, $"Phần thực đếm bị che khi mở đối chiếu: {countedBounds}");
             // Chặn tái xuất hiện lỗi AutoSize làm thẻ tiền giãn thành khoảng trống quá lớn.
@@ -149,12 +149,20 @@ internal static class WorkforceUiChecks
             var returnedToEntry = false;
             staff.ReauthenticationRequested += (_, _) => returnedToEntry = true;
             staff.Show();
-            await WaitUntil(() => Find<Button>(staff, "SubmitShiftReconciliation").Enabled);
+            await WaitUntil(() => Find<NumericUpDown>(staff, "ShiftCountedCash").Enabled);
             Assert.False(Find<Button>(staff, "CloseStaffShift").Enabled);
             staff.Navigate("sale");
-            await WaitUntil(() => Find<Button>(staff, "SubmitShiftReconciliation").Enabled);
+            await WaitUntil(() => Find<NumericUpDown>(staff, "ShiftCountedCash").Enabled);
             Assert.Contains(Descendants(staff), x => x.Name == "StaffShiftPage");
+            Assert.DoesNotContain(Descendants(staff),x=>x.Name=="ShiftCashReason"||x.Text=="Tạm khóa ca"||x.Text=="Đề nghị tiếp tục ca");
+            Find<NumericUpDown>(staff,"ShiftCountedCash").Value=750000;
+            Assert.DoesNotContain(Descendants(staff),x=>x.Name=="ShiftCashReceived"||x.Text=="Tiền mặt thuần từ đơn");
+            Assert.Contains("Chưa khớp",Find<Label>(staff,"ShiftCashDifference").Text);
+            Assert.False(Find<Button>(staff,"SubmitShiftReconciliation").Enabled);
+            Capture(staff,Path.Combine(output,"UC-ADM-12-pos-cash-received.png"));
             Find<NumericUpDown>(staff, "ShiftCountedCash").Value = 500000;
+            Assert.Equal("Đã khớp",Find<Label>(staff,"ShiftCashDifference").Text);
+            Assert.True(Find<Button>(staff,"SubmitShiftReconciliation").Enabled);
             Capture(staff, Path.Combine(output, "UC-ADM-12-pos-reconciliation.png"));
             Find<Button>(staff, "SubmitShiftReconciliation").PerformClick();
             await WaitUntil(() => returnedToEntry);

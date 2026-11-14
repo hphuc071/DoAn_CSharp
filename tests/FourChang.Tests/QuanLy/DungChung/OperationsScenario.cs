@@ -8,7 +8,10 @@ internal sealed record OperationsScenario(long Order, long Line, long Payment, l
 internal static class OperationsScenarioSeed
 {
     /// <summary>Tạo ca/đơn/snapshot/giữ chỗ/thu có kiểm soát trong database fixture GUID để test hành vi quản trị.</summary>
-    internal static async Task<OperationsScenario> Create(AdminFeatureFixture fixture, string state = "PENDING_CONFIRMATION", bool paid = true, bool invoice = false)
+    internal static Task<OperationsScenario> Create(AdminFeatureFixture fixture, string state = "PENDING_CONFIRMATION", bool paid = true, bool invoice = false) => Create(fixture.Api, state, paid, invoice);
+
+    /// <summary>Tái sử dụng seed cho fixture API độc lập với flag theo từng luồng; không ảnh hưởng môi trường ứng dụng.</summary>
+    internal static async Task<OperationsScenario> Create(TestApi api, string state = "PENDING_CONFIRMATION", bool paid = true, bool invoice = false)
     {
         var key = Guid.NewGuid().ToString("N")[..16];
         var sql = $"""
@@ -34,7 +37,7 @@ internal static class OperationsScenarioSeed
             {(invoice ? "INSERT dbo.HoaDon(SoHoaDon,MaDonHang,LoaiHoaDon,TenNguoiMua,SoTien,NoiDungHoaDonDaChotJson,TrangThai,PhatHanhLuc,MaQuanLyPhatHanh,MaCaLamViec) VALUES('HD-" + key + "',@dh,'ORIGINAL',N'Nguyễn Tuấn Kiệt',2*@price,N'{\"Version\":1,\"Mon\":\"Cà phê đã chốt\",\"SoLy\":2}', 'ISSUED',SYSUTCDATETIME(),1,@ca); SET @inv=SCOPE_IDENTITY();" : "")}
             SELECT CONCAT(@dh,',',@line,',',@pay,',',@ca,',',ISNULL(CONVERT(varchar(30),@inv),'0'),',',CONVERT(varchar(30),2*@price));
             """;
-        var values = (await fixture.Api.Sql(sql)).Split(',');
+        var values = (await api.Sql(sql)).Split(',');
         return new(long.Parse(values[0]), long.Parse(values[1]), long.Parse(values[2]), long.Parse(values[3]), values[4] == "0" ? null : long.Parse(values[4]), decimal.Parse(values[5], System.Globalization.CultureInfo.InvariantCulture));
     }
 }

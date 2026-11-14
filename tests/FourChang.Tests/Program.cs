@@ -26,6 +26,8 @@ internal static class Program
                 "UC-ADM-01" => CustomersUiTests.RunHarness([args[2]]),
                 "UC-ADM-02" => AccessUiTests.RunHarness([args[2]]),
                 "UC-POS-01" => EntryUiTests.RunHarness([args[2]]),
+                "CANCELLATION" => FourChang.Tests.Staff.CancellationDesktopTests.RunHarness(args[2]),
+                "ORDER-REFRESH" => FourChang.Tests.Staff.OrderListRefreshTests.RunHarness(args[2]),
                 _ => 2
             };
         }

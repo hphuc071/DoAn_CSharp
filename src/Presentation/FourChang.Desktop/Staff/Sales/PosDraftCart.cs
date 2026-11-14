@@ -6,7 +6,7 @@ namespace FourChang.Desktop.Staff.Sales;
 public sealed record PosDraftLine(Guid Key, long ProductId, string TenMon, MenuVariantItem Variant,
     MenuBrewOption Brew, int Quantity, string Note, List<OrderToppingInput> Toppings)
 {
-    public string CauHinh => $"{Variant.KichCo} · {(Variant.NhietDo == "HOT" ? "Nóng" : "Lạnh")} · Đường {Brew.PhanTramDuong}% · Đá {Brew.PhanTramDa}%" +
+    public string CauHinh => $"{Variant.KichCo} · {(Variant.NhietDo == "HOT" ? "Nóng" : "Lạnh")} · Đường {Brew.PhanTramDuong}%" + (Variant.NhietDo == "HOT" ? "" : $" · Đá {Brew.PhanTramDa}%") +
         (Toppings.Count == 0 ? "" : " · " + string.Join(", ", Toppings.Select(t => Variant.Toppings.Single(x => x.MaMonThem == t.MaMonThem).TenMonThem + " ×" + t.SoPhanMoiLy)));
     public decimal DonGia => Variant.GiaBan + Toppings.Sum(t => Variant.Toppings.Single(x => x.MaMonThem == t.MaMonThem).GiaMoiPhan * t.SoPhanMoiLy);
     public decimal ThanhTien => checked(DonGia * Quantity);

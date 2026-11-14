@@ -31,6 +31,7 @@ public sealed class ReportsManagementPage : UserControl
     /// <summary>Giữ khu vực lọc, KPI và bảng chi tiết; không dùng biểu đồ/trend giả khi chưa có dữ liệu.</summary>
     public ReportsManagementPage()
     {
+        status.Visible = false; status.TextChanged += (_, _) => status.Visible = !string.IsNullOrWhiteSpace(status.Text);
         Dock = DockStyle.Top; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; AutoScroll = false; Padding = new Padding(16); BackColor = CafeTheme.Cream; Name = "ReportsManagementPage";
         for (var i = 0; i < 4; i++) cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
         load = Ui.Button("Xem báo cáo", () => { }, true); load.Click += async (_, _) => await Reload();
@@ -57,7 +58,7 @@ public sealed class ReportsManagementPage : UserControl
                 channel.SelectedIndex == 0 ? null : channel.Text, fulfillment.SelectedIndex == 0 ? null : fulfillment.Text, shift.Value == 0 ? null : (long)shift.Value));
             if (IsDisposed) return; snapshot = result; Render(result);
         }
-        catch (CafeApiException ex) { if (!IsDisposed) status.Text = ex.Message + (snapshot is null ? " Chưa có báo cáo." : $" · Đang giữ mốc cũ {snapshot.MocDuLieu.ToLocalTime():dd/MM/yyyy HH:mm:ss}"); }
+        catch (CafeApiException ex) { if (!IsDisposed) status.Text = ex.Message + (snapshot is null ? " Chưa có báo cáo." : " · Đang hiển thị báo cáo đã tải trước đó."); }
         finally { if (!load.IsDisposed) load.Enabled = true; }
     }
     /// <summary>KPI có định nghĩa riêng; không cộng doanh thu với thực thu hoặc dùng cùng ngày cho cả thu và hoàn.</summary>
@@ -81,7 +82,7 @@ public sealed class ReportsManagementPage : UserControl
         tabs.SelectedIndexChanged += (_, _) => UpdateRelatedPage();
         tables.Controls.Add(tabs);
         UpdateRelatedPage();
-        status.Text = $"Mốc dữ liệu: {data.MocDuLieu.ToLocalTime():dd/MM/yyyy HH:mm:ss} · {data.MuiGio}";
+        status.Text = "";
         definition.MaximumSize = new Size(Math.Max(600, Width - 100), 0); definition.Text = data.DinhNghia;
     }
     /// <summary>Tạo bảng đúng số dòng/cột của snapshot, không thay dữ liệu thật bằng số minh họa.</summary>

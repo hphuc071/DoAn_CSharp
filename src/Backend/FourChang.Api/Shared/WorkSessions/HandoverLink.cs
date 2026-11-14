@@ -56,4 +56,13 @@ public static class HandoverLink
         }
         return result;
     }
+    /// <summary>Chỉ những đơn nằm trong biên bản ca trước giao cho ca này mới thuộc nhóm nhận bàn giao.</summary>
+    public static async Task<HandoverInfo?> ForReceiver(CafeDbContext db,long shift)
+    {
+        var source=await db.CaLamViec.AsNoTracking().Where(x=>x.MaCaLamViec==shift).Select(x=>x.MaCaBanGiaoTruoc).SingleAsync();
+        if(source is null)return null;
+        var key=source.Value.ToString();
+        var json=await db.NhatKyHeThong.AsNoTracking().Where(x=>x.LoaiDoiTuong=="CaLamViec"&&x.MaDoiTuong==key&&x.HanhDong=="SHIFT_HANDED_OVER").Select(x=>x.DuLieuSauJson).SingleOrDefaultAsync();
+        return json is null?null:Read(json);
+    }
 }

@@ -69,6 +69,26 @@ public sealed class OrderAdministrationTests(AdminFeatureFixture fixture)
         Assert.Equal(stock, await fixture.Api.Sql("SELECT SUM(TonThucTe) FROM dbo.TonKho"));
     }
 
+    /// <summary>Địa chỉ hồ sơ có trên đơn mang đi; thay hồ sơ không làm đổi địa chỉ giao đã chốt.</summary>
+    [Fact]
+    public async Task DiaChiKhachHang_TachRiengDiaChiGiaoDaChot()
+    {
+        var scenario = await OperationsScenarioSeed.Create(fixture);
+        var customer = await fixture.Api.NewCustomer("address");
+        await fixture.Api.Sql($"""
+            UPDATE dbo.DonHang SET MaKhachHang={customer.Id} WHERE MaDonHang={scenario.Order};
+            INSERT dbo.DiaChiKhachHang(MaKhachHang,TenNguoiNhan,DienThoaiNguoiNhan,DiaChiChiTiet,LaDiaChiMacDinh,DangSuDung,ThoiDiemTao,ThoiDiemCapNhat)
+            VALUES({customer.Id},N'Nguyễn Minh Anh','0901234567',N'123 Nguyễn Trãi, TP. Hồ Chí Minh',1,1,SYSUTCDATETIME(),SYSUTCDATETIME());
+            """);
+        var takeaway = await Detail(scenario.Order);
+        Assert.Equal("123 Nguyễn Trãi, TP. Hồ Chí Minh", takeaway.DiaChiKhachHang);
+        Assert.Null(takeaway.DiaChi);
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET HinhThucNhanMon='DELIVERY',DiaChiGiaoDaChot=N'45 Lê Lợi, TP. Hồ Chí Minh' WHERE MaDonHang={scenario.Order}; UPDATE dbo.DiaChiKhachHang SET DiaChiChiTiet=N'Địa chỉ hồ sơ mới' WHERE MaKhachHang={customer.Id}");
+        var delivery = await Detail(scenario.Order);
+        Assert.Equal("45 Lê Lợi, TP. Hồ Chí Minh", delivery.DiaChi);
+        Assert.Equal("Địa chỉ hồ sơ mới", delivery.DiaChiKhachHang);
+    }
+
     /// <summary>Tạo lệnh từ version mới nhất, để test thể hiện rõ việc kiểm tra máy chủ.</summary>
     private async Task Act(long order, string action, long? line = null, int quantity = 0, int expected = 200)
     {

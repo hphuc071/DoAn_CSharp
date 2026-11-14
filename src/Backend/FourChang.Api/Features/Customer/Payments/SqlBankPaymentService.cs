@@ -94,7 +94,7 @@ public sealed class SqlBankPaymentService(CafeDbContext db, IConfiguration confi
                     x.TrangThaiXacMinh == "VERIFIED" && x.ChieuGiaoDich == "IN").SumAsync(x => (decimal?)x.SoTien, ct) ?? 0;
                 if (!hasRefund && requests.Count == 1 && ledgerTotal == payment.SoTienDaXacMinh)
                 {
-                    var snapshot = new CustomerOrderDetail(new(order.MaDonHang, order.MaDonHienThi, order.TrangThai,
+                    var snapshot = new CustomerOrderDetail(new(order.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), order.TrangThai,
                         order.HinhThucNhanMon, order.ThoiDiemTao, order.ThoiDiemCapNhat), Convert.ToBase64String(order.PhienBanDuLieu),
                         order.HetHanLuc, order.TiepNhanLuc, order.HoanTatLuc, order.PhiGiaoHangBanDau, order.PhiGiaoHangHienTai,
                         lines.Select(x => new CustomerOrderLine(x.MaChiTietDonHang, x.TenMonDaChot, x.KichCoDaChot, x.NhietDoDaChot,

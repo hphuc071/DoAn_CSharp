@@ -45,3 +45,6 @@ ADM-03/04 được cấp DELETE có giới hạn trên NguyenLieu, DonViTinh, Qu
 Migration `006-admin-operations-and-finance.sql` đã được chấp thuận: thêm `DonHang.MaXuLyNgoaiLe`, `HoSoHoanTien.LoaiNguon/ChungCuYeuCau`, `HoaDon.MaHoanTien` cùng FK và unique nguồn điều chỉnh. EXPIRED tách hết hạn khỏi hủy chủ động. Giữ 37 bảng, tổng FK là 74. Nguồn hoàn cũ là LEGACY; không tự đoán hoặc xóa dữ liệu.
 
 Xem [hướng dẫn tích hợp ADM-06..10](../../INTEGRATION-ADM-06-10.md).
+## Mở nhiều ca độc lập
+
+`007-independent-work-sessions.sql` bỏ unique trên hai index ca chưa kết thúc theo nhân viên/máy; thay bằng index thường có filter giữ hiệu năng tra cứu. `--init-db` áp dụng idempotent, không thay bảng/cột/FK hay đóng/xóa ca cũ. EF và schema/model hiện tại đã đồng bộ. Xem [quy tắc ca](../../SHIFT-DAILY-RULE.md).

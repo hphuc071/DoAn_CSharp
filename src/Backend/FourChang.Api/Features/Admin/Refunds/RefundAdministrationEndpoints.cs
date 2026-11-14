@@ -8,7 +8,7 @@ namespace FourChang.Api.Features.Admin.Refunds;
 /// <summary>UC-ADM-09: chỉ Admin được yêu cầu, duyệt, ghi lần chi và xác minh sao kê ở các bước riêng.</summary>
 public static class RefundAdministrationEndpoints
 {
-    /// <summary>Không có route cho khách/Staff tự đánh dấu đã hoàn hoặc tự tăng số tiền đã thu.</summary>
+    /// <summary>Giữ các route này riêng Admin. Staff chi tiền mặt đã duyệt qua endpoint counter-refunds, không được tự tăng thu/hạn mức.</summary>
     public static void MapRefundAdministration(this WebApplication app)
     {
         var g = app.MapGroup("/api/admin/refunds").RequireAuthorization("Admin");

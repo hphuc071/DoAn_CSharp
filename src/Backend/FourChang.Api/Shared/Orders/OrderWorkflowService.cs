@@ -16,12 +16,19 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
         {
             await LockOrder(id);
             var order = await db.DonHang.SingleOrDefaultAsync(x => x.MaDonHang == id) ?? throw new AdminRule(404, "Không tìm thấy đơn.");
-            AdminOperation.Version(input.PhienBanDuLieu, order.PhienBanDuLieu); AdminOperation.Reason(input.LyDo);
+            AdminOperation.Version(input.PhienBanDuLieu, order.PhienBanDuLieu);
+            var reason = input.LyDo;
+            // Bước pha/bàn giao thường lệ không yêu cầu gõ lý do; nhật ký vẫn có nội dung rõ ràng.
+            if ((input.HanhDong is "ACCEPT" or "START" or "FINISH" or "COMPLETE") && string.IsNullOrWhiteSpace(reason))
+                reason = input.HanhDong switch { "ACCEPT" => "Tiếp nhận đơn hàng", "START" => "Bắt đầu pha theo đơn", "FINISH" => "Xác nhận pha xong theo đơn", _ => "Hoàn tất đơn hàng" };
+            AdminOperation.Reason(reason);
             var admin = context.User.IsInRole("ADMIN");
             var actor = admin ? long.Parse(context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value) : (long?)null;
             var shift = admin ? null : (long?)long.Parse(context.User.FindFirst("shift")!.Value);
             if (shift is not null && !await db.CaLamViec.AnyAsync(x => x.MaCaLamViec == shift && x.TrangThai == "OPEN")) throw new AdminRule(409, "Ca không còn mở.");
             if (!admin && input.HanhDong is "RETRY_DELIVERY" or "FAIL_DELIVERY" or "EXPIRE") throw new AdminRule(403, "Chỉ Quản lý được chốt ngoại lệ giao/hết hạn.");
+            if (await CancellationWorkflow.Pending(db, id) is not null)
+                throw new AdminRule(409, "Đơn đang chờ xét yêu cầu hủy. Chuyển Quản lý duyệt/từ chối trước khi xử lý tiếp.");
             var before = JsonSerializer.Serialize(order);
             var lines = await db.ChiTietDonHang.Where(x => x.MaDonHang == id).ToListAsync();
             if (lines.Count == 0) throw new AdminRule(409, "Đơn chưa có dòng món để xử lý.");
@@ -50,10 +57,13 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
                     Require(order.TrangThai == "PENDING_CONFIRMATION", "Đơn không còn chờ xác nhận.");
                     Require(order.KenhDatHang != "WEB" || financial.ConThu == 0, "Đơn Web chưa trả đủ tiền xác minh.");
                     Require(order.HetHanLuc is null || order.KenhDatHang != "WEB" || financial.ConThu == 0, "Đơn Web cần đối soát thời hạn.");
+                    if (shift is not null && order.MaCaLamViec is null) order.MaCaLamViec = shift;
                     order.TrangThai = "ACCEPTED"; order.TiepNhanLuc = now; break;
                 case "CANCEL":
                     Require(order.TrangThai is "PENDING_CONFIRMATION" or "ACCEPTED" or "PREPARING", "Không còn được hủy trước pha.");
-                    await Cancel(order, lines, input, actor, shift); break;
+                    if (!admin) await RequestCancellation(order, lines, input, shift!.Value);
+                    else await Cancel(order, lines, input, actor, shift);
+                    break;
                 case "START":
                 case "FINISH":
                     Require(order.TrangThai is "ACCEPTED" or "PREPARING", "Đơn chưa nhận hoặc đã kết thúc pha.");
@@ -89,11 +99,21 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             db.SuKienDongBo.Add(new() { MaSuKien = Guid.NewGuid(), MaThaoTac = input.MaThaoTac, LoaiSuKien = "ORDER_CHANGED",
                 NoiDungJson = JsonSerializer.Serialize(new { MaDonHang = id }), PhatSinhLuc = now });
             await db.SaveChangesAsync();
-            return (id, (object)new OrderActionReceipt(id, order.TrangThai, order.PhienBanDuLieu), before, input.LyDo);
+            return (id, (object)new OrderActionReceipt(id, order.TrangThai, order.PhienBanDuLieu), before, reason);
         }, allowStaff: true);
 
+    /// <summary>Nhân viên chỉ gửi phần chưa pha cho Quản lý: không giải phóng kho, đổi trạng thái đơn hay tạo hoàn.</summary>
+    private async Task RequestCancellation(DonHang order,List<ChiTietDonHang> lines,OrderActionInput input,long shift)
+    {
+        var line=lines.SingleOrDefault(x=>x.MaChiTietDonHang==input.MaDong)??throw new AdminRule(400,"Chọn dòng cần yêu cầu hủy.");
+        Require(input.SoLuong>0&&input.SoLuong<=line.SoLuongDat-line.SoLuongBatDauPha-line.SoLuongDaHuy,"Chỉ yêu cầu hủy số ly chưa bắt đầu pha.");
+        db.HuyMon.Add(new(){MaNhomHuy=input.MaThaoTac,MaChiTietDonHang=line.MaChiTietDonHang,SoLuongHuy=input.SoLuong,
+            LyDoHuy=input.LyDo,MaCaLamViec=shift,TrangThai="REQUESTED",TienHangGiam=0,PhiGiaoHangGiam=0});
+        await db.SaveChangesAsync();
+    }
+
     /// <summary>Hủy đúng phần chưa pha; giải phóng giữ chỗ và tạo yêu cầu hoàn, không ghi chi thành công.</summary>
-    private async Task Cancel(DonHang order, List<ChiTietDonHang> lines, OrderActionInput input, long? admin, long? shift)
+    internal async Task Cancel(DonHang order, List<ChiTietDonHang> lines, OrderActionInput input, long? admin, long? shift, HuyMon? request = null)
     {
         var line = lines.SingleOrDefault(x => x.MaChiTietDonHang == input.MaDong) ?? throw new AdminRule(400, "Chọn dòng cần hủy.");
         Require(input.SoLuong > 0 && input.SoLuong <= line.SoLuongDat - line.SoLuongBatDauPha - line.SoLuongDaHuy, "Chỉ hủy số ly chưa bắt đầu pha.");
@@ -118,10 +138,13 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
         var shipping = cancelledAll ? order.PhiGiaoHangHienTai : 0;
         if (cancelledAll) { order.PhiGiaoHangHienTai = 0; order.TrangThai = "CANCELLED"; }
         else if (lines.All(x => x.SoLuongPhaXong == x.SoLuongDat - x.SoLuongDaHuy)) order.TrangThai = "READY";
-        var cancellation = new HuyMon { MaNhomHuy = input.MaThaoTac, MaChiTietDonHang = line.MaChiTietDonHang, SoLuongHuy = input.SoLuong,
-            LyDoHuy = input.LyDo, MaQuanLyYeuCau = admin, MaCaLamViec = shift, MaQuanLyDuyet = admin, TrangThai = "ACCEPTED",
-            TienHangGiam = unitPrice * input.SoLuong, PhiGiaoHangGiam = shipping, XuLyLuc = DateTime.UtcNow };
-        db.HuyMon.Add(cancellation); await db.SaveChangesAsync();
+        var cancellation = request ?? new HuyMon { MaNhomHuy = input.MaThaoTac, MaChiTietDonHang = line.MaChiTietDonHang,
+            SoLuongHuy = input.SoLuong, LyDoHuy = input.LyDo, MaQuanLyYeuCau = admin, MaCaLamViec = shift };
+        cancellation.MaQuanLyDuyet=admin; cancellation.TrangThai="ACCEPTED";
+        cancellation.TienHangGiam=unitPrice*input.SoLuong; cancellation.PhiGiaoHangGiam=shipping;
+        cancellation.XuLyLuc=cancellation.ThoiDiemCapNhat=DateTime.UtcNow;
+        if(request is null)db.HuyMon.Add(cancellation);
+        await db.SaveChangesAsync();
         var balance = await money.Read(order);
         var available = Math.Max(0, balance.PhaiHoan - balance.DangGiuHanMuc);
         var requested = await db.HoSoHoanTien.Where(x => x.MaDonHang == order.MaDonHang && x.TrangThai == "REQUESTED").SumAsync(x => (decimal?)x.SoTienYeuCau) ?? 0;

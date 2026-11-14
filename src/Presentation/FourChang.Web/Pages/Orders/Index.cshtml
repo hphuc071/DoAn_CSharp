@@ -35,7 +35,7 @@
     @if (Model.Snapshot is { } snapshot)
     {
         <div data-order-private>
-            <div class="orders-results-heading"><h2>Danh sách đơn hàng <span class="orders-count">@snapshot.TotalCount</span></h2><p role="status">Cập nhật UTC: @snapshot.SnapshotUtc.ToString("dd/MM/yyyy HH:mm")</p></div>
+            <div class="orders-results-heading"><h2>Danh sách đơn hàng <span class="orders-count">@snapshot.TotalCount</span></h2></div>
             @if (snapshot.Items.Count == 0)
             {
                 <div class="orders-empty">
@@ -48,7 +48,10 @@
             {
                 <article class="order-summary-card">
                     <div class="order-summary-main"><span class="eyebrow">ĐƠN HÀNG</span><h2><a asp-page="/Orders/Details" asp-route-orderId="@order.Id" asp-route-ReturnPage="@Model.PageNumber" asp-route-ReturnStatus="@Model.Status" asp-route-ReturnFromUtc="@(Model.FromUtc?.ToString("O"))" asp-route-ReturnToUtc="@(Model.ToUtc?.ToString("O"))">@order.Code</a></h2><p>@FulfilmentLabel(order.Fulfilment) · Đặt lúc @order.CreatedUtc.ToString("dd/MM/yyyy HH:mm") UTC</p></div>
-                    <div class="order-summary-state"><span class="order-state-badge" data-state="@order.Status">@StateLabel(order.Status)</span><span>Cập nhật @order.UpdatedUtc.ToString("dd/MM/yyyy HH:mm") UTC</span></div>
+                    @if (order.Status == "CANCELLED" && order.CanReceiveCounterRefund) {
+                        <div class="order-counter-refund-notice" role="status"><strong>Yêu cầu hủy đã được duyệt</strong><span>Vui lòng đến quầy để nhận hoàn tiền. Cung cấp mã đơn để Nhân viên đối chiếu.</span></div>
+                    }
+                    <div class="order-summary-state"><span class="order-state-badge" data-state="@order.Status">@StateLabel(order.Status)</span></div>
                 </article>
             }
             </div>
