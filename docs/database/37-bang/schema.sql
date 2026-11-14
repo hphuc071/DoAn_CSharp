@@ -142,9 +142,9 @@ CREATE TABLE dbo.[CaLamViec] (
     CONSTRAINT [CK_CaLamViec_6] CHECK (TrangThai <> 'CLOSED' OR (TienMatDuKienCuoiCa IS NOT NULL AND TienMatThucDem IS NOT NULL))
 );
 
-CREATE UNIQUE INDEX [UX_Ca_MayDangMo] ON dbo.[CaLamViec] ([MaMay]) WHERE KetThucLuc IS NULL;
+CREATE INDEX [IX_Ca_MayDangMo] ON dbo.[CaLamViec] ([MaMay]) WHERE KetThucLuc IS NULL;
 
-CREATE UNIQUE INDEX [UX_Ca_NhanVienDangMo] ON dbo.[CaLamViec] ([MaNhanVien]) WHERE KetThucLuc IS NULL;
+CREATE INDEX [IX_Ca_NhanVienDangMo] ON dbo.[CaLamViec] ([MaNhanVien]) WHERE KetThucLuc IS NULL;
 
 CREATE TABLE dbo.[DanhMucMon] (
     [MaDanhMuc] bigint IDENTITY(1,1) NOT NULL,

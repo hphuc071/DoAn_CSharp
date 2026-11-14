@@ -20,6 +20,7 @@ public sealed class SimulationPaymentBrowserTests
         headers["Idempotency-Key"]=Guid.NewGuid().ToString();headers["X-Checkout-Accepted-Total"]=variant["giaBan"]!.ToString();
         var order=(await f.Api.Send("POST","/api/customer/orders",input,headers)).Expect(201,"Tạo đơn Web").Json;
         var id=order.Number("maDonHang");
+        Assert.Equal("WEB-"+id,order.Text("maDonHienThi")); Assert.Equal("WEB-"+id,await f.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={id}"));
         await f.Login(customer.Input.Text("TenDangNhap"),customer.Input.Text("MatKhau"));
         await f.Page.GotoAsync(f.WebUrl+"/Checkout/Payment?orderId="+id);
         await Assertions.Expect(f.Page.Locator("[data-simulation-payment]")).ToBeVisibleAsync();

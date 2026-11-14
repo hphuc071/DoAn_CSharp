@@ -20,6 +20,7 @@ public abstract class AdminWorkspacePage<T> : UserControl
     /// <summary>Thiết lập layout Dock/Anchor thay vì tọa độ cố định để không tràn khi resize.</summary>
     protected AdminWorkspacePage(string title, string description, bool polished = false, string section = "KHO / NGUYÊN LIỆU")
     {
+        Message.Visible = false; Message.TextChanged += (_, _) => Message.Visible = !string.IsNullOrWhiteSpace(Message.Text);
         AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Dock = DockStyle.Top; BackColor = CafeTheme.Cream; Padding = new Padding(16); AutoScroll = true;
         Grid.Name = "AdminDataGrid"; Grid.AutoGenerateColumns = false; Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         Grid.MinimumSize = new Size(0, 260); Grid.Height = 440;
@@ -85,22 +86,28 @@ public abstract class AdminWorkspacePage<T> : UserControl
     }
 
     /// <summary>Tải từ API, giữ bảng cũ có nhãn thời điểm khi mất mạng thay vì xóa hoặc giả số 0.</summary>
-    public async Task Reload()
+    public Task Reload() => ReloadCore(false);
+
+    /// <summary>Cập nhật nền khi polling: không bật overlay tải hoặc xóa nội dung đang đọc.</summary>
+    protected Task RefreshQuietly() => ReloadCore(true);
+
+    /// <summary>Chỉ hiển thị trạng thái tải khi người dùng yêu cầu; cả hai nhánh vẫn giữ dữ liệu cũ khi lỗi mạng.</summary>
+    private async Task ReloadCore(bool quiet)
     {
         if (Busy || IsDisposed) return;
-        Busy = true; if (listLayout is not null) listLayout.Busy = true; Message.Text = "Đang tải dữ liệu…";
+        Busy = true; if (!quiet && listLayout is not null) listLayout.Busy = true; if (!quiet) Message.Text = "Đang tải dữ liệu…";
         try
         {
             Items = await Fetch();
             if (IsDisposed) return;
-            lastLoaded = DateTime.Now; Message.Text = "Cập nhật " + lastLoaded.Value.ToString("HH:mm:ss"); Render();
+            lastLoaded = DateTime.Now; Grid.Tag = lastLoaded; Message.Text = ""; Render();
         }
         catch (CafeApiException ex)
         {
             if (IsDisposed) return;
-            Message.Text = ex.Message + (lastLoaded is null ? " Chưa tải được dữ liệu." : " · Dữ liệu cũ lúc " + lastLoaded.Value.ToString("HH:mm:ss"));
+            Message.Text = ex.Message + (lastLoaded is null ? " Chưa tải được dữ liệu." : " · Đang hiển thị dữ liệu đã tải trước đó.");
         }
-        finally { Busy = false; if (listLayout is not null) listLayout.Busy = false; }
+        finally { Busy = false; if (!quiet && listLayout is not null && !IsDisposed) listLayout.Busy = false; }
     }
 
     /// <summary>Lọc tại danh sách đã lấy; API tiếp tục kiểm tra điều kiện hiện tại khi ghi.</summary>
@@ -108,8 +115,11 @@ public abstract class AdminWorkspacePage<T> : UserControl
     {
         if (Grid.IsDisposed) return;
         var rows = Items.Where(x => Match(x, SearchBox.Text.Trim())).ToList();
-        Grid.DataSource = rows; Counter.Text = $"{rows.Count} / {Items.Count} bản ghi";
+        BindRows(rows); Counter.Text = $"{rows.Count} / {Items.Count} bản ghi";
     }
+    /// <summary>Mặc định gắn danh sách như trước; trang có polling được phép giữ binding khi snapshot không đổi.</summary>
+    protected virtual void BindRows(IReadOnlyList<T> rows) => Grid.DataSource = rows.ToList();
+
     /// <summary>Lớp con lấy đúng DTO của chức năng, không đọc bảng thô thay nghiệp vụ.</summary>
     protected abstract Task<IReadOnlyList<T>> Fetch();
     /// <summary>Lớp con định nghĩa các trường tìm kiếm hiển thị.</summary>

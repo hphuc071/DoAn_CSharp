@@ -16,7 +16,8 @@ public static class OrderAdministrationEndpoints
         g.MapGet("/{id:long}", (long id, OrderAdministrationService service) => service.Details(id));
         g.MapPost("/{id:long}/actions", (long id, OrderActionInput input, HttpContext context, OrderWorkflowService service) => service.Execute(id, input, context));
         g.MapPost("/{id:long}/address", (long id, OrderAddressInput input, HttpContext context, OrderAdministrationService service) => service.Address(id, input, context));
+        g.MapPost("/{id:long}/cancellation", (long id, FourChang.Presentation.Shared.Contracts.Orders.CancellationCommand input, HttpContext c, CancellationWorkflow s) => s.Execute(id, input, c));
         g.MapGet("/operations/{id:guid}", (Guid id, CafeDbContext db, HttpContext context) => AdminOperation.Receipt(db, id, "DonHang", context));
-        app.MapPost("/api/pos/orders/{id:long}/actions", (long id, OrderActionInput input, HttpContext context, OrderWorkflowService service) => service.Execute(id, input, context)).RequireAuthorization("Staff");
+
     }
 }

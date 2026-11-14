@@ -29,6 +29,8 @@ public sealed class EntryUiTests
         var first = await api.Employee(admin, name);
         var second = await api.Employee(admin, name);
         var device = await api.NewDevice(admin, Environment.MachineName.ToUpperInvariant());
+        var previous = (await api.Send("POST", "/api/pos/shifts", api.OpenBody(first, device), device.Headers)).Expect(200, "Ca Sáng đã làm của nhân viên thứ nhất").Json;
+        (await api.Send("POST", "/api/pos/shifts/current/close", FourChang.Tests.Shared.TestData.Body(("TienMatThucDem", 500000), ("MaThaoTac", Guid.NewGuid().ToString())), TestApi.Bearer(previous))).Expect(200, "Kết ca Sáng fixture");
         values["FOURCHANG_TEST_POS_KEY"] = device.Input.Text("KhoaThietBi");
         values["FOURCHANG_TEST_EMPLOYEE_ID"] = first.Number("maNhanVien").ToString();
         values["FOURCHANG_TEST_SECOND_EMPLOYEE_ID"] = second.Number("maNhanVien").ToString();
@@ -105,10 +107,13 @@ public sealed class EntryUiTests
                 fullName.Text = name;
                 PumpUntil(() => Field<Label>(entry, "StaffVerifyResult").Text.Contains("Mã " + first));
                 Check(Field<Label>(entry, "StaffVerifyResult").Text.Contains("Mã " + first), "Xác minh đúng mã thứ nhất");
+                Check(Field<ComboBox>(entry, "StaffShift").Items.Count == 2 && !Field<ComboBox>(entry, "StaffShift").Items.Contains("Sáng"), "Ẩn ca Sáng đã làm, chỉ còn Chiều/Tối");
+                Capture(entry, "staff-remaining-shifts");
                 id.Text = second;
                 Check(!Field<Label>(entry, "StaffVerifyResult").Visible, "Đổi mã làm mất trạng thái xác minh cũ");
                 PumpUntil(() => Field<Label>(entry, "StaffVerifyResult").Text.Contains("Mã " + second));
                 Check(Field<Label>(entry, "StaffVerifyResult").Text.Contains("Mã " + second), "Tên trùng vẫn xác minh đúng mã thứ hai");
+                Check(Field<ComboBox>(entry, "StaffShift").Items.Count == 3, "Nhân viên khác vẫn chọn đủ ba ca");
                 Capture(entry, "staff-verified");
                 fullName.Text = "Sai họ tên";
                 Pump(100);
@@ -126,6 +131,12 @@ public sealed class EntryUiTests
                 Show(shell);
                 Pump(650);
                 Capture(shell, "staff-sale");
+                // Route thật của POS phải mở workspace xử lý đơn, không còn bảng chỉ đọc.
+                shell.Navigate("orders");
+                Pump(650);
+                Check(All(shell).Any(x => x.GetType().Name == "StaffOrdersPage"), "POS dùng màn hình xử lý đơn thật");
+                Check(All(shell).OfType<Button>().Any(x => x.Name == "OrderNextAction"), "POS có nút bước tiến trình theo trạng thái");
+                Capture(shell, "staff-orders");
                 shell.Navigate("shift");
                 Pump(250);
                 Capture(shell, "staff-shift");

@@ -27,7 +27,7 @@ public static class CustomerOrdersEndpoints
                 .Where(x => x.MaKhachHang == id)
                 .OrderByDescending(x => x.ThoiDiemTao)
                 .Take(100)
-                .Select(x => new { x.MaDonHang, x.MaDonHienThi, x.HinhThucNhanMon, x.TrangThai, x.ThoiDiemTao })
+                .Select(x => new { x.MaDonHang, MaDonHienThi = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.HinhThucNhanMon, x.TrangThai, x.ThoiDiemTao })
                 .ToListAsync(ct));
         }).RequireAuthorization("Customer");
 
@@ -247,9 +247,8 @@ public static class CustomerOrdersEndpoints
             maBan = ban?.MaBan;
         }
 
-        // 16 hex characters (64 random bits) instead of only 9,000 possibilities per day.
-        // Database UNIQUE index is still the final collision safeguard.
-        var orderCode = $"ORD-{now:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..16]}";
+        // Mã tạm duy nhất chỉ tồn tại trong transaction để SQL cấp ID. Không trả mã tạm cho client.
+        var orderCode = "TMP-" + Guid.NewGuid().ToString("N")[..24];
         var order = new DonHang
         {
             MaDonHienThi = orderCode,
@@ -274,6 +273,8 @@ public static class CustomerOrdersEndpoints
         };
         db.DonHang.Add(order);
         await db.SaveChangesAsync(ct);
+        // Khóa identity bảo vệ cạnh tranh; mã ngắn được lưu trước khi transaction/biên nhận được commit.
+        order.MaDonHienThi = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang);
         for (var idx = 0; idx < req.Items.Count; idx++)
         {
             var item = req.Items[idx];

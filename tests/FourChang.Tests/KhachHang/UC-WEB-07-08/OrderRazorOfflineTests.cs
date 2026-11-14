@@ -75,13 +75,13 @@ public sealed class OrderRazorOfflineTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Razor_routes_render_owned_snapshots_links_and_disabled_cancellation_with_csrf()
+    public async Task Razor_routes_render_owned_snapshots_and_cancellation_protocol_with_csrf()
     {
         var list = await http.GetStringAsync("/Orders");
         Assert.Contains("WEB-FAKE-7", list); Assert.Contains("/Orders/7", list);
         var detail = await http.GetStringAsync("/Orders/7");
         Assert.Contains("__RequestVerificationToken", detail);
-        Assert.Contains("disabled", detail); Assert.Contains("name=\"reason\"", detail);
+        Assert.Contains("name=\"expectedVersion\"", detail); Assert.Contains("name=\"operation\"", detail); Assert.Contains("name=\"reason\"", detail);
         Assert.Contains("/Checkout/Payment?orderId=7", detail);
         Assert.Contains("name=\"orderId\" value=\"7\"", detail);
         var payment = WebUtility.HtmlDecode(await http.GetStringAsync("/Checkout/Payment?orderId=7"));
@@ -164,8 +164,8 @@ public sealed class OrderRazorOfflineTests : IAsyncLifetime
         Assert.NotEmpty(csrf);
         using var blocked = await http.PostAsync("/Orders/7?handler=Cancel", new FormUrlEncodedContent(
             new Dictionary<string, string> { ["orderId"] = "7", ["reason"] = "Đổi ý", ["__RequestVerificationToken"] = csrf }));
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, blocked.StatusCode);
-        Assert.Contains("CANCELLATION_NOT_VERIFIED", await blocked.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.BadRequest, blocked.StatusCode);
+        Assert.Contains("phiên bản", await blocked.Content.ReadAsStringAsync());
         Assert.Equal(1, backendReads); // Only the GET snapshot; no outbound cancel/create.
     }
 

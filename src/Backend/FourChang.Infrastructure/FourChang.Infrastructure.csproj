@@ -24,4 +24,5 @@
     <EmbeddedResource Include="../../../docs/database/37-bang/006-admin-operations-and-finance.sql" LogicalName="FourChang.AdminFinance.sql" />
     <EmbeddedResource Include="../../../docs/database/37-bang/model-before-admin-finance.json" LogicalName="FourChang.Model37BeforeFinance.json" />
   </ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../../../docs/database/37-bang/007-independent-work-sessions.sql" LogicalName="FourChang.IndependentShifts.sql" /></ItemGroup>
 </Project>

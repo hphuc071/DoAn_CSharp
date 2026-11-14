@@ -42,8 +42,9 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
                 : shift.TrangThai != "OPEN"))
             throw new AdminRule(409, "Ca không còn cho phép gửi số đếm mới. Tải lại để xem kết quả hoặc liên hệ Quản lý.");
         var detail = await sessions.Detail(shift);
+        if (counted != detail.TienMatDuKienHienTai)
+            throw new AdminRule(409, $"Tiền mặt cuối ca phải khớp số hệ thống {detail.TienMatDuKienHienTai:N0}đ. Chênh lệch {counted-detail.TienMatDuKienHienTai:N0}đ; kiểm đếm hoặc tải lại dữ liệu.");
         if (detail.TienMatDuKienHienTai < 0) throw new AdminRule(409, "Nguồn tiền đang bất thường. Cần đối chiếu thu/hoàn trước.");
-        if (counted != detail.TienMatDuKienHienTai) AdminOperation.Reason(input.LyDoChenhLech);
         shift.TienMatThucDem = counted;
         shift.TienMatDuKienCuoiCa = detail.TienMatDuKienHienTai;
         shift.LyDoChenhLech = input.LyDoChenhLech?.Trim();
@@ -53,35 +54,7 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
         return new { maCaLamViec = shift.MaCaLamViec, trangThai = shift.TrangThai, phienBanDuLieu = shift.PhienBanDuLieu };
     });
 
-    /// <summary>Tạm khóa không ghi tiền thực đếm và không kết thúc ca.</summary>
-    public Task<IResult> Lock(ResumeWorkSessionInput input, HttpContext context) => Execute(context, input.MaThaoTac,
-        "SHIFT_TEMP_LOCKED", input, async grant =>
-    {
-        if (grant.ReconciliationOnly) throw new AdminRule(403, "Phiên phục hồi chỉ được gửi đối chiếu.");
-        AdminOperation.Reason(input.LyDo);
-        var shift = await db.CaLamViec.SingleAsync(x => x.MaCaLamViec == grant.Shift);
-        AdminOperation.Version(input.PhienBanDuLieu, shift.PhienBanDuLieu);
-        if (shift.TrangThai != "OPEN" || shift.KetThucLuc is not null) throw new AdminRule(409, "Ca không còn mở.");
-        shift.TrangThai = "LOCKED";
-        shift.ThoiDiemCapNhat = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        return new { maCaLamViec = shift.MaCaLamViec, trangThai = shift.TrangThai };
-    });
-
-    /// <summary>Chứng minh còn giữ phiên hợp lệ và đúng hồ sơ trước khi Admin xem xét mở khóa tạm.</summary>
-    public Task<IResult> RequestResume(RequestShiftResumeInput input, HttpContext context) => Execute(context, input.MaThaoTac,
-        "SHIFT_RESUME_REQUESTED", input, async grant =>
-    {
-        if (grant.ReconciliationOnly) throw new AdminRule(403, "Mã phục hồi không cấp quyền tiếp tục bán hàng.");
-        if (input.MaNhanVien != grant.Employee || !EmployeeIdentity.Matches(grant.Name, input.HoTen))
-            throw new AdminRule(400, "Hồ sơ khai báo không khớp phiên ca.");
-        var shift = await db.CaLamViec.AsNoTracking().SingleAsync(x => x.MaCaLamViec == grant.Shift);
-        if (shift.TrangThai != "LOCKED" || shift.TienMatThucDem is not null || await sessions.LastLifecycle(grant.Shift) != "SHIFT_TEMP_LOCKED")
-            throw new AdminRule(409, "Chỉ đề nghị tiếp tục ca khóa tạm chưa gửi đối chiếu.");
-        return new { maCaLamViec = shift.MaCaLamViec, message = "Đã gửi yêu cầu. Quản lý kiểm tra tại Ca làm việc." };
-    });
-
-    /// <summary>Giữ đường chốt trực tiếp khi đủ điều kiện; không bỏ qua đơn dở, khoản chưa rõ hoặc lý do chênh lệch.</summary>
+    /// <summary>Giữ đường chốt trực tiếp khi đủ điều kiện; không bỏ qua đơn dở hoặc khoản chưa rõ; số thu thực đếm bằng cuối ca trừ đầu ca.</summary>
     public Task<IResult> Close(CloseShift input, HttpContext context) => Execute(context,
         input.MaThaoTac == Guid.Empty ? Guid.NewGuid() : input.MaThaoTac, "CLOSE_SHIFT", input, async grant =>
     {
@@ -91,11 +64,13 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
         if (input.PhienBanDuLieu is not null) AdminOperation.Version(input.PhienBanDuLieu, shift.PhienBanDuLieu);
         if (input.TienMatThucDem is not { } counted || counted < 0 || counted > 999999999999999999m || counted != decimal.Truncate(counted))
             throw new AdminRule(400, "Tiền thực đếm không hợp lệ.");
+        if (input.LyDoChenhLech?.Length > 500) throw new AdminRule(400, "Ghi chú cũ không được quá 500 ký tự.");
         var detail = await sessions.Detail(shift);
         if (detail.DonDangXuLy.Count > 0 || detail.KhoanChuaRo.Count > 0)
             throw new AdminRule(409, "Ca còn đơn dở/khoản chưa rõ. Xử lý hoặc gửi đối chiếu để Quản lý bàn giao.");
+        if (counted != detail.TienMatDuKienHienTai)
+            throw new AdminRule(409, $"Tiền mặt cuối ca phải khớp số hệ thống {detail.TienMatDuKienHienTai:N0}đ. Chênh lệch {counted-detail.TienMatDuKienHienTai:N0}đ; kiểm đếm hoặc tải lại dữ liệu.");
         if (detail.TienMatDuKienHienTai < 0) throw new AdminRule(409, "Nguồn tiền chưa hợp lệ.");
-        if (counted != detail.TienMatDuKienHienTai) AdminOperation.Reason(input.LyDoChenhLech);
         shift.TienMatThucDem = counted;
         shift.TienMatDuKienCuoiCa = detail.TienMatDuKienHienTai;
         shift.LyDoChenhLech = input.LyDoChenhLech?.Trim();
@@ -103,7 +78,14 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
         shift.TrangThai = "CLOSED";
         shift.ThoiDiemCapNhat = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return new { maCaLamViec = shift.MaCaLamViec, trangThai = shift.TrangThai, message = "Đã kết thúc ca" };
+        return new {
+            maCaLamViec = shift.MaCaLamViec, trangThai = shift.TrangThai, ketThucLuc = shift.KetThucLuc,
+            // Báo cáo nằm trong cùng giao dịch/audit với đóng ca; gửi lặp trả đúng báo cáo cũ, không ghi tiền hai lần.
+            ketQuaNghiemThu = new { tienDauCa = shift.TienMatDauCa, tienCuoiCa = counted, tienThuDuoc = detail.ThuTienMat - detail.HoanTienMat, thuTienMat = detail.ThuTienMat,
+                hoanTienMat = detail.HoanTienMat, tienDuKien = detail.TienMatDuKienHienTai,
+                tienThucDem = counted, chenhLech = counted - detail.TienMatDuKienHienTai, lyDo = shift.LyDoChenhLech },
+            message = "Đã gửi kết quả và kết thúc ca"
+        };
     });
 
     /// <summary>Kiểm chữ ký trước và trong giao dịch; chỉ delegate nội bộ nhận principal Staff đã kiểm chứng.</summary>
@@ -120,10 +102,9 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
             var result = await change(grant);
             var reason = input switch
             {
-                SubmitReconciliation sent => sent.LyDoChenhLech,
-                CloseShift closed => closed.LyDoChenhLech,
-                ResumeWorkSessionInput locked => locked.LyDo,
-                _ => "Nhân viên đề nghị tiếp tục bằng phiên còn hợp lệ"
+                SubmitReconciliation sent => sent.LyDoChenhLech ?? "Nhân viên gửi tiền cuối ca",
+                CloseShift closed => closed.LyDoChenhLech ?? "Nhân viên gửi kết quả và kết thúc ca",
+                _ => "Nhân viên gửi kết quả ca"
             };
             return (grant.Shift, result, before, reason);
         }, allowStaff: true);
@@ -150,8 +131,6 @@ public static class ReconciliationEndpoints
         app.MapGet("/api/pos/shifts/current/reconciliation", (HttpContext c, ShiftStaffService s) => s.Current(c));
         app.MapGet("/api/pos/shifts/current/reconciliation/operations/{id:guid}", (Guid id, HttpContext c, ShiftStaffService s) => s.Receipt(id, c));
         app.MapPost("/api/pos/shifts/current/reconciliation", (SubmitReconciliation i, HttpContext c, ShiftStaffService s) => s.Submit(i, c));
-        app.MapPost("/api/pos/shifts/current/lock", (ResumeWorkSessionInput i, HttpContext c, ShiftStaffService s) => s.Lock(i, c));
-        app.MapPost("/api/pos/shifts/current/resume-request", (RequestShiftResumeInput i, HttpContext c, ShiftStaffService s) => s.RequestResume(i, c));
         app.MapPost("/api/pos/shifts/recovery", (RedeemShiftRecoveryInput i, ShiftRecoveryService s) => s.Redeem(i));
     }
 }

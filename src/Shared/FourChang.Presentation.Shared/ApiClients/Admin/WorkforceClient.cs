@@ -47,16 +47,10 @@ public sealed partial class CafeApiClient
     public Task<JsonElement> EmployeeOperationReceiptAsync(Guid id) => SendAsync<JsonElement>(HttpMethod.Get, $"/api/admin/employees/operations/{id}");
     /// <summary>Đọc đúng kiểu kết quả của lệnh ca đã commit khi mất phản hồi.</summary>
     public Task<T> ReadWorkSessionReceiptAsync<T>(Guid id) => SendAsync<T>(HttpMethod.Get, $"/api/admin/work-sessions/operations/{id}");
-    /// <summary>Chỉ Admin cho tiếp tục khóa tạm sau khi POS đã chứng minh phiên còn hợp lệ.</summary>
-    public Task<WorkSessionInfo> ResumeWorkSessionAsync(long id, ResumeWorkSessionInput input) => SendAsync<WorkSessionInfo>(HttpMethod.Post, $"/api/admin/work-sessions/{id}/resume", input);
     /// <summary>Chỉ trả mã phục hồi ở lần cấp đầu; receipt không chứa mã bí mật.</summary>
     public Task<ShiftRecoveryReceipt> IssueShiftRecoveryAsync(long id, IssueShiftRecoveryInput input) => SendAsync<ShiftRecoveryReceipt>(HttpMethod.Post, $"/api/admin/work-sessions/{id}/recovery", input);
     /// <summary>Nhân viên đổi mã một lần thành phiên chỉ gửi đối chiếu, không phải đăng nhập tài khoản.</summary>
     public Task<FourChang.Presentation.Shared.Contracts.Common.SessionResult> RedeemShiftRecoveryAsync(RedeemShiftRecoveryInput input) => SendAsync<FourChang.Presentation.Shared.Contracts.Common.SessionResult>(HttpMethod.Post, "/api/pos/shifts/recovery", input);
     /// <summary>Xác minh token đã lưu với API trước khi tiếp tục sau khởi động lại.</summary>
     public Task<ShiftSessionContext> CurrentShiftSessionAsync() => SendAsync<ShiftSessionContext>(HttpMethod.Get, "/api/pos/shifts/current/session");
-    /// <summary>Tạm khóa ca không ghi tiền thực đếm.</summary>
-    public Task<JsonElement> LockCurrentShiftAsync(ResumeWorkSessionInput input) => SendAsync<JsonElement>(HttpMethod.Post, "/api/pos/shifts/current/lock", input);
-    /// <summary>Gửi bằng chứng còn giữ phiên để Admin xem xét khôi phục khóa tạm.</summary>
-    public Task<JsonElement> RequestShiftResumeAsync(RequestShiftResumeInput input) => SendAsync<JsonElement>(HttpMethod.Post, "/api/pos/shifts/current/resume-request", input);
 }

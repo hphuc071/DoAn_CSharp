@@ -85,6 +85,12 @@ public static class DatabaseBootstrap
                 finance.CommandText = await ReadResourceAsync("FourChang.AdminFinance.sql");
                 await finance.ExecuteNonQueryAsync();
             }
+            // Nâng cấp idempotent đúng hai index mở ca, giữ nguyên bảng/cột/FK và lịch sử tài chính.
+            await using (var shifts = connection.CreateCommand())
+            {
+                shifts.CommandText = await ReadResourceAsync("FourChang.IndependentShifts.sql");
+                await shifts.ExecuteNonQueryAsync();
+            }
             await ValidateAsync(connection);
         }
         await CreateApplicationLoginAsync();

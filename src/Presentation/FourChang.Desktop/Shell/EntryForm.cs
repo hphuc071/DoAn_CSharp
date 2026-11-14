@@ -88,17 +88,40 @@ public sealed class EntryForm : Form
             finally { arranging = false; }
         }
         main.Resize += (_, _) => Position(); layout.SizeChanged += (_, _) => Position(); Shown += (_, _) => Position();
+        OpenShift? pendingOpen = null; bool openUnknown = false;
         bool busy = false; var identityRevision = 0; CancellationTokenSource? pendingIdentity = null;
         var debounce = new System.Windows.Forms.Timer { Interval = 500 };
         void Error(string text) { feedback.ForeColor = CafeTheme.Danger; feedback.Text = text; feedback.Visible = true; }
         string Friendly(CafeApiException ex) => staff && ex.StatusCode == System.Net.HttpStatusCode.Unauthorized ? "Phiên ca không còn hợp lệ. Dùng phiên đã lưu hoặc nhờ Quản lý cấp mã phục hồi đối chiếu." : ex.Message;
-        void ShowIdentity(Employee employee) { verified.ForeColor = Color.FromArgb(67, 110, 65); verified.Text = $"{employee.HoTen} · Mã {employee.MaNhanVien}"; verified.Visible = true; }
+        void ShowIdentity(Employee employee)
+        {
+            // Chỉ liệt kê ca chưa làm hôm nay; server vẫn kiểm lại khi mở để chống hai máy chọn đồng thời.
+            var preferred = shift.Text;
+            shift.Items.Clear();
+            foreach (var value in new[] { "Sáng", "Chiều", "Tối" })
+                if (employee.CaDaLamTrongNgay?.Contains(value) != true) shift.Items.Add(value);
+            shift.SelectedItem = preferred;
+            if (shift.SelectedIndex < 0 && shift.Items.Count > 0) shift.SelectedIndex = 0;
+            verified.ForeColor = Color.FromArgb(67, 110, 65);
+            verified.Text = $"{employee.HoTen} · Mã {employee.MaNhanVien}" + (shift.Items.Count == 0 ? " · Đã làm đủ 3 ca hôm nay." : "");
+            verified.Visible = true;
+        }
         async Task<Employee> CheckEmployee()
         {
             if (!long.TryParse(employeeId.Text.Trim(), out var id) || id <= 0 || string.IsNullOrWhiteSpace(employeeName.Text)) throw new CafeApiException("Nhập mã nhân viên hợp lệ và đầy đủ họ tên.");
             var employee = await LiveSession.Api.VerifyEmployeeAsync(new(id, employeeName.Text)); if (!IsDisposed) ShowIdentity(employee); return employee;
         }
-        void SetBusy(bool value) { busy = value; button.Enabled = continueSaved.Enabled = recoverShift.Enabled = !value; employeeId.Enabled = employeeName.Enabled = shift.Enabled = opening.Enabled = !value; name.Enabled = password.Enabled = !value; UseWaitCursor = value; }
+        // Trong lúc mất phản hồi, giữ nguyên yêu cầu để lần thử lại tra đúng ca đã mở.
+        void SetBusy(bool value)
+        {
+            busy = value;
+            button.Enabled = !value;
+            continueSaved.Enabled = recoverShift.Enabled = !value && !openUnknown;
+            employeeId.Enabled = employeeName.Enabled = shift.Enabled = opening.Enabled = !value && !openUnknown;
+            button.Text = staff && openUnknown ? "Kiểm tra / thử lại mở ca" : staff ? "Mở ca làm việc" : "Đăng nhập";
+            name.Enabled = password.Enabled = !value;
+            UseWaitCursor = value;
+        }
         // Chờ người dùng ngừng gõ 500ms. Hủy lần kiểm tra cũ và bỏ phản hồi cũ nếu mã/tên đã đổi.
         foreach (var input in new[] { employeeId, employeeName }) input.TextChanged += (_, _) =>
         {
@@ -163,7 +186,15 @@ public sealed class EntryForm : Form
                 if (staff)
                 {
                     // Luôn kiểm tra lại khi bấm mở ca; API cũng kiểm tra cặp mã/tên trong transaction.
-                    var employee = await CheckEmployee(); session = await LiveSession.Api.OpenShiftAsync(new(employee.MaNhanVien, shift.Text, Environment.MachineName, opening.Value, employeeName.Text));
+                    if (pendingOpen is null)
+                    {
+                        var employee = await CheckEmployee();
+                        if (shift.SelectedIndex < 0) throw new CafeApiException("Nhân viên đã làm đủ các ca hôm nay. Có thể mở ca lại vào ngày mai.");
+                        pendingOpen = new(employee.MaNhanVien, shift.Text, Environment.MachineName, opening.Value, employeeName.Text, Guid.NewGuid());
+                    }
+                    // Khi mất phản hồi phải giữ nguyên mã và dữ liệu để API trả lại đúng ca, không tạo ca thứ hai.
+                    session = await LiveSession.Api.OpenShiftAsync(pendingOpen);
+                    pendingOpen = null; openUnknown = false;
                 }
                 else session = await LiveSession.Api.LoginAdminAsync(new(name.Text, password.Text));
                 LiveSession.Current = session; LiveSession.Api.Token = session.Token;
@@ -180,7 +211,12 @@ public sealed class EntryForm : Form
                 }
                 password.Clear(); onContinue(session.Name);
             }
-            catch (CafeApiException ex) { Error(Friendly(ex)); }
+            catch (CafeApiException ex)
+            {
+                openUnknown = staff && pendingOpen is not null && (ex.StatusCode is null || (int)ex.StatusCode >= 500);
+                if (!openUnknown) pendingOpen = null;
+                Error(Friendly(ex) + (openUnknown ? " Thử lại đúng thao tác để kiểm tra ca đã mở." : ""));
+            }
             finally { if (!IsDisposed) SetBusy(false); }
         };
     }

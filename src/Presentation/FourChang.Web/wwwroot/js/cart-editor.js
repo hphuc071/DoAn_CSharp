@@ -194,7 +194,9 @@
       product = matches[0]; title.textContent = (old ? "Sửa món: " : "Cấu hình: ") + product.name; variants = normalize(await json(`/Cart?handler=Variants&productId=${productId}`, signal));
       variantSelect.replaceChildren(option("", "Chọn size / nhiệt độ"));
       for (const v of variants) { const o = option(String(v.id), `${v.size} / ${v.temperature === "HOT" ? "Nóng" : "Lạnh"} · ${C.format(v.price)}${v.available ? "" : " · Tạm hết"}`); o.disabled = !v.available; o.dataset.size = v.size; o.dataset.temperature = v.temperature; variantSelect.append(o); }
-      if (old && variants.some(v => v.id === old.variantId && v.available)) variantSelect.value = String(old.variantId);
+      // Cùng cấu hình và giá đang niêm yết trên thẻ; sửa giỏ ưu tiên cấu hình cũ.
+      const initial = variants.find(v => v.id === (old?.variantId ?? product.variantId) && v.available) ?? variants.find(v => v.available);
+      if (initial) variantSelect.value = String(initial.id);
       size.replaceChildren(option("", "Chọn kích cỡ"));
       for (const value of [...new Set(variants.map(v => v.size))].sort((a,b) => { const rank = s => ({S:0,M:1,L:2}[s] ?? 99); return rank(a)-rank(b) || a.localeCompare(b); })) {
         const o = option(value, value); o.disabled = !variants.some(v => v.size === value && v.available); size.append(o);

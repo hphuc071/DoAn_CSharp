@@ -29,7 +29,7 @@ public sealed class PosCheckoutTests
         (await api.Send("POST","/api/pos/checkout",input)).Expect(401,"Ẩn danh không thu");
         (await api.Send("POST","/api/pos/checkout",input,admin)).Expect(403,"Admin không giả phiên ca");
         var receipt=(await api.Send("POST","/api/pos/checkout",input,staff)).Expect(200,"Thu CASH").Json;
-        Assert.Equal(10000,receipt.Number("tienThua"));var id=receipt.Number("maDonHang");
+        Assert.Equal(10000,receipt.Number("tienThua"));var id=receipt.Number("maDonHang"); Assert.Equal("POS-"+id,receipt.Text("maDon")); Assert.Equal("POS-"+id,await api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={id}"));
         var replay=(await api.Send("POST","/api/pos/checkout",input,staff)).Expect(200,"Replay không tạo đơn mới").Json;
         Assert.Equal(id,replay.Number("maDonHang"));Assert.Equal("VERIFIED",receipt.Text("trangThaiThanhToan"));
         Assert.Equal("2",await api.Sql($"SELECT COUNT(*) FROM dbo.ChiTietDonHang WHERE MaDonHang={id}"));

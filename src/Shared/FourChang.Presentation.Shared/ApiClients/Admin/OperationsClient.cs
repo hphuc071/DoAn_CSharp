@@ -8,7 +8,7 @@ public sealed partial class CafeApiClient
     public Task<AdminPage<AdminOrderRow>> GetAdminOrdersAsync(AdminOrderFilter f) => SendAsync<AdminPage<AdminOrderRow>>(HttpMethod.Get,
         "/api/admin/orders?" + EncodeQuery(new() { ["Kenh"] = f.Kenh, ["HinhThuc"] = f.HinhThuc, ["TrangThai"] = f.TrangThai,
             ["TuLuc"] = f.TuLuc?.ToString("O"), ["DenLuc"] = f.DenLuc?.ToString("O"), ["MaCa"] = f.MaCa?.ToString(),
-            ["TimKiem"] = f.TimKiem, ["Trang"] = f.Trang.ToString(), ["KichThuocTrang"] = f.KichThuocTrang.ToString() }));
+            ["NhomDon"] = f.NhomDon, ["TimKiem"] = f.TimKiem, ["Trang"] = f.Trang.ToString(), ["KichThuocTrang"] = f.KichThuocTrang.ToString() }));
     /// <summary>Đọc cấu hình đã chốt, tiền, giữ chỗ và lịch sử một đơn.</summary>
     public Task<AdminOrderDetail> GetAdminOrderAsync(long id) => SendAsync<AdminOrderDetail>(HttpMethod.Get, $"/api/admin/orders/{id}");
     /// <summary>Gửi cùng lệnh tiến trình mà POS dùng; không cập nhật tiền/trạng thái cục bộ.</summary>

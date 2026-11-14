@@ -24,22 +24,33 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         (await fixture.Api.Send("POST", "/api/pos/shifts/current/reconciliation", missing, s.Headers)).Expect(400, "Thiếu thực đếm không tự lấy 0");
         (await fixture.Api.Send("POST", "/api/pos/shifts/current/close", missing, s.Headers)).Expect(400, "Thiếu thực đếm không tự chốt 0");
         var input = Body(("MaThaoTac", NewId()), ("PhienBanDuLieu", detail["ca"]!.Text("phienBanDuLieu")), ("TienMatThucDem", 499000));
-        (await fixture.Api.Send("POST", "/api/pos/shifts/current/reconciliation", input, s.Headers)).Expect(400, "Lệch phải có lý do");
-        input["LyDoChenhLech"] = "Thực đếm thiếu 1000 đồng";
+        (await fixture.Api.Send("POST", "/api/pos/shifts/current/reconciliation", input, s.Headers)).Expect(409,"Lệch tiền phải kiểm đếm lại");
+        input["TienMatThucDem"]=500000;
         (await fixture.Api.Send("POST", "/api/pos/shifts/current/reconciliation", input, s.Headers)).Expect(200, "Gửi đếm");
         (await fixture.Api.Send("POST", "/api/pos/shifts/current/reconciliation", input, s.Headers)).Expect(200, "Gửi lặp");
-        var changed = input.Copy(); changed["TienMatThucDem"] = 500000;
+        var changed = input.Copy(); changed["TienMatThucDem"] = 499000;
         (await fixture.Api.Send("POST", "/api/pos/shifts/current/reconciliation", changed, s.Headers)).Expect(409, "Không đổi nội dung mã cũ");
         (await fixture.Api.Send("GET", "/api/pos/data/DonHang", headers: s.Headers)).Expect(403, "LOCKED không bán");
         detail = await WorkforceScenarios.Detail(fixture, id);
         Assert.True(detail.Flag("dangChoDoiChieu"));
-        Assert.Equal(-1000m, detail["chenhLech"]!.GetValue<decimal>());
+        Assert.Equal(0m, detail["chenhLech"]!.GetValue<decimal>());
         var close = WorkforceScenarios.CloseInput(detail);
         var closed = await fixture.Send("POST", url + "/close", close);
         Assert.Equal("CLOSED", closed.Text("trangThai"));
         await fixture.Send("POST", url + "/close", close);
         close["MaThaoTac"] = NewId(); await fixture.Send("POST", url + "/close", close, 409);
         Assert.Equal("1", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.NhatKyHeThong WHERE HanhDong='SHIFT_ADMIN_CLOSED' AND MaDoiTuong='{id}'"));
+    }
+
+    /// <summary>Tổng chỉ lấy đơn hoàn thành và giá đã chốt; không cộng đơn đang xử lý hoặc ca khác.</summary>
+    [Fact]
+    public async Task TongTienDonHoanThanh_DocGiaDaChot_VaKhongCongDonDo()
+    {
+        var done=await OperationsScenarioSeed.Create(fixture,"COMPLETED");
+        var waiting=await OperationsScenarioSeed.Create(fixture);
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET MaCaLamViec={done.Shift} WHERE MaDonHang={waiting.Order}");
+        var detail=await WorkforceScenarios.Detail(fixture,done.Shift);
+        Assert.Equal(1,detail.Number("soDonHoanThanh"));Assert.Equal(done.Total,detail["tongTienDonHoanThanh"]!.GetValue<decimal>());
     }
 
     /// <summary>Đọc nguồn tiền mặt/CK riêng; thay đổi nguồn dù tổng không đổi cũng buộc Admin tải lại.</summary>
@@ -55,6 +66,7 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         var detail = await WorkforceScenarios.Submit(fixture, id, s.Headers, 595000);
         Assert.Equal(595000m, detail["tienMatDuKienHienTai"]!.GetValue<decimal>());
         Assert.Equal(3, detail["giaoDich"]!.AsArray().Count);
+        Assert.Equal(95000,detail.Number("tienThuDuoc"));Assert.Equal(200000,detail.Number("thuChuyenKhoan"));
         var old = WorkforceScenarios.CloseInput(detail);
         await fixture.Api.Sql($"INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TrangThai,MaThaoTac) VALUES('CK2-{code}',{order},{id},'BANK_TRANSFER',1000,1000,'VERIFIED',NEWID());");
         await fixture.Send("POST", $"/api/admin/work-sessions/{id}/close", old, 409);
@@ -72,7 +84,8 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         var id = s.Session.Number("shiftId"); var suffix = Guid.NewGuid().ToString("N")[..20];
         var order = await fixture.Api.Sql($"INSERT dbo.DonHang(MaDonHienThi,MaCaLamViec,KenhDatHang,HinhThucNhanMon,PhiGiaoHangBanDau,PhiGiaoHangHienTai,TrangThai) VALUES('BG-{suffix}',{id},'POS','TAKEAWAY',0,0,'PREPARING'); SELECT SCOPE_IDENTITY();");
         await fixture.Api.Sql($"INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TrangThai,MaThaoTac) VALUES('BG-P-{suffix}',{order},{id},'BANK_TRANSFER',100000,0,'RECONCILING',NEWID());");
-        var detail = await WorkforceScenarios.Submit(fixture, id, s.Headers);
+        await fixture.Api.Sql($"INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TrangThai,MaThaoTac) VALUES('BG-C-{suffix}',{order},{id},'CASH',100000,100000,'VERIFIED',NEWID()); INSERT dbo.DonHang(MaDonHienThi,MaCaLamViec,KenhDatHang,HinhThucNhanMon,PhiGiaoHangBanDau,PhiGiaoHangHienTai,TrangThai) VALUES('BG-DONE-{suffix[..10]}',{id},'POS','TAKEAWAY',0,0,'COMPLETED');");
+        var detail = await WorkforceScenarios.Submit(fixture, id, s.Headers,600000);
         await fixture.Send("POST", $"/api/admin/work-sessions/{id}/close", WorkforceScenarios.CloseInput(detail), 409);
         var machine = "NHAN-" + suffix[..10];
         var handover = WorkforceScenarios.CloseInput(detail);
@@ -89,6 +102,17 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         var target = await WorkforceScenarios.Detail(fixture, received.Number("shiftId"));
         Assert.Equal(id, target["ca"]!.Number("maCaBanGiaoTruoc"));
         Assert.Single(target["donDangXuLy"]!.AsArray()); Assert.Single(target["khoanChuaRo"]!.AsArray());
+        Assert.Equal(0,target.Number("thuTienMat"));Assert.Equal(500000,target.Number("tienMatDuKienHienTai"));
+        var receiverStaff=TestApi.Bearer(received);var targetId=received.Number("shiftId");
+        var own=await fixture.Api.Sql($"INSERT dbo.DonHang(MaDonHienThi,MaCaLamViec,KenhDatHang,HinhThucNhanMon,PhiGiaoHangBanDau,PhiGiaoHangHienTai,TrangThai) VALUES('BG-OWN-{suffix[..10]}',{targetId},'POS','TAKEAWAY',0,0,'ACCEPTED');SELECT SCOPE_IDENTITY();");
+        var previous=(await fixture.Api.Send("GET","/api/pos/orders?PhamViCa=PREVIOUS&NhomDon=NORMAL",headers:receiverStaff)).Expect(200,"Đơn nhận từ ca trước").Json;
+        var previousRow=Assert.Single(previous["duLieu"]!.AsArray())!;Assert.Equal(long.Parse(order),previousRow.Number("maDonHang"));
+        Assert.Equal($"Bàn giao từ ca #{id}",previousRow.Text("nguonCa"));Assert.Equal(1,previous.Number("tongSo"));
+        var current=(await fixture.Api.Send("GET","/api/pos/orders?PhamViCa=CURRENT&NhomDon=NORMAL",headers:receiverStaff)).Expect(200,"Đơn ca này").Json;
+        var ownRow=Assert.Single(current["duLieu"]!.AsArray())!;Assert.Equal(long.Parse(own),ownRow.Number("maDonHang"));
+        Assert.Equal($"Ca này #{targetId}",ownRow.Text("nguonCa"));
+        (await fixture.Api.Send("GET","/api/pos/orders?PhamViCa=INVALID",headers:receiverStaff)).Expect(400,"Không chấp nhận nhóm ca giả");
+
         Assert.Equal(s.Employee.Number("maNhanVien").ToString(), await fixture.Api.Sql($"SELECT MaNhanVien FROM dbo.CaLamViec WHERE MaCaLamViec={id}"));
         Assert.Equal(id.ToString(), await fixture.Api.Sql($"SELECT MaCaLamViec FROM dbo.ThanhToan WHERE MaThanhToanHienThi='BG-P-{suffix}'"));
     }
@@ -117,26 +141,16 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         await fixture.Send("POST", $"/api/admin/work-sessions/{id}/close", WorkforceScenarios.CloseInput(after));
     }
 
-    /// <summary>Khóa tạm chỉ mở lại khi POS còn phiên hợp lệ đã yêu cầu; gửi đối chiếu không được coi là khóa tạm.</summary>
+    /// <summary>Chức năng khóa tạm/tiếp tục đã bỏ; gọi endpoint cũ không đổi trạng thái ca.</summary>
     [Fact]
-    public async Task KhoaTam_KiemPhien_TruocKhiAdminChoTiepTuc()
+    public async Task KhongConKhoaTamVaDeNghiTiepTuc()
     {
-        var s = await WorkforceScenarios.Open(fixture);
-        var id = s.Session.Number("shiftId");
-        var detail = await WorkforceScenarios.Detail(fixture, id);
-        var action = Body(("MaThaoTac", NewId()), ("PhienBanDuLieu", detail["ca"]!.Text("phienBanDuLieu")), ("LyDo", "Tạm rời quầy"));
-        (await fixture.Api.Send("POST", "/api/pos/shifts/current/lock", action, s.Headers)).Expect(200, "Khóa tạm");
-        detail = await WorkforceScenarios.Detail(fixture, id);
-        action["PhienBanDuLieu"] = detail["ca"]!.Text("phienBanDuLieu"); action["MaThaoTac"] = NewId();
-        await fixture.Send("POST", $"/api/admin/work-sessions/{id}/resume", action, 409);
-        var proof = Body(("MaThaoTac", NewId()), ("MaNhanVien", s.Employee.Number("maNhanVien")), ("HoTen", s.Employee.Text("hoTen")));
-        (await fixture.Api.Send("POST", "/api/pos/shifts/current/resume-request", proof, s.Headers)).Expect(200, "Chứng minh phiên còn hợp lệ");
-        Assert.True((await WorkforceScenarios.Detail(fixture, id)).Flag("coYeuCauKhoiPhuc"));
-        await fixture.Send("POST", $"/api/admin/work-sessions/{id}/resume", action);
-        (await fixture.Api.Send("GET", "/api/pos/data/DonHang", headers: s.Headers)).Expect(200, "Tiếp tục ca cũ");
-        detail = await WorkforceScenarios.Submit(fixture, id, s.Headers);
-        proof["MaThaoTac"] = NewId();
-        (await fixture.Api.Send("POST", "/api/pos/shifts/current/resume-request", proof, s.Headers)).Expect(409, "Đối chiếu không tự mở bán lại");
+        var s=await WorkforceScenarios.Open(fixture);var id=s.Session.Number("shiftId");
+        var input=Body(("MaThaoTac",NewId()));
+        (await fixture.Api.Send("POST","/api/pos/shifts/current/lock",input,s.Headers)).Expect(404,"Đã bỏ khóa tạm");
+        (await fixture.Api.Send("POST","/api/pos/shifts/current/resume-request",input,s.Headers)).Expect(404,"Đã bỏ đề nghị tiếp tục");
+        (await fixture.Api.Send("POST",$"/api/admin/work-sessions/{id}/resume",input,fixture.Admin)).Expect(404,"Đã bỏ mở khóa tạm");
+        Assert.Equal("OPEN",(await WorkforceScenarios.Detail(fixture,id))["ca"]!.Text("trangThai"));
     }
 
     /// <summary>Không có audit thì ca không đóng một phần; có thể thử lại cùng mã khi quyền ghi được phục hồi.</summary>

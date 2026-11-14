@@ -22,7 +22,9 @@ public static class CatalogEndpoints
                 (l, o) => new { l.MaCauHinhMon, Quantity = l.SoLuongDat - l.SoLuongDaHuy }).ToListAsync();
             var items = snapshot.Mon.Where(x => x.CauHinh.Count > 0).Select(m =>
             {
-                var v = m.CauHinh.FirstOrDefault(x => x.LaMacDinh) ?? m.CauHinh.First();
+                var v = m.CauHinh.FirstOrDefault(x => x.LaMacDinh && x.ConHang)
+                    ?? m.CauHinh.FirstOrDefault(x => x.ConHang)
+                    ?? m.CauHinh.FirstOrDefault(x => x.LaMacDinh) ?? m.CauHinh.First();
                 var image = int.TryParse(m.DuongDanAnh?.Replace("sprite:", "", StringComparison.Ordinal), out var index) ? index : 0;
                 return new MenuProduct(v.MaCauHinhMon, m.MaMon, m.TenMon, m.TenDanhMuc, v.GiaBan, image, m.CauHinh.Any(x => x.ConHang), m.CauHinh.Any(x => x.ConHang) ? "" : "Tạm hết");
             }).Where(x => string.IsNullOrWhiteSpace(category) || Normalize(x.Category) == Normalize(category))

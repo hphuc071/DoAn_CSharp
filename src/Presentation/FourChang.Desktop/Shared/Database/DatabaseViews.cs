@@ -31,9 +31,9 @@ public static class DatabaseViews
             {
                 "shift" => FourChang.Desktop.Staff.WorkSessions.ShiftPage.Create(),
                 "sale" => FourChang.Desktop.Staff.Sales.SalePage.Create(),
-                "orders" => new FourChang.Desktop.Staff.Shared.StaffDocumentsPage(false),
-                "cancel" => Ui.Panel("Hủy món", Ui.Label("Chọn đơn để tra cứu. Thao tác hủy sẽ được triển khai cùng luồng xử lý đơn."), Table("DonHang", false)),
-                "payment" => new FourChang.Desktop.Staff.Shared.StaffDocumentsPage(true),
+                "orders" => new FourChang.Desktop.Staff.Orders.StaffOrdersPage(),
+                "cancel" => new FourChang.Desktop.Staff.Orders.StaffCancelledOrdersPage(),
+                "payment" => new FourChang.Desktop.Staff.Invoices.StaffBillingPage(),
                 _ => Ui.Label("Chưa có màn hình")
             };
         // UC-ADM-01 dùng màn hình nghiệp vụ riêng, thay bảng đọc thô ở chế độ chạy thật.
@@ -51,6 +51,7 @@ public static class DatabaseViews
         if (route == "recipes") return new FourChang.Desktop.Admin.Recipes.RecipesPage();
         if (route == "inventory") return new FourChang.Desktop.Admin.Inventory.InventoryPage();
         if (route == "stock") return new FourChang.Desktop.Admin.StockDocuments.StockDocumentsPage();
+        if (route == "cancelled-orders") return new FourChang.Desktop.Admin.Orders.CancelledOrdersPage();
         if (route == "manage-orders") return new FourChang.Desktop.Admin.Orders.OrdersManagementPage();
         if (route == "invoices") return new FourChang.Desktop.Admin.Invoices.InvoicesManagementPage();
         if (route == "refunds") return new FourChang.Desktop.Admin.Refunds.RefundsManagementPage();

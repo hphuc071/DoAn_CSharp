@@ -48,7 +48,7 @@ public sealed class RefundAdministrationService(CafeDbContext db, OrderFinancial
             if (input.LoaiNguon == "COMPLAINT" && order.TrangThai is not ("COMPLETED" or "DELIVERY_FAILED")) throw Bad("Hoàn khiếu nại cần đơn đã phục vụ hoặc chốt giao thất bại.");
             if (input.LoaiNguon == "CANCELLATION" && !await (from c in db.HuyMon join l in db.ChiTietDonHang on c.MaChiTietDonHang equals l.MaChiTietDonHang
                 where c.MaHuyMon == input.MaHuyMon && c.TrangThai == "ACCEPTED" && l.MaDonHang == input.MaDonHang select c).AnyAsync()) throw Bad("Nguồn hủy không hợp lệ.");
-            if (input.PhuongThuc is not ("CASH" or "BANK_TRANSFER") || (order.KenhDatHang == "WEB" && input.PhuongThuc != "BANK_TRANSFER")) throw Bad("Web chỉ hoàn chuyển khoản.");
+            if (input.PhuongThuc is not ("CASH" or "BANK_TRANSFER") || (order.KenhDatHang == "WEB" && input.PhuongThuc != "BANK_TRANSFER")) throw Bad("Hoàn tiền mặt cho đơn Web phải đi qua luồng duyệt hủy và hoàn tại quầy.");
             if (string.IsNullOrWhiteSpace(input.NguoiNhan) || input.NguoiNhan.Length > 120) throw Bad("Nhập người nhận tối đa 120 ký tự.");
             if (input.PhuongThuc == "BANK_TRANSFER" && (string.IsNullOrWhiteSpace(input.TaiKhoan) || input.TaiKhoan.Length > 50 || input.TaiKhoan.Any(char.IsControl) || string.IsNullOrWhiteSpace(input.NganHang) || input.NganHang.Length > 100)) throw Bad("Nhập thông tin ngân hàng/người nhận hợp lệ.");
             var record = id is null ? new HoSoHoanTien { MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"), MaQuanLyYeuCau = Actor(context), TrangThai = "REQUESTED" }

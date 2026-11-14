@@ -34,7 +34,13 @@ public sealed class CustomerOrderReader(CafeDbContext db, IConfiguration? config
         var count = await query.CountAsync(ct);
         var rows = await query.OrderByDescending(x => x.ThoiDiemTao).ThenByDescending(x => x.MaDonHang)
             .Skip((filter.Page - 1) * filter.PageSize).Take(filter.PageSize).ToListAsync(ct);
-        return new(rows.Select(Summary).ToArray(), filter.Page, filter.PageSize, count, DateTime.UtcNow);
+        // Chỉ đọc hồ sơ của các đơn đã lọc theo chủ sở hữu. Không dựa riêng CANCELLED để hứa hoàn tiền.
+        var ids = rows.Where(x => x.TrangThai == "CANCELLED").Select(x => x.MaDonHang).ToArray();
+        var counterOrders = await db.HoSoHoanTien.AsNoTracking().Where(x => ids.Contains(x.MaDonHang) && x.PhuongThucHoan == "CASH" &&
+            (x.TrangThai == "APPROVED" || x.TrangThai == "PARTIALLY_REFUNDED") && x.SoTienDuocDuyet >
+            (db.LanChiHoanTien.Where(a => a.MaHoanTien == x.MaHoanTien && a.TrangThai == "SUCCEEDED").Sum(a => (decimal?)a.SoTien) ?? 0))
+            .Select(x => x.MaDonHang).Distinct().ToListAsync(ct);
+        return new(rows.Select(x => Summary(x) with { CanReceiveCounterRefund = counterOrders.Contains(x.MaDonHang) }).ToArray(), filter.Page, filter.PageSize, count, DateTime.UtcNow);
     }
 
     public async Task<CustomerOrderDetail?> DetailAsync(long customerId, long orderId, CancellationToken ct)
@@ -74,19 +80,20 @@ public sealed class CustomerOrderReader(CafeDbContext db, IConfiguration? config
                 x.MaThamChieuChuyenKhoan, Utc(x.HetHanLuc), Utc(x.XacMinhLuc))).ToArray(),
             refunds.Select(x => new CustomerRefundSnapshot(x.MaHoanTien, x.MaHoanTienHienThi,
                 x.TrangThai, x.SoTienYeuCau, x.SoTienDuocDuyet,
-                disbursements.Where(d => d.MaHoanTien == x.MaHoanTien).Sum(d => d.SoTien))).ToArray(),
+                disbursements.Where(d => d.MaHoanTien == x.MaHoanTien).Sum(d => d.SoTien), x.PhuongThucHoan)).ToArray(),
             invoices.Select(x => new CustomerInvoiceSnapshot(x.MaHoaDon, x.SoHoaDon, x.LoaiHoaDon,
                 x.TrangThai, x.SoTien, Utc(x.PhatHanhLuc))).ToArray(), DateTime.UtcNow,
             -invoices.Where(x => x.LoaiHoaDon == "ADJUSTMENT" && x.TrangThai == "ISSUED" && x.MaHoanTien != null).Sum(x => x.SoTien)
             + refunds.Where(x => !invoices.Any(i => i.MaHoanTien == x.MaHoanTien && i.TrangThai == "ISSUED") && x.LoaiNguon == "COMPLAINT" &&
                 x.TrangThai is "APPROVED" or "PROCESSING" or "PARTIALLY_REFUNDED" or "RECONCILING" or "REFUNDED").Sum(x => x.SoTienDuocDuyet ?? 0));
+        result = result with { YeuCauHuy = await FourChang.Api.Shared.Orders.CancellationWorkflow.Pending(db, orderId), KetQuaYeuCauHuy = await FourChang.Api.Shared.Orders.CancellationWorkflow.LatestDecision(db, orderId) };
         await tx.CommitAsync(ct);
         return result;
     }
 
     private static DateTime? Utc(DateTime? value) => value is { } time ? DateTime.SpecifyKind(time, DateTimeKind.Utc) : null;
     private static CustomerOrderSummary Summary(DonHang order) => new(order.MaDonHang,
-        order.MaDonHienThi, order.TrangThai, order.HinhThucNhanMon,
+        FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), order.TrangThai, order.HinhThucNhanMon,
         DateTime.SpecifyKind(order.ThoiDiemTao, DateTimeKind.Utc),
         DateTime.SpecifyKind(order.ThoiDiemCapNhat, DateTimeKind.Utc));
 }

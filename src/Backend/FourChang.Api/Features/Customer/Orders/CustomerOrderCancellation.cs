@@ -10,8 +10,7 @@ using System.Security.Cryptography;
 
 namespace FourChang.Api.Features.Customer.Orders;
 
-// UC-WEB-08: Hủy toàn bộ đơn WEB trong trạng thái chờ xác nhận.
-// Không thực hiện chi hoàn tiền ngân hàng; chỉ tạo HoSoHoanTien REQUESTED.
+// Khách gửi yêu cầu trong trạng thái chờ xác nhận; chỉ Admin duyệt sau khi Staff chuyển mới hủy thật.
 public static class CustomerOrderCancellation
 {
     public sealed record CancelRequest(string? Reason, string? ExpectedVersion = null);
@@ -50,13 +49,14 @@ public static class CustomerOrderCancellation
         // SERIALIZABLE + rowversion: các cập nhật đơn/kho/hoàn tiền cùng một giao dịch.
         await using var tx = await db.Database.BeginTransactionAsync(
             IsolationLevel.Serializable, ct);
+        await FourChang.Api.Shared.Operations.AdminOperation.Lock(db);
         var hash = OrderIntegrationSafety.Hash(new { orderId, request.Reason, request.ExpectedVersion });
         if (!await OrderIntegrationSafety.LockAsync(db, tx, "4chang.order." + operation.ToString("N"), ct))
             return Results.Conflict(new { code = "OPERATION_BUSY" });
         var previous = await db.NhatKyHeThong.AsNoTracking().SingleOrDefaultAsync(x => x.MaThaoTac == operation, ct);
         if (previous is not null)
         {
-            if (previous.MaKhachHang != customerId || previous.HanhDong != "CANCEL_ORDER" ||
+            if (previous.MaKhachHang != customerId || previous.HanhDong is not ("CANCEL_ORDER" or "REQUEST_CANCEL_ORDER") ||
                 previous.MaDoiTuong != orderId.ToString(System.Globalization.CultureInfo.InvariantCulture) ||
                 previous.MaBamYeuCau is null || !CryptographicOperations.FixedTimeEquals(previous.MaBamYeuCau, hash) ||
                 string.IsNullOrWhiteSpace(previous.KetQuaDaChotJson))
@@ -98,134 +98,24 @@ public static class CustomerOrderCancellation
                 message = "Đơn có chi tiết đã xử lý hoặc không hợp lệ; cần nhân viên hỗ trợ."
             });
 
-        var detailIds = details.Select(x => x.MaChiTietDonHang).ToArray();
-        var toppingLines = await db.MonThemChiTietDonHang.AsNoTracking()
-            .Where(x => detailIds.Contains(x.MaChiTietDonHang))
-            .ToListAsync(ct);
-
-        var holds = await db.GiuChoNguyenLieu
-            .Where(x => detailIds.Contains(x.MaChiTietDonHang))
-            .ToListAsync(ct);
-        if (holds.Count == 0 || detailIds.Any(id => !holds.Any(x => x.MaChiTietDonHang == id)) ||
-            holds.Any(x => x.TrangThai is not ("RESERVED" or "PARTIAL" or "RELEASED" or "EXPIRED")))
-            return Results.Conflict(new { code = "INVENTORY_RECONCILIATION_REQUIRED" });
-
-        // All release checks and updates are shared with future expiration handling.
-        // This method requires the caller's active SERIALIZABLE transaction.
-        var payments = await db.ThanhToan
-            .Where(x => x.MaDonHang == orderId)
-            .ToListAsync(ct);
-
-        var paymentIds = payments.Select(x => x.MaThanhToan).ToArray();
-        var hasRefunds = await db.HoSoHoanTien.AnyAsync(x =>
-            x.MaDonHang == orderId &&
-            paymentIds.Contains(x.MaThanhToan), ct);
-
-        if (hasRefunds)
-            return Results.Conflict(new
-            {
-                message = "Đơn đã có hồ sơ hoàn tiền; cần đối soát trước khi hủy."
-            });
-
+        if (await FourChang.Api.Shared.Orders.CancellationWorkflow.Pending(db, orderId) is not null)
+            return Results.Conflict(new { message = "Đơn đã có yêu cầu đang chờ xử lý." });
         var now = DateTime.UtcNow;
-        var releaseError = await OrderInventoryRelease.ReleaseAllUnconsumedAsync(db, holds, "RELEASED", now, ct);
-        if (releaseError is not null) return Results.Conflict(new { message = releaseError });
-
-        var groupId = operation;
-        var originalStatus = order.TrangThai;
-        var originalShippingFee = order.PhiGiaoHangHienTai;
-
         foreach (var detail in details)
-        {
-            var toppingsPerCup = toppingLines
-                .Where(x => x.MaChiTietDonHang == detail.MaChiTietDonHang)
-                .Sum(x => x.SoPhanMoiLy * x.GiaMoiPhanDaChot);
-
-            var reduction = (detail.GiaMonDaChot + toppingsPerCup)
-                * detail.SoLuongDat;
-
-            db.HuyMon.Add(new HuyMon
-            {
-                MaNhomHuy = groupId,
-                MaChiTietDonHang = detail.MaChiTietDonHang,
-                SoLuongHuy = detail.SoLuongDat,
-                LyDoHuy = reason,
-                MaKhachHangYeuCau = customerId,
-                TrangThai = "ACCEPTED",
-                TienHangGiam = reduction,
-                PhiGiaoHangGiam = detail == details[0]
-                    ? originalShippingFee : 0m,
-                XuLyLuc = now
-            });
-
-            detail.SoLuongDaHuy = detail.SoLuongDat;
-        }
-
-        decimal refundRequested = 0m;
-        foreach (var payment in payments)
-        {
-            if (payment.SoTienDaXacMinh > 0)
-            {
-                // Yêu cầu duyệt/chi hoàn; không tự xác nhận đã hoàn tiền.
-                db.HoSoHoanTien.Add(new HoSoHoanTien
-                {
-                    LoaiNguon = "CANCELLATION",
-                    MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"),
-                    MaDonHang = orderId,
-                    MaThanhToan = payment.MaThanhToan,
-                    LyDoHoan = "Khách hủy đơn: " + reason,
-                    SoTienYeuCau = payment.SoTienDaXacMinh,
-                    PhuongThucHoan = "BANK_TRANSFER",
-                    TrangThai = "REQUESTED",
-                    MaKhachHangYeuCau = customerId
-                });
-                refundRequested += payment.SoTienDaXacMinh;
-            }
-            else if (payment.TrangThai == "PENDING")
-            {
-                payment.TrangThai = "EXPIRED";
-            }
-        }
-
-        order.TrangThai = "CANCELLED";
-        order.PhiGiaoHangHienTai = 0m;
-        order.HoanTatLuc = now;
-
-        var receipt = new
-        {
-            maDonHang = orderId, trangThai = "CANCELLED", soTienDeNghiHoan = refundRequested,
-            thongBao = "Đã hủy và ghi nhận nghĩa vụ hoàn nếu có; chưa thực hiện chi hoàn."
-        };
-        db.NhatKyHeThong.Add(OrderAuditOutbox.Stamp(new NhatKyHeThong
-        {
-            MaLienKetXuLy = groupId,
-            MaThaoTac = operation,
-            MaBamYeuCau = hash,
-            KetQuaDaChotJson = JsonSerializer.Serialize(receipt),
-            LoaiTacNhan = "CUSTOMER",
-            MaKhachHang = customerId,
-            TenNguoiThucHienDaChot = context.User.Identity?.Name
-                ?? $"CUSTOMER-{customerId}",
-            HanhDong = "CANCEL_ORDER",
-            LoaiDoiTuong = "DonHang",
-            MaDoiTuong = orderId.ToString(),
-            DuLieuTruocJson = JsonSerializer.Serialize(new
-            {
-                trangThai = originalStatus
-            }),
-            DuLieuSauJson = JsonSerializer.Serialize(new
-            {
-                trangThai = "CANCELLED",
-                refundRequested
-            }),
-            LyDo = reason,
-            KetQua = "SUCCESS",
-            PhatSinhLuc = now
-        }));
-
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
-
+            db.HuyMon.Add(new HuyMon { MaNhomHuy = operation, MaChiTietDonHang = detail.MaChiTietDonHang,
+                SoLuongHuy = detail.SoLuongDat, LyDoHuy = reason, MaKhachHangYeuCau = customerId,
+                TrangThai = "REQUESTED", TienHangGiam = 0, PhiGiaoHangGiam = 0, ThoiDiemTao = now, ThoiDiemCapNhat = now });
+        // Chỉ cập nhật phiên bản: chưa hủy món, chưa giải phóng kho, chưa tạo hồ sơ hoàn tiền.
+        order.ThoiDiemCapNhat = now;
+        var receipt = new { maDonHang = orderId, trangThai = order.TrangThai, maNhomHuy = operation,
+            trangThaiYeuCau = "REQUESTED", thongBao = "Đã gửi yêu cầu hủy. Nhân viên sẽ chuyển Quản lý xét duyệt." };
+        db.NhatKyHeThong.Add(new NhatKyHeThong { MaLienKetXuLy = operation, MaThaoTac = operation,
+            MaBamYeuCau = hash, KetQuaDaChotJson = JsonSerializer.Serialize(receipt), LoaiTacNhan = "CUSTOMER",
+            MaKhachHang = customerId, TenNguoiThucHienDaChot = context.User.Identity?.Name ?? $"CUSTOMER-{customerId}",
+            HanhDong = "REQUEST_CANCEL_ORDER", LoaiDoiTuong = "DonHang", MaDoiTuong = orderId.ToString(),
+            DuLieuSauJson = JsonSerializer.Serialize(receipt), LyDo = reason, KetQua = "SUCCEEDED", PhatSinhLuc = now });
+        db.SuKienDongBo.Add(new() { MaSuKien = Guid.NewGuid(), MaThaoTac = operation, LoaiSuKien = "ORDER_CHANGED", NoiDungJson = JsonSerializer.Serialize(new { MaDonHang = orderId }), PhatSinhLuc = now });
+        await db.SaveChangesAsync(ct); await tx.CommitAsync(ct);
         return Results.Ok(receipt);
     }
 }

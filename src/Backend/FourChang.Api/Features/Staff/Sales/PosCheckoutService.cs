@@ -22,7 +22,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             ?? throw new AdminRule(404, "Không tìm thấy đơn của ca này.");
         var payment = await db.ThanhToan.AsNoTracking().SingleAsync(x => x.MaDonHang == id);
         var invoice = await db.HoaDon.AsNoTracking().Where(x => x.MaDonHang == id && x.LoaiHoaDon == "ORIGINAL").Select(x => (long?)x.MaHoaDon).SingleOrDefaultAsync();
-        return new(id, order.MaDonHienThi, payment.MaThanhToan, payment.SoTienYeuCau,
+        return new(id, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), payment.MaThanhToan, payment.SoTienYeuCau,
             payment.PhuongThuc == "CASH" ? (payment.TienKhachDua ?? 0) - payment.SoTienDaXacMinh : 0, payment.TrangThai, invoice);
     }
 
@@ -148,11 +148,13 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
         }
 
 
-        var order = new DonHang { MaDonHienThi = "POS-" + Guid.NewGuid().ToString("N")[..20], MaCaLamViec = grant.Shift,
+        var order = new DonHang { MaDonHienThi = "TMP-" + Guid.NewGuid().ToString("N")[..24], MaCaLamViec = grant.Shift,
             KenhDatHang = "POS", HinhThucNhanMon = input.HinhThuc, MaBan = table?.MaBan, MaBanDaChot = table?.MaBanHienThi,
             TrangThai = input.PhuongThuc == "CASH" ? "ACCEPTED" : "PENDING_PAYMENT", HetHanLuc = expiresAt,
             TiepNhanLuc = input.PhuongThuc == "CASH" ? now : null, ThoiDiemTao = now, ThoiDiemCapNhat = now };
         db.DonHang.Add(order); await db.SaveChangesAsync();
+        // Cùng quy ước Web: lấy identity SQL, không tự đếm số tại máy POS.
+        order.MaDonHienThi = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang);
         for (var idx = 0; idx < req.Items.Count; idx++)
         {
             var item = req.Items[idx];

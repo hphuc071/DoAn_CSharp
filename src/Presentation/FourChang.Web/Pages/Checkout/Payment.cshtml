@@ -73,7 +73,6 @@
                         <p>Xác nhận UTC: @(payment.VerifiedUtc?.ToString("dd/MM/yyyy HH:mm") ?? "Chưa có")</p><p>@CustomerOrderPresentation.PaymentMessage(payment,DateTime.UtcNow)</p>
                     </article>
                 }
-                <p class="fine-print">Mốc dữ liệu UTC: @order.SnapshotUtc.ToString("dd/MM/yyyy HH:mm:ss"). Tải lại chỉ đọc trạng thái, không tạo yêu cầu thanh toán khác.</p>
             </details>
         </aside>
     </div>

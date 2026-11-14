@@ -57,7 +57,7 @@ public sealed class InventoryPage : AdminWorkspacePage<StockView>
         var held = Ui.Grid(new([], []), 420); held.DataSource = data.GiuCho.ToList();
         var affected = Ui.Grid(new([], []), 420); affected.DataSource = data.AnhHuong.ToList();
         foreach (var grid in new[] { movements, held, affected }) { grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells; }
-        form.Controls.Add(Ui.Panel(selected.TenNguyenLieu, Ui.Label("Dữ liệu máy chủ lúc " + data.DocLuc.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss"), 9),
+        form.Controls.Add(Ui.Panel(selected.TenNguyenLieu,
             Ui.Tabs(("Sổ kho và nguồn phát sinh", movements), ("Giữ chỗ / tiêu hao / giải phóng", held), ("BOM và cấu hình ảnh hưởng", affected))));
         form.ShowDialog(FindForm());
     }

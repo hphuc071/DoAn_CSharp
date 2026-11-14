@@ -17,7 +17,6 @@ public static class WorkSessionEndpoints
         group.MapGet("/{id:long}", (long id, WorkSessionService service) => service.Details(id));
         group.MapPost("/{id:long}/close", (long id, CloseWorkSessionInput input, HttpContext context, WorkSessionService service) => service.Close(id, input, context));
         group.MapPost("/{id:long}/handover", (long id, HandoverWorkSessionInput input, HttpContext context, WorkSessionService service) => service.Handover(id, input, context));
-        group.MapPost("/{id:long}/resume", (long id, ResumeWorkSessionInput input, HttpContext context, WorkSessionService service) => service.Resume(id, input, context));
         group.MapPost("/{id:long}/recovery", (long id, IssueShiftRecoveryInput input, HttpContext context, ShiftRecoveryService service) => service.Issue(id, input, context));
         group.MapGet("/operations/{id:guid}", (Guid id, CafeDbContext db, HttpContext context) => AdminOperation.Receipt(db, id, "CaLamViec", context));
     }

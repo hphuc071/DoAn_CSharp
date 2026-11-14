@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FourChang.Api.Features.Admin.WorkSessions;
 
 /// <summary>UC-ADM-12: đọc nguồn tiền thật, giám sát và xác nhận ca; không sửa thu/hoàn để ép khớp quỹ.</summary>
-public sealed class WorkSessionService(CafeDbContext db)
+public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Orders.OrderFinancials financials)
 {
     /// <summary>Giữ snapshot tên lúc mở ca; dữ liệu cũ thiếu audit chỉ hiển thị tên hồ sơ hiện tại có nhãn.</summary>
     private async Task<WorkSessionInfo> View(CaLamViec shift)
@@ -75,13 +75,21 @@ public sealed class WorkSessionService(CafeDbContext db)
                 .Select(x => "REFUND:" + x.MaLanChiHoan)).Order().ToList();
         var orders = await db.DonHang.AsNoTracking().Where(x => x.MaCaLamViec != null && ids.Contains(x.MaCaLamViec.Value) &&
             x.TrangThai != "COMPLETED" && x.TrangThai != "CANCELLED" && x.TrangThai != "EXPIRED" && x.TrangThai != "DELIVERY_FAILED" && x.TrangThai != "REJECTED")
-            .OrderBy(x => x.MaDonHang).Select(x => new ShiftOrder(x.MaDonHang, x.MaDonHienThi, x.TrangThai, x.MaCaLamViec)).ToListAsync();
+            .OrderBy(x => x.MaDonHang).Select(x => new ShiftOrder(x.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TrangThai, x.MaCaLamViec)).ToListAsync();
         var objectId = shift.MaCaLamViec.ToString();
         var audits = await db.NhatKyHeThong.AsNoTracking().Where(x => x.MaCaLamViec == shift.MaCaLamViec || x.LoaiDoiTuong == "CaLamViec" && x.MaDoiTuong == objectId)
             .OrderByDescending(x => x.MaNhatKy).Select(x => new ShiftAudit(x.PhatSinhLuc, x.TenNguoiThucHienDaChot, x.HanhDong, x.LyDo)).ToListAsync();
         var handoverJson = await db.NhatKyHeThong.AsNoTracking().Where(x => x.LoaiDoiTuong == "CaLamViec" && x.MaDoiTuong == objectId && x.HanhDong == "SHIFT_HANDED_OVER")
             .Select(x => x.DuLieuSauJson).SingleOrDefaultAsync();
         var handover = handoverJson is null ? null : HandoverLink.Read(handoverJson);
+        // Đơn do ca nào hoàn tất được tính vào ca đó; tiền thu vẫn giữ ca đã thực thu.
+        // Bản cũ/Admin hoàn tất không có ca trong audit thì dùng ca gắn với đơn để tương thích dữ liệu.
+        var completions = db.NhatKyHeThong.AsNoTracking().Where(x => x.LoaiDoiTuong == "DonHang" && x.HanhDong == "ORDER_COMPLETE" && x.MaCaLamViec != null);
+        var finished = await db.DonHang.AsNoTracking().Where(x => x.TrangThai == "COMPLETED" &&
+            (completions.Any(a => a.MaDoiTuong == x.MaDonHang.ToString() && a.MaCaLamViec == shift.MaCaLamViec) ||
+             x.MaCaLamViec == shift.MaCaLamViec && !completions.Any(a => a.MaDoiTuong == x.MaDonHang.ToString()))).ToListAsync();
+        decimal completedTotal = 0;
+        foreach (var order in finished) completedTotal += (await financials.Read(order)).NghiaVu;
         return new(await View(shift), cashIn, cashOut, expected, shift.TienMatThucDem is { } counted ? counted - expected : null,
             transactions, orders, unresolved, audits, handover, DateTime.UtcNow,
             Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new {
@@ -90,7 +98,7 @@ public sealed class WorkSessionService(CafeDbContext db)
                 Refunds = ownRefunds.OrderBy(x => x.MaLanChiHoan).Select(x => new { x.MaLanChiHoan, x.PhienBanDuLieu }),
                 Orders = orders, Unresolved = unresolved }))),
             shift.TrangThai == "LOCKED" && await LastLifecycle(shift.MaCaLamViec) == "SHIFT_RECONCILIATION_SENT",
-            await HasRecentResumeRequest(shift.MaCaLamViec), await LastLifecycle(shift.MaCaLamViec));
+            await HasRecentResumeRequest(shift.MaCaLamViec), await LastLifecycle(shift.MaCaLamViec), finished.Count, completedTotal);
     }
 
     /// <summary>Chốt từ số thực đếm POS đã gửi; kiểm tra lại nguồn tiền ngay trong giao dịch, không chốt lần hai.</summary>
@@ -161,27 +169,6 @@ public sealed class WorkSessionService(CafeDbContext db)
         return last is { HanhDong: "SHIFT_RESUME_REQUESTED" } && last.PhatSinhLuc >= DateTime.UtcNow.AddMinutes(-5);
     }
 
-    /// <summary>Admin chỉ mở khóa tạm khi POS còn giữ phiên đã được xác minh; ca chờ đối chiếu không tự mở bán lại.</summary>
-    public Task<IResult> Resume(long id, ResumeWorkSessionInput input, HttpContext context) => AdminOperation.Execute(db,
-        input.MaThaoTac, "SHIFT_ADMIN_RESUMED", "CaLamViec", new { id, input }, context, async () =>
-    {
-        AdminOperation.Reason(input.LyDo);
-        var shift = await Editable(id, input.PhienBanDuLieu);
-        if (shift.TrangThai != "LOCKED" || !await HasRecentResumeRequest(id))
-            throw new AdminRule(409, "Cần POS dùng phiên hiện có yêu cầu tiếp tục ca; nếu mất phiên, cấp mã phục hồi chỉ đối chiếu.");
-        var latestSent = await db.NhatKyHeThong.AsNoTracking().Where(x => x.MaCaLamViec == id && x.HanhDong == "SHIFT_RECONCILIATION_SENT").OrderByDescending(x => x.MaNhatKy).Select(x => (long?)x.MaNhatKy).FirstOrDefaultAsync();
-        var latestLock = await db.NhatKyHeThong.AsNoTracking().Where(x => x.MaCaLamViec == id && x.HanhDong == "SHIFT_TEMP_LOCKED").OrderByDescending(x => x.MaNhatKy).Select(x => (long?)x.MaNhatKy).FirstOrDefaultAsync();
-        if (latestLock is null || latestSent > latestLock || shift.TienMatThucDem is not null)
-            throw new AdminRule(409, "Ca đã gửi đối chiếu không được mở bán lại bằng khôi phục khóa tạm. Hãy chốt hoặc bàn giao.");
-        if (!await db.NhanVien.AnyAsync(x => x.MaNhanVien == shift.MaNhanVien && x.TrangThai == "ACTIVE"))
-            throw new AdminRule(409, "Nhân viên không còn đang làm.");
-        var before = JsonSerializer.Serialize(await View(shift));
-        shift.TrangThai = "OPEN";
-        shift.ThoiDiemCapNhat = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        return (id, (object)await View(shift), before, input.LyDo.Trim());
-    });
-
     /// <summary>Đọc ca để ghi và chặn CLOSED/HANDED_OVER; không mở lại ca đã kết thúc.</summary>
     private async Task<CaLamViec> Editable(long id, byte[] version)
     {
@@ -191,12 +178,12 @@ public sealed class WorkSessionService(CafeDbContext db)
         return shift;
     }
 
-    /// <summary>NULL khác 0; Admin không được nhập thay nhân viên hoặc bỏ qua lý do chênh lệch.</summary>
+    /// <summary>NULL khác 0; Admin không được nhập tiền cuối ca thay nhân viên.</summary>
     private static void ValidateCount(CaLamViec shift, decimal expected)
     {
         if (shift.TienMatThucDem is null || shift.TienMatThucDem < 0 || expected < 0)
             throw new AdminRule(400, "Cần nhân viên gửi tiền thực đếm hợp lệ tại POS. Không tự coi chưa nhập là 0.");
-        if (shift.TienMatThucDem != expected) AdminOperation.Reason(shift.LyDoChenhLech);
+        if (shift.TienMatThucDem != expected) throw new AdminRule(409, "Tiền nhân viên kiểm đếm chưa khớp số hệ thống; không được chốt hoặc bàn giao ca.");
     }
 
     /// <summary>Chỉ chốt trạng thái và số liệu đối chiếu, không chỉnh sửa khoản thu/hoàn hoặc đổi nhân viên nguồn.</summary>

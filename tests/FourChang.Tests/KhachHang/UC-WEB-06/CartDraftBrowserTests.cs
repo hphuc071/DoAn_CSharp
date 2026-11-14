@@ -12,7 +12,7 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
     private IBrowser browser = null!;
     private IBrowserContext context = null!;
     private IPage page = null!;
-    private int price = 45000, limit = 2;
+    private int price = 45000, limit = 2, defaultVariant = 1;
     private bool available = true, sourceError, toppingAvailable = true, accept = true, extraVariant;
     private long topPrice = 5000;
     private const string Key = "fourchang.cart-draft.v1";
@@ -28,7 +28,7 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
         {
             var uri = new Uri(route.Request.Url); Assert.Equal("GET", route.Request.Method);
             if (uri.Query.Contains("handler=Catalog"))
-                await route.FulfillAsync(new() { ContentType = "application/json", Body = """[{"productId":1,"name":"Latte","available":true}]""" });
+                await route.FulfillAsync(new() { ContentType = "application/json", Body = JsonSerializer.Serialize(new[] { new { productId = 1, variantId = defaultVariant, name = "Latte", available = true } }) });
             else if (uri.Query.Contains("handler=Variants"))
             {
                 if (sourceError) { await route.FulfillAsync(new() { Status = 503, ContentType = "text/html", Body = "unavailable" }); return; }
@@ -87,6 +87,21 @@ public sealed class CartDraftBrowserTests : IAsyncLifetime
     private async Task<JsonElement[]> CartAsync() { using var j = JsonDocument.Parse(await RawAsync()); return j.RootElement.EnumerateArray().Select(x => x.Clone()).ToArray(); }
     private Task SetRawAsync(string text) => page.EvaluateAsync("text => localStorage.setItem('" + Key + "', text)", text);
 
+    /// <summary>Giá niêm yết của cấu hình mặc định không bị thay bằng cấu hình đầu danh sách.</summary>
+    [Fact]
+    public async Task New_item_selects_the_listed_variant_instead_of_the_first_variant()
+    {
+        extraVariant = true; defaultVariant = 4;
+        await page.GetByRole(AriaRole.Button, new() { Name = "Choose" }).ClickAsync();
+        await Assertions.Expect(page.Locator("[data-editor-variant]")).ToHaveValueAsync("4");
+        await CartEditorActions.Brew(page, "[100,0]");
+        await Assertions.Expect(page.Locator("[data-editor-total]")).ToContainTextAsync("46.000");
+        await page.Locator("[data-editor-save]").ClickAsync();
+        await page.WaitForFunctionAsync("!!localStorage.getItem('fourchang.cart-draft.v1')");
+        var row = Assert.Single(await CartAsync());
+        Assert.Equal(4, row.GetProperty("variantId").GetInt32());
+        Assert.Equal(46000, row.GetProperty("listedPrice").GetInt32());
+    }
     [Fact]
     public async Task Same_configuration_merges_only_with_the_same_price_context()
     {

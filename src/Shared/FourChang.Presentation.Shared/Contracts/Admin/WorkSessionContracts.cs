@@ -14,19 +14,22 @@ public sealed record HandoverInfo(long MaCaNguon, long MaNhanVienNhan, string Ma
 public sealed record WorkSessionDetails(WorkSessionInfo Ca, decimal ThuTienMat, decimal HoanTienMat,
     decimal TienMatDuKienHienTai, decimal? ChenhLech, IReadOnlyList<ShiftTransaction> GiaoDich,
     IReadOnlyList<ShiftOrder> DonDangXuLy, IReadOnlyList<string> KhoanChuaRo, IReadOnlyList<ShiftAudit> NhatKy,
-    HandoverInfo? BanGiao, DateTime DuLieuTaiLuc, string MaDoiChieu, bool DangChoDoiChieu, bool CoYeuCauKhoiPhuc, string? SuKienTrangThai = null);
+    HandoverInfo? BanGiao, DateTime DuLieuTaiLuc, string MaDoiChieu, bool DangChoDoiChieu, bool CoYeuCauKhoiPhuc, string? SuKienTrangThai = null, int SoDonHoanThanh = 0, decimal TongTienDonHoanThanh = 0)
+{
+    /// <summary>Tiền mặt thuần từ giao dịch của chính ca; không tính lại khoản thu của ca bàn giao.</summary>
+    public decimal TienThuDuoc => ThuTienMat - HoanTienMat;
+    /// <summary>Chuyển khoản ghi nhận ở ca, hiển thị riêng và không cộng vào tiền mặt kiểm đếm.</summary>
+    public decimal ThuChuyenKhoan => GiaoDich.Where(x => x.Loai == "Thu" && x.PhuongThuc == "BANK_TRANSFER" && x.TrangThai == "VERIFIED").Sum(x => x.SoTien);
+}
 public sealed record CloseWorkSessionInput(byte[] PhienBanDuLieu, Guid MaThaoTac, string MaDoiChieu);
 public sealed record HandoverWorkSessionInput(long MaNhanVienNhan, string MaMayNhan, string LyDo,
     long[] MaDonBanGiao, string[] KhoanChuaRo, byte[] PhienBanDuLieu, Guid MaThaoTac, string MaDoiChieu);
 /// <summary>POS gửi số thực đếm để Admin đối chiếu, không tự cho Admin nhập thay nhân viên.</summary>
 public sealed record SubmitReconciliation(decimal? TienMatThucDem, string? LyDoChenhLech, byte[] PhienBanDuLieu, Guid MaThaoTac);
 
-/// <summary>Admin cho tiếp tục ca khóa tạm sau khi POS chứng minh vẫn giữ phiên hợp lệ.</summary>
-public sealed record ResumeWorkSessionInput(string LyDo, byte[] PhienBanDuLieu, Guid MaThaoTac);
 /// <summary>Cấp mã phục hồi chỉ gửi đối chiếu; không đưa mã bí mật vào audit/receipt.</summary>
 public sealed record IssueShiftRecoveryInput(string LyDo, byte[] PhienBanDuLieu, Guid MaThaoTac);
 public sealed record ShiftRecoveryReceipt(long MaCaLamViec, long MaNhanVien, Guid MaYeuCau, DateTime HetHanLuc, string? MaPhucHoi = null);
 public sealed record RedeemShiftRecoveryInput(long MaCaLamViec, long MaNhanVien, string HoTen, string MaPhucHoi);
-public sealed record RequestShiftResumeInput(long MaNhanVien, string HoTen, Guid MaThaoTac);
 public sealed record ShiftSessionContext(FourChang.Presentation.Shared.Contracts.Common.SessionResult Phien,
     string TrangThai, bool ChiDoiChieu, bool DangChoDoiChieu);
