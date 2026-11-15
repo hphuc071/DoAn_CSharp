@@ -17,11 +17,15 @@ public sealed class CustomerPhoneTests(AdminFeatureFixture fixture)
     [InlineData("09123abc78", 400)]
     [InlineData("０９１２３４５６７８", 400)]
     [InlineData("0907654321", 200)]
+    [InlineData(" 0907654322 ", 200)]
     public async Task SoDienThoai_DungMuoiChuSoAscii(string? phone, int status)
     {
-        var input = fixture.Api.CustomerInput(); input["SoDienThoai"] = phone;
-        var result = (await fixture.Api.Send("POST", "/api/admin/customers", input, fixture.Admin)).Expect(status, "Điện thoại 10 chữ số");
-        if (status == 200) Assert.Equal(phone, result.Json["account"]!.Text("soDienThoai"));
+        var customer = await fixture.Api.NewCustomer();
+        var account = await fixture.Api.CustomerAccount(customer.Id, fixture.Admin);
+        var input = TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", account.Text("tenDangNhap")),
+            ("HoTen", account.Text("hoTen")), ("Email", account.Text("email")), ("SoDienThoai", phone), ("PhienBanDuLieu", account.Text("phienBanDuLieu")));
+        var result = (await fixture.Api.Send("PUT", $"/api/admin/customers/{customer.Id}", input, fixture.Admin)).Expect(status, "Sửa điện thoại 10 chữ số");
+        if (status == 200) Assert.Equal(phone?.Trim(), result.Json["account"]!.Text("soDienThoai"));
     }
 
     /// <summary>Seed gọi hai lần vẫn đúng 10 hồ sơ tự nhiên, không ghi mật khẩu rõ hoặc xóa dữ liệu cũ.</summary>
@@ -41,26 +45,26 @@ public sealed class CustomerPhoneTests(AdminFeatureFixture fixture)
     [Fact]
     public async Task RangBuocSql_ChanSoSai_KhongCatSo()
     {
-        var input = fixture.Api.CustomerInput("phoneconstraint");
-        input["SoDienThoai"] = "0907888111";
-        var customer = (await fixture.Api.Send("POST", "/api/admin/customers", input, fixture.Admin)).Expect(200, "Tạo hồ sơ kiểm tra SQL").Json["account"]!;
-        var id = customer.Number("maKhachHang");
+        var customer = await fixture.Api.NewCustomer("phoneconstraint");
+        var id = customer.Id;
+        var original = customer.Input.Text("SoDienThoai");
         foreach (var invalid in new[] { "123456789", "01234567890", "090788811x" })
         {
             var error = await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() => fixture.Api.Sql($"UPDATE dbo.TaiKhoanKhachHang SET SoDienThoaiChuanHoa='{invalid}' WHERE MaKhachHang={id}"));
             Assert.Equal(547, error.Number);
-            Assert.Equal("0907888111", await fixture.Api.Sql($"SELECT SoDienThoaiChuanHoa FROM dbo.TaiKhoanKhachHang WHERE MaKhachHang={id}"));
+            Assert.Equal(original, await fixture.Api.Sql($"SELECT SoDienThoaiChuanHoa FROM dbo.TaiKhoanKhachHang WHERE MaKhachHang={id}"));
         }
     }
 
 
-    /// <summary>NOT NULL chặn bỏ trống trực tiếp SQL, còn API chặn null/rỗng ở cả tạo và sửa hồ sơ.</summary>
+    /// <summary>NOT NULL chặn bỏ trống trực tiếp SQL, còn API chặn null/rỗng khi sửa hồ sơ.</summary>
     [Fact]
     public async Task DienThoaiBatBuoc_ApiSuaVaSqlKhongNhanNull()
     {
-        var input = fixture.Api.CustomerInput("required");
-        var account = (await fixture.Api.Send("POST", "/api/admin/customers", input, fixture.Admin)).Expect(200, "Tạo khách có điện thoại").Json["account"]!;
-        var id = account.Number("maKhachHang");
+        var customer = await fixture.Api.NewCustomer("required");
+        var id = customer.Id;
+        var account = await fixture.Api.CustomerAccount(id, fixture.Admin);
+        var input = TestData.Body(("TenDangNhap", account.Text("tenDangNhap")), ("HoTen", account.Text("hoTen")), ("Email", account.Text("email")));
         var edit = input.Copy(); edit["MaThaoTac"] = TestData.NewId(); edit["PhienBanDuLieu"] = account.Text("phienBanDuLieu"); edit["MatKhauTam"] = null; edit["SoDienThoai"] = null;
         (await fixture.Api.Send("PUT", $"/api/admin/customers/{id}", edit, fixture.Admin)).Expect(400, "Không xóa điện thoại khi sửa");
         var error = await Assert.ThrowsAsync<Microsoft.Data.SqlClient.SqlException>(() => fixture.Api.Sql($"UPDATE dbo.TaiKhoanKhachHang SET SoDienThoaiChuanHoa=NULL WHERE MaKhachHang={id}"));

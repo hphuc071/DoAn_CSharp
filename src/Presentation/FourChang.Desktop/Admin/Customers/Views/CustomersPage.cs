@@ -10,7 +10,7 @@ using FourChang.Presentation.Shared.Preview;
 
 namespace FourChang.Desktop.Admin.Customers.Views;
 
-// UC-ADM-01: chỉ tổ chức lại cách hiển thị; mọi lệnh vẫn qua API và giữ nguyên kiểm tra nghiệp vụ.
+/// <summary>UC-ADM-01 tinh gọn: tìm/xem/sửa, khóa/mở và cấp lại mật khẩu khách.</summary>
 public sealed class CustomersPage : UserControl
 {
     private readonly AdminSearchBox searchBox = new();
@@ -32,6 +32,7 @@ public sealed class CustomersPage : UserControl
     private int hoveredRow = -1;
     private bool loading;
 
+    /// <summary>Dựng danh sách và nhóm thao tác theo đặc tả mới, không có tạo/xóa/ngừng.</summary>
     public CustomersPage()
     {
         Name = "CustomersPage"; Dock = DockStyle.Top; AutoSize = true; DoubleBuffered = true;
@@ -45,12 +46,10 @@ public sealed class CustomersPage : UserControl
         // Tìm và tải lại đều đọc nội dung hiện tại của ô tìm, không tái sử dụng từ khóa đã bị xóa.
         var find = Command("Tìm kiếm", AdminIcon.Search, ApplySearch, true); find.Name = "CustomerFind";
         var reload = Command("Tải lại", AdminIcon.Refresh, ApplySearch); reload.Name = "CustomerReload";
-        var add = Command("Thêm khách hàng", AdminIcon.Add, () => OpenEditor(null, "create"), true);
         var details = SelectionCommand("Xem hồ sơ", AdminIcon.View, ShowDetails);
         var edit = SelectionCommand("Sửa hồ sơ", AdminIcon.Edit, () => OpenSelected("update"));
-        var status = SelectionCommand("Khóa / mở / ngừng", AdminIcon.Lock, () => OpenSelected("status"));
+        var status = SelectionCommand("Khóa / mở tài khoản", AdminIcon.Lock, () => OpenSelected("status"));
         var reset = SelectionCommand("Đặt lại mật khẩu", AdminIcon.Key, () => OpenSelected("reset-password"));
-        var delete = SelectionCommand("Xóa có điều kiện", AdminIcon.Delete, () => OpenSelected("delete"), true);
         previous = new AdminActionButton("Trước", AdminIcon.Previous) { Name = "CustomerPrevious" };
         next = new AdminActionButton("Sau", AdminIcon.Next) { Name = "CustomerNext" };
         previous.Click += async (_, _) => { if (!loading && controller.Page > 1) { controller.PreviousPage(); await LoadPage(); } };
@@ -72,7 +71,7 @@ public sealed class CustomersPage : UserControl
         find.Margin = new Padding(0, 0, 10, 12); reload.Margin = new Padding(0, 0, 0, 12);
         searchRow.Controls.Add(searchBox, 0, 0); searchRow.Controls.Add(find, 1, 0); searchRow.Controls.Add(reload, 2, 0);
 
-        var toolbar = Ui.Row(add, details, edit, status, reset, delete);
+        var toolbar = Ui.Row(details, edit, status, reset);
         toolbar.Dock = DockStyle.Fill; toolbar.Margin = new Padding(0, 2, 0, 10);
         ConfigureGrid();
         grid.Dock = DockStyle.Fill; list.Controls.Add(grid); list.Controls.Add(progress);
@@ -139,7 +138,7 @@ public sealed class CustomersPage : UserControl
     }
 
     /// <summary>Chuyển mã trạng thái tài khoản sang nhãn tiếng Việt để dễ nhận biết.</summary>
-    private static string StatusText(string status) => status switch { "ACTIVE" => "Hoạt động", "LOCKED" => "Đã khóa", "INACTIVE" => "Đã ngừng", _ => status };
+    private static string StatusText(string status) => status switch { "ACTIVE" => "Hoạt động", "LOCKED" => "Đã khóa", "INACTIVE" => "Đã khóa", _ => status };
     /// <summary>Hiển thị trạng thái tài khoản bằng nhãn/màu, không dùng màu thay cho kiểm tra quyền.</summary>
     private void PaintStatus(object? sender, DataGridViewCellPaintingEventArgs e)
     {
@@ -230,8 +229,8 @@ public sealed class CustomersPage : UserControl
         var detail = await controller.GetDetailsAsync(selected.MaKhachHang);
         if (!IsDisposed) await OpenEditor(detail, action);
     }
-    /// <summary>Mở form tạo/sửa với rowversion, chỉ tải lại danh sách sau khi API xác nhận lưu.</summary>
-    private async Task OpenEditor(CustomerDetails? detail, string action)
+    /// <summary>Mở form sửa/thao tác với rowversion, chỉ tải lại danh sách sau khi API xác nhận lưu.</summary>
+    private async Task OpenEditor(CustomerDetails detail, string action)
     {
         using var editor = new CustomerEditorForm(detail, action);
         if (editor.ShowDialog(FindForm()) == DialogResult.OK) await LoadPage();
@@ -247,6 +246,7 @@ public sealed class CustomersPage : UserControl
     private void ResizeList(object? sender, EventArgs e) => list.Height = Math.Clamp((host?.ClientSize.Height ?? 920) - 500, 260, 420);
     /// <summary>Hiển thị lỗi có thể hiểu được và giữ trạng thái chưa xác nhận thành công.</summary>
     private void ShowError(string message) { feedback.Text = message; feedback.Visible = true; }
+    /// <summary>Hủy đăng ký resize khi rời trang để tránh giữ tham chiếu cửa sổ.</summary>
     protected override void Dispose(bool disposing)
     { if (disposing && host is not null) host.Resize -= ResizeList; base.Dispose(disposing); }
 }

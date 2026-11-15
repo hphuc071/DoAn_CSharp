@@ -1,4 +1,4 @@
-using FourChang.Desktop.Admin.Employees;
+﻿using FourChang.Desktop.Admin.Employees;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
@@ -10,6 +10,8 @@ namespace FourChang.Desktop.Admin.Menu;
 /// <summary>Editor ADM-02: trường có nhãn, nút thẳng hàng, giữ nháp và request khi lỗi mạng.</summary>
 internal sealed class MenuEditorForm : Form
 {
+    internal const string ImageFileFilter = "Ảnh PNG / JPG / WebP|*.png;*.jpg;*.jpeg;*.webp|Tất cả tệp|*.*";
+    internal long? SavedId { get; private set; }
     private readonly string kind;
     private readonly long? id;
     private readonly MenuAdminSnapshot data;
@@ -22,11 +24,19 @@ internal sealed class MenuEditorForm : Form
     private object? pending;
     private Guid operation;
     private bool sending;
+    private string? imageValue;
+    private byte[]? imageUpload;
+    private Panel? imagePreview;
+    private Label? imageCaption;
 
     /// <summary>Tạo form cho một đối tượng, không thay đổi dữ liệu cho đến khi người dùng bấm Lưu.</summary>
-    internal MenuEditorForm(string kind, long? id, MenuAdminSnapshot data)
+    internal MenuEditorForm(string kind, long? id, MenuAdminSnapshot data) : this(kind, id, data, null, null) { }
+
+    /// <summary>Nạp định lượng vào form topping để không phải mở công thức ở màn hình khác.</summary>
+    internal MenuEditorForm(string kind, long? id, MenuAdminSnapshot data, IngredientSnapshot? ingredients, IReadOnlyList<RecipeView>? recipes)
     {
         AutoScaleMode = AutoScaleMode.Dpi;
+        if (kind is not ("dishes" or "variants" or "toppings")) throw new ArgumentOutOfRangeException(nameof(kind));
         this.kind = kind;
         this.id = id;
         this.data = data;
@@ -35,9 +45,8 @@ internal sealed class MenuEditorForm : Form
         {
             "dishes" => "món",
             "variants" => "cấu hình món",
-            "categories" => "danh mục",
             "toppings" => "topping",
-            _ => "banner"
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         Text = (id is null ? "Thêm " : "Chỉnh sửa ") + noun;
         ClientSize = new(880, 780);
@@ -49,9 +58,6 @@ internal sealed class MenuEditorForm : Form
         save.Name = "SaveMenu";
         switch (kind)
         {
-            case "categories":
-                Category();
-                break;
             case "dishes":
                 Dish();
                 break;
@@ -59,10 +65,7 @@ internal sealed class MenuEditorForm : Form
                 Variant();
                 break;
             case "toppings":
-                Topping();
-                break;
-            case "banners":
-                Banner();
+                Topping(ingredients, recipes);
                 break;
             default:
                 throw new InvalidOperationException();
@@ -145,20 +148,12 @@ internal sealed class MenuEditorForm : Form
             case "dishes":
                 Pair("Loại món", "Tên món");
                 break;
-            case "categories":
-                Pair("Tên danh mục", "Thứ tự");
-                break;
             case "variants":
                 Pair("Món", "Giá bán (VND)");
                 Pair("Size", "Nhiệt độ");
                 break;
             case "toppings":
                 Pair("Tên topping", "Giá mỗi phần (VND)");
-                break;
-            case "banners":
-                Pair("Tên banner", "Thứ tự");
-                Pair("Ảnh", "Liên kết");
-                Pair("Bắt đầu", "Kết thúc (bỏ chọn: không giới hạn)");
                 break;
         }
         result.AddRange(remaining);
@@ -204,14 +199,7 @@ internal sealed class MenuEditorForm : Form
         AddField(label, input);
         return input;
     }
-    /// <summary>Thời điểm nhập theo máy Admin, chuyển UTC rõ ràng trước khi gửi API.</summary>
-    private DateTimePicker Date(string label, DateTime? value, bool optional = false)
-    {
-        var input = new DateTimePicker { Width = 700, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy HH:mm", ShowCheckBox = optional, Checked = value is not null, Value = value?.ToLocalTime() ?? DateTime.Now, Name = label };
-        AddField(label, input);
-        return input;
-    }
-    /// <summary>Không suy khóa từ SelectedIndex vì danh sách có thể sắp xếp lại.</summary>
+    /// <summary>Đọc khóa thật từ lựa chọn, không dùng caption để suy mã.</summary>
     private static long Key(ComboBox combo) => combo.SelectedItem is Option item ? item.Id : 0;
     /// <summary>Caption hiển thị tên và mã, dữ liệu gửi chỉ dùng khóa thật.</summary>
     private sealed record Option(long Id, string Caption)
@@ -219,34 +207,42 @@ internal sealed class MenuEditorForm : Form
         public override string ToString() => Caption;
     }
 
-    /// <summary>Danh mục hiện số món chịu tác động và checkbox xác nhận trước khi ẩn/ngừng.</summary>
-    private void Category()
-    {
-        var x = id is null ? null : data.DanhMuc.Single(x => x.MaDanhMuc == id);
-        var name = TextField("Tên danh mục", x?.TenDanhMuc, 100);
-        var description = TextField("Mô tả", x?.MoTa);
-        var order = Number("Thứ tự", x?.ThuTuHienThi ?? 0, int.MaxValue);
-        var publish = Flag("Công bố danh mục", x?.DaCongBo ?? false);
-        var active = Flag("Đang sử dụng", x?.DangSuDung ?? true);
-        var confirm = Flag($"Xác nhận tác động tới {x?.SoMon ?? 0} món khi ẩn/ngừng");
-        build = op => new MenuCategoryInput(name.Text, description.Text, (int)order.Value, publish.Checked, active.Checked, confirm.Checked, x?.PhienBanDuLieu, op);
-    }
-    /// <summary>Món tách công bố/bật bán và lịch; nháp được lưu trước khi có BOM.</summary>
+    /// <summary>Thông tin món và cờ hiển thị/bật bán; món mới ẩn đến khi đủ cấu hình và công thức.</summary>
     private void Dish()
     {
         var x = id is null ? null : data.Mon.Single(x => x.MaMon == id);
-        var category = Select("Loại món", data.DanhMuc.Select(c => (c.MaDanhMuc, c.TenDanhMuc)), x?.MaDanhMuc);
+        var category = Select("Loại món", data.DanhMuc.Select(c => (c.MaDanhMuc, c.TenDanhMuc)), x?.MaDanhMuc, false);
         var name = TextField("Tên món", x?.TenMon, 150);
         var description = TextField("Mô tả", x?.MoTa, 1000);
-        var image = TextField("Ảnh (sprite:0…5 hoặc đường dẫn ảnh)", x?.DuongDanAnh);
-        var order = Number("Thứ tự", x?.ThuTuHienThi ?? 0, int.MaxValue);
-        var date = Date("Công bố từ (bỏ chọn: ngay khi công bố)", x?.CongBoTuLuc, true);
-        var publish = Flag("Công bố món", x?.DaCongBo ?? false);
-        var sell = Flag("Bật bán (vẫn chịu kiểm tra tồn kho)", x?.DangBan ?? true);
-        fields.Add(Ui.Label("Món mới: lưu nháp → tạo cấu hình → gắn BOM tại ADM-05 → công bố.", 9, false, CafeTheme.Muted));
-        build = op => new MenuDishInput(Key(category), name.Text, description.Text, image.Text, (int)order.Value, publish.Checked, sell.Checked, date.Checked ? date.Value.ToUniversalTime() : null, x?.PhienBanDuLieu, op);
+        ComboBox? template = null;
+        if (x is null)
+        {
+            template = Select("Dùng công thức từ món", new[] { (0L, "Tự tạo công thức sau") }.Concat(data.Mon.Select(m => (m.MaMon, m.TenMon))), 0, false);
+            template.Name = "MenuDishTemplate";
+            fields.Add(Ui.Label("Chọn món mẫu để lấy size, nóng/lạnh, giá và nguyên liệu hiện tại. Mỗi món có công thức riêng, sửa lại được sau.", 9, false, CafeTheme.Muted));
+        }
+        ImageField(x?.DuongDanAnh);
+        var publish = Flag("Hiển thị món", x?.DaCongBo ?? false);
+        var sell = Flag("Bật bán (vẫn chịu kiểm tra tồn kho)", x?.DangBan ?? false);
+        fields.Add(Ui.Label("Món mới: chọn món mẫu hoặc tự tạo cấu hình/công thức, sau đó hiển thị và bật bán.", 9, false, CafeTheme.Muted));
+        build = op => new MenuDishInput(Key(category), name.Text, description.Text, imageValue, x?.ThuTuHienThi ?? 0, publish.Checked, sell.Checked, null, x?.PhienBanDuLieu, op, template is not null && Key(template) > 0 ? Key(template) : null);
     }
-    /// <summary>Giá theo cấu hình, tổ hợp đường/đá và liên kết topping đều gửi chung một transaction.</summary>
+    /// <summary>Chỉ đưa món có đủ công thức đang áp dụng vào danh sách mẫu; kiểm tra server vẫn là bắt buộc.</summary>
+    internal void SetRecipeTemplates(IReadOnlyList<RecipeView> recipes)
+    {
+        if (kind != "dishes" || id is not null) return;
+        var picker = Controls.Find("MenuDishTemplate", true).OfType<ComboBox>().Single();
+        picker.Items.Clear(); picker.Items.Add(new Option(0, "Tự tạo công thức sau"));
+        foreach (var dish in data.Mon)
+        {
+            var variants = data.CauHinh.Where(v => v.MaMon == dish.MaMon && v.DangBan).ToList();
+            if (variants.Count > 0 && variants.Count(v => v.LaMacDinh) == 1 && variants.All(v => recipes.Any(r => r.MaCauHinhMon == v.MaCauHinhMon && r.TrangThai == "ACTIVE" && r.ThanhPhan.Count > 0)))
+                picker.Items.Add(new Option(dish.MaMon, dish.TenMon));
+        }
+        picker.SelectedIndex = 0;
+    }
+
+    /// <summary>Khai báo riêng size, nhiệt độ và giá; đường/đá và topping theo chính sách chung.</summary>
     private void Variant()
     {
         var x = id is null ? null : data.CauHinh.Single(x => x.MaCauHinhMon == id);
@@ -260,8 +256,14 @@ internal sealed class MenuEditorForm : Form
         }, false);
         var temperature = Select("Nhiệt độ", new[] { (1L, "Nóng"), (2L, "Lạnh") }, x?.NhietDo == "HOT" ? 1 : 2, false);
         var price = Number("Giá bán (VND)", x?.GiaBan ?? 0);
-        var sell = Flag("Bật cấu hình", x?.DangBan ?? true);
+        var sell = Flag("Bật cấu hình", x?.DangBan ?? false);
         var def = Flag("Cấu hình mặc định của món", x?.LaMacDinh ?? false);
+        if (x is null)
+        {
+            // Cấu hình đầu tiên mặc định được chọn, tránh tạo món chưa có cấu hình mặc định.
+            void SuggestDefault() => def.Checked = !data.CauHinh.Any(v => v.MaMon == Key(dish));
+            dish.SelectedIndexChanged += (_, _) => SuggestDefault(); SuggestDefault();
+        }
         fields.Add(Ui.Label("Đường: 0%, 25%, 50%, 75%, 100%. Món nóng không có đá; món lạnh chọn thêm mức đá tương tự.", 10));
         fields.Add(Ui.Label("Topping đang sử dụng áp dụng cho mọi món. Giá và số phần tối đa quản lý ở tab Topping.", 10));
         build = op => new MenuVariantInput(Key(dish), Key(size) switch { 2 => "M", 3 => "L", _ => "S" },
@@ -269,31 +271,109 @@ internal sealed class MenuEditorForm : Form
 
     }
     /// <summary>Topping giá/phần và giới hạn; mới lưu ngừng rồi gắn BOM trước khi bật.</summary>
-    private void Topping()
+    private void Topping(IngredientSnapshot? ingredients, IReadOnlyList<RecipeView>? recipes)
     {
         var x = id is null ? null : data.MonThem.Single(x => x.MaMonThem == id);
         var name = TextField("Tên topping", x?.TenMonThem, 100);
         var description = TextField("Mô tả", x?.MoTa);
         var price = Number("Giá mỗi phần (VND)", x?.GiaMoiPhan ?? 0);
         var limit = Number("Giới hạn phần mỗi ly", x?.GioiHanMacDinhMoiLy ?? 1, int.MaxValue);
-        var image = TextField("Ảnh", x?.DuongDanAnh);
-        var active = Flag("Đang sử dụng (cần BOM hợp lệ)", x?.DangSuDung ?? false);
-        build = op => new MenuToppingInput(name.Text, description.Text, price.Value, (int)limit.Value, image.Text, active.Checked, x?.PhienBanDuLieu, op);
+        var recipe = id is null ? null : recipes?.SingleOrDefault(r => r.MaMonThem == id);
+        ComboBox? material = null;
+        NumericUpDown? quantity = null;
+        if (ingredients is not null)
+        {
+            var simple = recipe?.ThanhPhan.Count == 1 && recipe.ThanhPhan[0].LoaiDinhMuc == "FIXED";
+            var candidates = ingredients.NguyenLieu.Where(n => n.DangSuDung || recipe?.ThanhPhan.Any(l => l.MaNguyenLieu == n.MaNguyenLieu) == true);
+            material = Select("Nguyên liệu lấy từ kho", new[] { (0L, recipe is null ? "Chọn nguyên liệu" : "Giữ định lượng hiện tại") }
+                .Concat(candidates.Select(n => (n.MaNguyenLieu, $"{n.TenNguyenLieu} ({(n.MaDonViCoSo == 1 ? "g" : "ml")})"))), simple ? recipe!.ThanhPhan[0].MaNguyenLieu : 0, false);
+            material.Name = "ToppingIngredient";
+            quantity = FourChang.Desktop.Admin.Ingredients.IngredientEditorForm.Amount(simple ? recipe!.ThanhPhan[0].DinhMucCoSo : 0);
+            quantity.Name = "ToppingPortion"; AddField("Lượng mỗi phần", quantity);
+            var unitHint = Ui.Label("", 9, false, CafeTheme.Muted);
+            void DescribeUnit()
+            {
+                var n = ingredients.NguyenLieu.FirstOrDefault(n => n.MaNguyenLieu == Key(material));
+                unitHint.Text = n is null ? "Chọn nguyên liệu để nhập định lượng cho một phần." : $"Một phần dùng số {(n.MaDonViCoSo == 1 ? "gam (g)" : "mililit (ml)")} đã nhập; hệ thống tự trừ kho khi bắt đầu pha.";
+                quantity.Enabled = n is not null;
+            }
+            material.SelectedIndexChanged += (_, _) => DescribeUnit(); DescribeUnit(); fields.Add(unitHint);
+            if (recipe is not null && !simple) fields.Add(Ui.Label("Topping đang có công thức nhiều nguyên liệu. Giữ định lượng hiện tại để không thay công thức cũ; chọn nguyên liệu mới sẽ thay bằng định lượng một nguyên liệu.", 9, false, CafeTheme.Muted));
+        }
+        ImageField(x?.DuongDanAnh);
+        var active = Flag("Đang sử dụng", x?.DangSuDung ?? true);
+        build = op =>
+        {
+            if (material is not null && Key(material) == 0 && recipe is null) throw new CafeApiException("Chọn nguyên liệu lấy từ kho cho topping.", System.Net.HttpStatusCode.BadRequest);
+            if (material is not null && Key(material) > 0 && quantity!.Value <= 0) throw new CafeApiException("Lượng mỗi phần phải lớn hơn 0.", System.Net.HttpStatusCode.BadRequest);
+            return new MenuToppingInput(name.Text, description.Text, price.Value, (int)limit.Value, imageValue, active.Checked, x?.PhienBanDuLieu, op,
+                material is not null && Key(material) > 0 ? new ToppingPortionInput(Key(material), quantity!.Value, recipe?.MaCongThuc, recipe?.PhienBanDuLieu) : null);
+        };
     }
-    /// <summary>Banner dùng khu vực hero đang có, không đổi layout; lịch tùy chọn kết thúc và có công bố riêng.</summary>
-    private void Banner()
+
+    /// <summary>Chọn ảnh bằng nút, xem trước và bỏ ảnh; không yêu cầu nhập sprite hoặc đường dẫn máy.</summary>
+    private void ImageField(string? current)
     {
-        var x = id is null ? null : data.Banner.Single(x => x.MaBanner == id);
-        var name = TextField("Tên banner", x?.TenBanner, 150);
-        var content = TextField("Nội dung", x?.NoiDung, 1000);
-        var image = TextField("Ảnh", x?.DuongDanAnh ?? "sprite:2");
-        var link = TextField("Liên kết", x?.LienKet ?? "/#menu");
-        var order = Number("Thứ tự", x?.ThuTuHienThi ?? 0, int.MaxValue);
-        var start = Date("Bắt đầu", x?.BatDauLuc ?? DateTime.UtcNow);
-        var end = Date("Kết thúc (bỏ chọn: không giới hạn)", x?.KetThucLuc, true);
-        var publish = Flag("Công bố banner", x?.DaCongBo ?? false);
-        build = op => new MenuBannerInput(name.Text, content.Text, image.Text, link.Text, "HOME_HERO", (int)order.Value, start.Value.ToUniversalTime(), end.Checked ? end.Value.ToUniversalTime() : null, publish.Checked, x?.PhienBanDuLieu, op);
+        imageValue = current;
+        imagePreview = new Panel { Width = 160, Height = 140, BackColor = CafeTheme.Soft, Name = "MenuImagePreview" };
+        var initial = CatalogImage.Create(current, "Ảnh món", 140); initial.Dock = DockStyle.Fill; imagePreview.Controls.Add(initial);
+        imageCaption = Ui.Label(current is null ? "Chưa chọn ảnh" : "Đang dùng ảnh đã lưu", 9, false, CafeTheme.Muted);
+        imageCaption.Name = "MenuImageCaption"; imageCaption.MaximumSize = new Size(420, 0);
+        var choose = Ui.Button("Chọn hình ảnh", () =>
+        {
+            using var picker = new OpenFileDialog { Title = "Chọn hình ảnh món", Filter = ImageFileFilter, CheckFileExists = true, Multiselect = false };
+            if (picker.ShowDialog(this) != DialogResult.OK) return;
+            try { SelectImage(picker.FileName); }
+            catch (Exception ex) when (ex is IOException or ArgumentException or OutOfMemoryException or NotSupportedException)
+            { error.Text = "Không đọc được ảnh. Chọn ảnh PNG/JPG/WebP tối đa 5 MB, kích thước tối đa 4096 × 4096."; }
+        });
+        choose.Name = "MenuChooseImage";
+        var clear = Ui.Button("Bỏ ảnh", () =>
+        {
+            imageValue = null; imageUpload = null; SetPreview(null);
+            imageCaption.Text = "Chưa chọn ảnh";
+        });
+        clear.Name = "MenuClearImage";
+        fields.Add(Ui.Stack(Ui.Label("Hình ảnh", 10, true), Ui.Row(imagePreview,
+            Ui.Stack(Ui.Row(choose, clear), imageCaption, Ui.Label("PNG / JPG / WebP · tối đa 5 MB. Ảnh được lưu chung cho Web và POS.", 9, false, CafeTheme.Muted)))));
     }
+
+    /// <summary>Đọc và chuẩn hóa ảnh thật thành PNG; chỉ tải lên lúc Lưu để Hủy không ghi ảnh mới.</summary>
+    internal void SelectImage(string file)
+    {
+        if (new FileInfo(file).Length > 5 * 1024 * 1024) throw new ArgumentException("Ảnh quá lớn.");
+        var input = File.ReadAllBytes(file);
+        if (input.Length > 5 * 1024 * 1024) throw new ArgumentException("Ảnh quá lớn.");
+        // Nhận dạng nội dung thật, kể cả WebP tải từ mạng; không phụ thuộc phần mở rộng/codec Windows.
+        using var data = SkiaSharp.SKData.CreateCopy(input);
+        using var codec = SkiaSharp.SKCodec.Create(data) ?? throw new ArgumentException("Không đọc được ảnh.");
+        if (codec.EncodedFormat is not (SkiaSharp.SKEncodedImageFormat.Png or SkiaSharp.SKEncodedImageFormat.Jpeg or SkiaSharp.SKEncodedImageFormat.Webp))
+            throw new ArgumentException("Chỉ hỗ trợ PNG, JPG hoặc WebP.");
+        var info = codec.Info;
+        if (info.Width is <= 0 or > 4096 || info.Height is <= 0 or > 4096) throw new ArgumentException("Ảnh quá lớn.");
+        using var decoded = new SkiaSharp.SKBitmap(new SkiaSharp.SKImageInfo(info.Width, info.Height, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul));
+        if (codec.GetPixels(decoded.Info, decoded.GetPixels()) != SkiaSharp.SKCodecResult.Success)
+            throw new ArgumentException("Ảnh bị lỗi hoặc chưa tải đầy đủ.");
+        using var normalizedImage = SkiaSharp.SKImage.FromBitmap(decoded);
+        using var png = normalizedImage.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100) ?? throw new ArgumentException("Không chuyển được ảnh.");
+        if (png.Size > 5 * 1024 * 1024) throw new ArgumentException("Ảnh quá lớn.");
+        var bytes = png.ToArray();
+        using var previewSource = new MemoryStream(bytes);
+        using var normalized = Image.FromStream(previewSource);
+        SetPreview(new Bitmap(normalized)); imageUpload = bytes;
+        imageCaption!.Text = Path.GetFileName(file); error.Text = "";
+    }
+
+    /// <summary>Giải phóng ảnh/control cũ khi thay xem trước, tránh khóa file ảnh người dùng.</summary>
+    private void SetPreview(Image? image)
+    {
+        foreach (Control child in imagePreview!.Controls.Cast<Control>().ToArray()) child.Dispose();
+        imagePreview.Controls.Clear();
+        if (image is null) return;
+        var picture = new PictureBox { Image = image, Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom };
+        picture.Disposed += (_, _) => picture.Image?.Dispose(); imagePreview.Controls.Add(picture);
+    }
+
     /// <summary>Lỗi dữ liệu cho sửa; timeout giữ payload/mã và khóa trường để thử lại đúng yêu cầu, tránh ghi trùng.</summary>
     private async Task Save()
     {
@@ -306,10 +386,16 @@ internal sealed class MenuEditorForm : Form
         {
             if (pending is null)
             {
+                if (imageUpload is not null)
+                {
+                    imageValue = (await LiveSession.Api.UploadMenuImageAsync(imageUpload)).Path;
+                    imageUpload = null;
+                }
                 operation = Guid.NewGuid();
                 pending = build(operation);
             }
-            await AdminUi.Recover(() => LiveSession.Api.SaveMenuAsync(kind, id, pending), () => LiveSession.Api.MenuReceiptAsync(operation));
+            var receipt = await AdminUi.Recover(() => LiveSession.Api.SaveMenuAsync(kind, id, pending), () => LiveSession.Api.MenuReceiptAsync(operation));
+            SavedId = receipt.Ma;
             sending = false;
             DialogResult = DialogResult.OK;
             Close();
@@ -327,5 +413,150 @@ internal sealed class MenuEditorForm : Form
                 AdminUi.Error(this, ex);
         }
         finally { sending = false; if (!IsDisposed) save.Enabled = cancel.Enabled = true; }
+    }
+}
+
+
+/// <summary>Chọn món một lần, nhập giá nhiều size/nhiệt độ và chuyển thẳng sang bảng công thức.</summary>
+internal sealed class MenuVariantBatchForm : Form
+{
+    private sealed record Choice(long Id, string Label);
+    private readonly MenuAdminSnapshot data;
+    private readonly ComboBox dish;
+    private readonly CheckBox cold = new() { Name = "VariantCold", Text = "Lạnh", AutoSize = true, Checked = true };
+    private readonly CheckBox hot = new() { Name = "VariantHot", Text = "Nóng", AutoSize = true };
+    private readonly ComboBox defaultChoice = new() { Name = "VariantDefault", Width = 300, DropDownStyle = ComboBoxStyle.DropDownList };
+    private readonly DataGridView grid = Ui.Grid(new([], []), 230);
+    private readonly Label feedback = Ui.Label("", 9, false, CafeTheme.Danger);
+    private readonly Button save;
+    private readonly Dictionary<string, decimal?> prices = [];
+    private readonly HashSet<string> sizes = [];
+    private bool rendering, busy, uncertain;
+    private MenuVariantBatchInput? pending;
+    internal long? SavedDishId { get; private set; }
+
+    /// <summary>Cấu hình có sẵn được nạp để sửa giá, giữ trạng thái bán và không tạo tổ hợp trùng.</summary>
+    internal MenuVariantBatchForm(MenuAdminSnapshot data, long? selectedDish = null)
+    {
+        this.data = data;
+        Name = "MenuVariantBatchForm"; Text = "Cấu hình size và giá"; ClientSize = new Size(860, 650); MinimumSize = new Size(690, 550);
+        AutoScaleMode = AutoScaleMode.Dpi; BackColor = CafeTheme.Cream; Font = CafeTheme.Body(); Padding = new Padding(16); StartPosition = FormStartPosition.CenterParent;
+        dish = new ComboBox { Name = "VariantDish", Width = 530, DropDownStyle = ComboBoxStyle.DropDownList, DisplayMember = "Label", ValueMember = "Id", BindingContext = new BindingContext(),
+            DataSource = data.Mon.OrderBy(m => m.ThuTuHienThi).Select(m => new Choice(m.MaMon, m.TenMon)).ToList() };
+        grid.Name = "VariantPriceMatrix"; grid.DataSource = null; grid.Columns.Clear(); grid.ReadOnly = false;
+        grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "UseSize", HeaderText = "Sử dụng", FillWeight = 16 });
+        grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size", HeaderText = "Size", ReadOnly = true, FillWeight = 14 });
+        foreach (var temp in new[] { "ICED", "HOT" }) grid.Columns.Add(new DataGridViewTextBoxColumn { Name = temp, HeaderText = temp == "ICED" ? "Giá lạnh (đ)" : "Giá nóng (đ)", ValueType = typeof(decimal), FillWeight = 35, DefaultCellStyle = new() { Format = "N0", NullValue = "Nhập giá" } });
+        grid.CurrentCellDirtyStateChanged += (_, _) => { if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewCheckBoxCell) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
+        grid.CellValidating += (_, e) =>
+        {
+            if (rendering || e.RowIndex < 0 || e.ColumnIndex < 2 || grid.Rows[e.RowIndex].Cells[e.ColumnIndex].ReadOnly) return;
+            if (!Price(e.FormattedValue, out var validatedPrice)) { e.Cancel = true; feedback.Text = "Giá phải là số đồng nguyên không âm, ví dụ 35000."; }
+        };
+        grid.CellParsing += (_, e) => { if (e.ColumnIndex >= 2 && Price(e.Value, out var value)) { e.Value = value; e.ParsingApplied = true; } };
+        grid.CellValueChanged += (_, e) =>
+        {
+            if (rendering || e.RowIndex < 0) return;
+            var size = (string)grid.Rows[e.RowIndex].Cells[1].Value;
+            if (e.ColumnIndex == 0)
+            {
+                // Bỏ chọn không xóa cấu hình đã có hoặc làm mất liên kết đơn/công thức.
+                if (Equals(grid.Rows[e.RowIndex].Cells[0].Value, true)) sizes.Add(size); else sizes.Remove(size);
+                RefreshChoices();
+            }
+            if (e.ColumnIndex >= 2 && Price(grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value, out var value)) prices[size + ":" + grid.Columns[e.ColumnIndex].Name] = value;
+        };
+        grid.DataError += (_, e) => { e.ThrowException = false; e.Cancel = true; feedback.Text = "Kiểm tra lại giá đã nhập."; };
+        cold.CheckedChanged += (_, _) => RefreshChoices(); hot.CheckedChanged += (_, _) => RefreshChoices();
+        save = Ui.Button("Lưu & nhập công thức", () => { }, true); save.Name = "VariantBatchSave"; save.MinimumSize = new Size(260, 44); save.Width = 260; save.Click += async (_, _) => await Save();
+        var hint = Ui.Label("Bỏ chọn size để bỏ qua tạo mới; cấu hình đã có vẫn được giữ. Cấu hình mới lưu tắt bán để bạn hoàn thiện công thức trước.", 9, false, CafeTheme.Muted); hint.MaximumSize = new Size(760, 0);
+        feedback.Name = "VariantBatchFeedback"; feedback.MaximumSize = new Size(760, 0);
+        AdminUi.Compose(this, Ui.Panel("Cấu hình size và giá", Ui.Field("Món", dish), Ui.Row(Ui.Label("Có phục vụ:", 10, true), cold, hot), grid,
+            Ui.Field("Lựa chọn mặc định khi khách chọn món", defaultChoice), hint, feedback), save, Ui.Button("Hủy", () => Close()));
+        dish.SelectedValueChanged += (_, _) => LoadDish();
+        if (selectedDish is { } id) { dish.SelectedValue = id; dish.Enabled = false; }
+        LoadDish();
+        FormClosing += (_, e) => { if (busy || uncertain) { e.Cancel = true; feedback.Text = "Kết quả chưa rõ. Kiểm tra / thử lại trước khi đóng."; } };
+    }
+
+    /// <summary>Nạp giá và lựa chọn mặc định hiện hành của món, không điền giá tùy ý.</summary>
+    private void LoadDish()
+    {
+        rendering = true; prices.Clear(); sizes.Clear(); grid.Rows.Clear();
+        var variants = Current();
+        cold.Checked = variants.Count == 0 || variants.Any(v => v.NhietDo == "ICED"); hot.Checked = variants.Any(v => v.NhietDo == "HOT");
+        foreach (var v in variants) { prices[v.KichCo + ":" + v.NhietDo] = v.GiaBan; sizes.Add(v.KichCo); }
+        if (variants.Count == 0) sizes.Add("M");
+        foreach (var size in new[] { "S", "M", "L" }) grid.Rows.Add(sizes.Contains(size), size, prices.GetValueOrDefault(size + ":ICED"), prices.GetValueOrDefault(size + ":HOT"));
+        rendering = false; feedback.Text = ""; RefreshChoices();
+        if (variants.FirstOrDefault(v => v.LaMacDinh) is { } def) defaultChoice.SelectedItem = Label(def.KichCo, def.NhietDo);
+    }
+
+    /// <summary>Chỉ hiện giá theo nhiệt độ đã chọn, danh sách mặc định chỉ lấy tổ hợp sẽ được lưu.</summary>
+    private void RefreshChoices()
+    {
+        if (rendering) return;
+        rendering = true;
+        grid.Columns["ICED"].Visible = cold.Checked; grid.Columns["HOT"].Visible = hot.Checked;
+        foreach (DataGridViewRow row in grid.Rows)
+            foreach (var temp in new[] { "ICED", "HOT" }) row.Cells[temp].ReadOnly = !sizes.Contains((string)row.Cells[1].Value);
+        var old = defaultChoice.SelectedItem as string;
+        defaultChoice.Items.Clear();
+        var keys = Current().Select(v => (v.KichCo, v.NhietDo)).Concat(sizes.SelectMany(size => new[] { "ICED", "HOT" }.Where(t => t == "ICED" ? cold.Checked : hot.Checked).Select(t => (size, t)))).Distinct();
+        foreach (var (size, temp) in keys.OrderBy(v => v.Item1 == "S" ? 0 : v.Item1 == "M" ? 1 : 2).ThenBy(v => v.Item2)) defaultChoice.Items.Add(Label(size, temp));
+        if (old is not null && defaultChoice.Items.Contains(old)) defaultChoice.SelectedItem = old;
+        else if (defaultChoice.Items.Count > 0) defaultChoice.SelectedIndex = 0;
+        rendering = false;
+    }
+
+    /// <summary>Giữ cấu hình hiện có của món, kể cả khi bỏ chọn size tạo mới.</summary>
+    private List<MenuVariant> Current() => dish.SelectedValue is long id ? data.CauHinh.Where(v => v.MaMon == id).ToList() : [];
+    /// <summary>Tên tổ hợp dùng trong lựa chọn mặc định, không hiển thị ID kỹ thuật.</summary>
+    private static string Label(string size, string temp) => $"{size} – {(temp == "HOT" ? "Nóng" : "Lạnh")}";
+    /// <summary>Nhận giá VND nguyên, bỏ dấu phân cách nhóm do N0 hiển thị; không làm tròn giá lẻ.</summary>
+    private static bool Price(object? input, out decimal? value)
+    {
+        var text = Convert.ToString(input)?.Trim() ?? "";
+        if (input is decimal amount) { value = amount; return amount >= 0 && amount <= 999999999999999999m && amount == decimal.Truncate(amount); }
+        if (text.Length == 0) { value = null; return true; }
+        if (decimal.TryParse(text, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.CurrentCulture, out var price) && price >= 0 && price <= 999999999999999999m && price == decimal.Truncate(price)) { value = price; return true; }
+        value = null; return false;
+    }
+
+    /// <summary>Lưu bảng giá nguyên tử rồi trả món để trang gọi mở bảng công thức; retry giữ nguyên lệnh.</summary>
+    private async Task Save()
+    {
+        if (busy || dish.SelectedValue is not long id || !grid.EndEdit()) return;
+        if (pending is null)
+        {
+            var lines = Current().Select(v => new MenuVariantBatchLine(v.MaCauHinhMon, v.KichCo, v.NhietDo, v.GiaBan, false, v.PhienBanDuLieu)).ToDictionary(v => (v.KichCo, v.NhietDo));
+            foreach (var size in sizes)
+                foreach (var temp in new[] { "ICED", "HOT" }.Where(t => t == "ICED" ? cold.Checked : hot.Checked))
+                {
+                    if (prices.GetValueOrDefault(size + ":" + temp) is not { } price) { feedback.Text = $"Nhập giá cho {Label(size, temp)}."; return; }
+                    var old = lines.GetValueOrDefault((size, temp));
+                    lines[(size, temp)] = new(old?.MaCauHinhMon, size, temp, price, false, old?.PhienBanDuLieu);
+                }
+            if (lines.Count == 0 || defaultChoice.SelectedItem is not string def) { feedback.Text = "Chọn size, nhiệt độ và cấu hình mặc định."; return; }
+            pending = new(id, lines.Values.Select(v => v with { LaMacDinh = Label(v.KichCo, v.NhietDo) == def }).ToList(), Guid.NewGuid());
+        }
+        busy = true; SetFields(false);
+        try
+        {
+            await AdminUi.Recover(() => LiveSession.Api.SaveVariantBatchAsync(pending), () => LiveSession.Api.MenuReceiptAsync(pending.MaThaoTac));
+            SavedDishId = pending.MaMon; uncertain = false; busy = false; DialogResult = DialogResult.OK; Close();
+        }
+        catch (CafeApiException ex)
+        {
+            uncertain = ex.StatusCode is null || (int)ex.StatusCode >= 500; feedback.Text = ex.Message;
+            if (!uncertain) { pending = null; SetFields(true); }
+            save.Text = uncertain ? "Kiểm tra / thử lại" : "Lưu & nhập công thức";
+        }
+        finally { busy = false; if (!save.IsDisposed) save.Enabled = true; }
+    }
+    /// <summary>Khóa nháp khi đang ghi hoặc chưa rõ kết quả để không thay nội dung lần thử lại.</summary>
+    private void SetFields(bool enabled)
+    {
+        dish.Enabled = false; cold.Enabled = hot.Enabled = grid.Enabled = defaultChoice.Enabled = enabled; save.Enabled = enabled;
     }
 }

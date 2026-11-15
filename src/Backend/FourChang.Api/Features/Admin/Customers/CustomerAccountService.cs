@@ -7,21 +7,17 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using FourChang.Domain.Entities.Accounts;
-using FourChang.Domain.Entities.Audit;
-using FourChang.Domain.Entities.Orders;
-using FourChang.Domain.Entities.Payments;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Infrastructure.Security;
 using FourChang.Presentation.Shared.Contracts.Admin;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 
 namespace FourChang.Api.Features.Admin.Customers;
 
 // UC-ADM-01: toàn bộ quy tắc ghi tài khoản khách nằm tại đây; endpoint chỉ định tuyến.
 public sealed class CustomerAccountService(CafeDbContext db)
 {
-    // Luồng chính 1: lọc ở SQL và chỉ lấy một trang, tránh tải toàn bộ dữ liệu cá nhân.
+    /// <summary>Luồng chính 1: lọc ở SQL và chỉ lấy một trang, tránh tải toàn bộ dữ liệu cá nhân.</summary>
     public async Task<IResult> Search(string? search, int page, int pageSize)
     {
         if (page < 1 || pageSize is < 1 or > 100 || search?.Length > 254 || (long)(page - 1) * pageSize > int.MaxValue)
@@ -41,12 +37,11 @@ public sealed class CustomerAccountService(CafeDbContext db)
         return Results.Ok(new CustomerPage(users.Select(CustomerRules.View).ToList(), page, pageSize, total));
     }
 
-    // Luồng chính 2 / A2: hiển thị hồ sơ và nguồn tham chiếu để Admin biết vì sao được/không được xóa.
+    /// <summary>Đọc hồ sơ cùng giao dịch gần đây; không còn kiểm tra khả năng xóa hoặc lộ tên bảng kỹ thuật.</summary>
     public async Task<IResult> Details(long id)
     {
         var user = await db.TaiKhoanKhachHang.AsNoTracking().SingleOrDefaultAsync(x => x.MaKhachHang == id);
         if (user is null) return Results.NotFound();
-        var references = await References(id);
         var orders = db.DonHang.AsNoTracking().Where(x => x.MaKhachHang == id);
         var recent = await orders.OrderByDescending(x => x.MaDonHang).Take(20)
             .Select(x => new CustomerReference("Đơn hàng", FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TrangThai)).ToListAsync();
@@ -56,10 +51,10 @@ public sealed class CustomerAccountService(CafeDbContext db)
             orderby invoice.MaHoaDon descending select new CustomerReference("Hóa đơn", invoice.SoHoaDon, invoice.TrangThai)).Take(20).ToListAsync());
         recent.AddRange(await (from refund in db.HoSoHoanTien.AsNoTracking() join order in orders on refund.MaDonHang equals order.MaDonHang
             orderby refund.MaHoanTien descending select new CustomerReference("Hoàn tiền", refund.MaHoanTienHienThi, refund.TrangThai)).Take(20).ToListAsync());
-        return Results.Ok(new CustomerDetails(CustomerRules.View(user), references.All(x => x.SoLuong == 0), references, recent));
+        return Results.Ok(new CustomerDetails(CustomerRules.View(user), recent));
     }
 
-    // E4: tra kết quả đã commit khi đường truyền bị ngắt; không suy đoán timeout nghĩa là chưa lưu.
+    /// <summary>Tra kết quả đã commit đúng Admin khi mất phản hồi; không coi timeout là chưa lưu.</summary>
     public async Task<IResult> Operation(Guid operation, HttpContext context)
     {
         var actor = Actor(context);
@@ -68,48 +63,45 @@ public sealed class CustomerAccountService(CafeDbContext db)
         return audit?.KetQuaDaChotJson is { } json ? Results.Ok(JsonSerializer.Deserialize<CustomerMutation>(json)) : Results.NotFound();
     }
 
-    // Luồng chính 3–5: tạo hoặc sửa các trường hồ sơ được phép, không gộp với thao tác đổi trạng thái/reset.
-    public async Task<IResult> Save(long? id, CustomerSaveInput input, HttpContext context)
+    /// <summary>Sửa hồ sơ hiện hữu với định danh duy nhất; tạo khách chỉ thuộc đăng ký Web.</summary>
+    public async Task<IResult> Save(long id, CustomerSaveInput input, HttpContext context)
     {
-        var problem = CustomerRules.Validate(input, id is null);
+        var problem = CustomerRules.Validate(input, false);
         if (problem is not null) return Error(400, problem);
-        return await Execute(id, id is null ? "CREATE" : "UPDATE", input.MaThaoTac, input, input.PhienBanDuLieu, null, context,
+        return await Execute(id, "UPDATE", input.MaThaoTac, input, input.PhienBanDuLieu, null, context,
             async user =>
             {
                 var username = CustomerRules.Normalize(input.TenDangNhap, true)!;
                 var email = CustomerRules.Normalize(input.Email, true);
                 var phone = CustomerRules.Normalize(input.SoDienThoai);
-                if (id is not null && username != user.TenDangNhapChuanHoa) return "Không thay đổi tên đăng nhập của hồ sơ hiện có.";
-                if (await db.TaiKhoanKhachHang.AnyAsync(x => (id == null || x.MaKhachHang != id) &&
-                    (x.TenDangNhapChuanHoa == username || email != null && x.EmailChuanHoa == email || phone != null && x.SoDienThoaiChuanHoa == phone)))
-                    return "Tên đăng nhập, email hoặc số điện thoại đã được sử dụng.";
-                user.TenDangNhapChuanHoa = username; user.HoTen = input.HoTen.Trim();
-                user.EmailChuanHoa = email; user.SoDienThoaiChuanHoa = phone;
-                if (id is null)
-                {
-                    user.MatKhauBam = Passwords.Hash(input.MatKhauTam!);
-                    user.BatBuocDoiMatKhau = true; user.TrangThai = "ACTIVE";
-                }
+                if (username != user.TenDangNhapChuanHoa) return "Không thay đổi tên đăng nhập của hồ sơ hiện có.";
+                if (await db.TaiKhoanKhachHang.AnyAsync(x => x.MaKhachHang != id &&
+                    (email != null && x.EmailChuanHoa == email || x.SoDienThoaiChuanHoa == phone)))
+                    return "Email hoặc số điện thoại đã được sử dụng.";
+                user.HoTen = input.HoTen.Trim();
+                user.EmailChuanHoa = email;
+                user.SoDienThoaiChuanHoa = phone;
+                user.ThoiDiemCapNhat = DateTime.UtcNow;
                 return null;
             });
     }
 
-    // A1/A2: thay trạng thái, reset và xóa dùng cùng cơ chế version/audit nhưng điều kiện nghiệp vụ riêng.
+    /// <summary>Khóa/mở hoặc cấp mật khẩu tạm; tự ghi lý do nghiệp vụ, giữ thu hồi phiên và lịch sử.</summary>
     public async Task<IResult> Act(long id, string action, CustomerActionInput input, HttpContext context)
     {
-        if (string.IsNullOrWhiteSpace(input.LyDo) || input.LyDo.Trim().Length > 500) return Error(400, "Lý do bắt buộc, tối đa 500 ký tự.");
-        if (action == "STATUS" && input.TrangThai is not ("ACTIVE" or "LOCKED" or "INACTIVE")) return Error(400, "Trạng thái không hợp lệ.");
+        if (action is not ("STATUS" or "RESET_PASSWORD")) return Error(400, "Thao tác khách hàng không còn được hỗ trợ.");
+        if (input.LyDo?.Length > 500) return Error(400, "Ghi chú tối đa 500 ký tự.");
+        if (action == "STATUS" && input.TrangThai is not ("ACTIVE" or "LOCKED")) return Error(400, "Trạng thái không hợp lệ.");
         if (action == "RESET_PASSWORD" && !CustomerRules.ValidPassword(input.MatKhauTam)) return Error(400, "Mật khẩu tạm phải có 5–128 ký tự.");
-        return await Execute(id, action, input.MaThaoTac, input, input.PhienBanDuLieu, input.LyDo.Trim(), context,
+        if (action == "RESET_PASSWORD" && input.MatKhauTam != input.XacNhanMatKhau)
+            return Error(400, "Xác nhận mật khẩu chưa khớp.");
+        var reason = string.IsNullOrWhiteSpace(input.LyDo)
+            ? action == "RESET_PASSWORD" ? "Cấp mật khẩu tạm theo yêu cầu khách hàng" : input.TrangThai == "LOCKED" ? "Quản lý khóa tài khoản" : "Quản lý mở khóa tài khoản"
+            : input.LyDo.Trim();
+        return await Execute(id, action, input.MaThaoTac, input, input.PhienBanDuLieu, reason, context,
             async user =>
             {
-                if (action == "DELETE")
-                {
-                    // BR-28: xét mọi FK, không chỉ đếm đơn. Không xóa phiên, địa chỉ hoặc log để lách kiểm tra.
-                    if ((await References(id)).Any(x => x.SoLuong > 0)) return "Khách hàng đã có dữ liệu tham chiếu. Không thể xóa; hãy ngừng hoặc khóa với lý do.";
-                    db.TaiKhoanKhachHang.Remove(user);
-                }
-                else if (action == "STATUS") user.TrangThai = input.TrangThai!;
+                if (action == "STATUS") user.TrangThai = input.TrangThai!;
                 else
                 {
                     if (Passwords.Verify(input.MatKhauTam!, user.MatKhauBam)) return "Mật khẩu tạm mới không được trùng mật khẩu hiện tại.";
@@ -126,12 +118,12 @@ public sealed class CustomerAccountService(CafeDbContext db)
             });
     }
 
-    // BR-14/29: một điểm ghi chung bảo đảm chống trùng và commit nguyên tử hồ sơ + phiên + nhật ký.
-    private async Task<IResult> Execute(long? id, string action, Guid operation, object input, byte[]? version,
+    /// <summary>Ghi hồ sơ, thu hồi phiên và audit nguyên tử; chống lặp và từ chối rowversion cũ.</summary>
+    private async Task<IResult> Execute(long id, string action, Guid operation, object input, byte[]? version,
         string? reason, HttpContext context, Func<TaiKhoanKhachHang, Task<string?>> mutate)
     {
         if (operation == Guid.Empty) return Error(400, "Thiếu mã thao tác để kiểm tra kết quả khi thử lại.");
-        if (id is not null && version is not { Length: 8 }) return Error(400, "Thiếu phiên bản hồ sơ hợp lệ.");
+        if (version is not { Length: 8 }) return Error(400, "Thiếu phiên bản hồ sơ hợp lệ.");
         var actor = Actor(context);
         // Chỉ lưu HMAC của yêu cầu: không lưu mật khẩu tạm, cũng không tạo hash dễ dò từ mật khẩu ngắn.
         var secret = Environment.GetEnvironmentVariable("FOURCHANG_POS_KEY") ?? throw new InvalidOperationException("Thiếu khóa máy chủ.");
@@ -147,23 +139,22 @@ public sealed class CustomerAccountService(CafeDbContext db)
                 !CryptographicOperations.FixedTimeEquals(previous.MaBamYeuCau, digest)) return Error(409, "Mã thao tác đã được dùng với nội dung khác.");
             return Results.Ok(JsonSerializer.Deserialize<CustomerMutation>(previous.KetQuaDaChotJson!));
         }
-        var user = id is null ? new TaiKhoanKhachHang() : await db.TaiKhoanKhachHang.SingleOrDefaultAsync(x => x.MaKhachHang == id);
+        var user = await db.TaiKhoanKhachHang.SingleOrDefaultAsync(x => x.MaKhachHang == id);
         if (user is null) return Results.NotFound();
-        if (id is not null && !version!.SequenceEqual(user.PhienBanDuLieu))
+        if (!version!.SequenceEqual(user.PhienBanDuLieu))
             return Results.Conflict(new { detail = "Hồ sơ đã thay đổi. Tải lại trước khi xác nhận.", current = CustomerRules.View(user) });
-        var before = id is null ? null : JsonSerializer.Serialize(CustomerRules.View(user));
+        var before = JsonSerializer.Serialize(CustomerRules.View(user));
         var problem = await mutate(user);
         if (problem is not null) return Error(409, problem);
-        if (id is null) db.TaiKhoanKhachHang.Add(user);
         try
         {
             await db.SaveChangesAsync();
-            var result = new CustomerMutation(operation, action == "DELETE" ? null : CustomerRules.View(user), action == "DELETE");
+            var result = new CustomerMutation(operation, CustomerRules.View(user), false);
             var audit = AuditFactory.Create("ADMIN", actor, "CUSTOMER_" + action, "TaiKhoanKhachHang", user.MaKhachHang);
             audit.TenNguoiThucHienDaChot = context.User.Identity?.Name ?? "Quản lý";
             audit.MaThaoTac = operation; audit.MaBamYeuCau = digest; audit.LyDo = reason;
             audit.DuLieuTruocJson = before;
-            audit.DuLieuSauJson = action == "DELETE" ? null : JsonSerializer.Serialize(result.Account);
+            audit.DuLieuSauJson = JsonSerializer.Serialize(result.Account);
             audit.KetQuaDaChotJson = JsonSerializer.Serialize(result);
             // BR-29/E6: audit thất bại thì toàn bộ thay đổi hồ sơ/phiên cũng phải rollback.
             db.NhatKyHeThong.Add(audit); await db.SaveChangesAsync(); await tx.CommitAsync();
@@ -177,26 +168,8 @@ public sealed class CustomerAccountService(CafeDbContext db)
         }
     }
 
-    private async Task<List<CustomerReferenceCount>> References(long id)
-    {
-        var counts = new List<CustomerReferenceCount>();
-        if (db.Database.GetDbConnection().State != ConnectionState.Open) await db.Database.OpenConnectionAsync();
-        // Tên bảng/cột chỉ lấy từ mô hình EF tin cậy, còn id luôn là tham số SQL.
-        // Nhờ đó kiểm tra không bỏ sót FK khi bảo trì mà không cần thêm bảng phụ.
-        foreach (var entity in db.Model.GetEntityTypes())
-        foreach (var fk in entity.GetForeignKeys().Where(x => x.PrincipalEntityType.ClrType == typeof(TaiKhoanKhachHang)))
-        {
-            var table = entity.GetTableName()!; var column = fk.Properties.Single().Name;
-            await using var command = db.Database.GetDbConnection().CreateCommand();
-            command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
-            command.CommandText = $"SELECT COUNT_BIG(*) FROM [dbo].[{table.Replace("]", "]]")}] WHERE [{column.Replace("]", "]]")}]=@customer";
-            var parameter = command.CreateParameter(); parameter.ParameterName = "@customer"; parameter.Value = id; command.Parameters.Add(parameter);
-            var count = Convert.ToInt64(await command.ExecuteScalarAsync(), CultureInfo.InvariantCulture);
-            counts.Add(new(table + "." + column, count));
-        }
-        return counts;
-    }
-
+    /// <summary>Lấy mã Admin từ phiên đã được middleware xác thực.</summary>
     private static long Actor(HttpContext context) => long.Parse(context.User.FindFirst(ClaimTypes.NameIdentifier)!.Value, CultureInfo.InvariantCulture);
+    /// <summary>Trả lỗi nghiệp vụ chuẩn, không đưa dữ liệu nhạy cảm vào phản hồi.</summary>
     private static IResult Error(int status, string message) => Results.Problem(detail: message, statusCode: status);
 }

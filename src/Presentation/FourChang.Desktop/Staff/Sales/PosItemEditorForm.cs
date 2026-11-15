@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
@@ -88,7 +88,7 @@ public sealed class PosItemEditorForm : Form
         selected = variants.SingleOrDefault(x => x.KichCo == size.Text && x.NhietDo == (temperature.SelectedItem as Choice<string>)?.Value);
         sugar.Items.Clear();
         foreach (var value in AllowedPairs().Select(x => x.PhanTramDuong).Distinct().Order()) sugar.Items.Add(new Choice<int>(value + "%", value));
-        SelectPercent(sugar, preferred?.PhanTramDuong);
+        SelectPercent(sugar, preferred?.PhanTramDuong ?? selected?.PhanTramDuongMacDinh);
         foreach (Control control in toppings.Controls.Cast<Control>().ToArray()) control.Dispose();
         toppings.Controls.Clear(); portions.Clear();
         foreach (var top in selected?.Toppings.Where(x => x.Available) ?? [])

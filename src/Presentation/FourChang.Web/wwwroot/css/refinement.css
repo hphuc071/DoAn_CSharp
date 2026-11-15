@@ -1,4 +1,4 @@
-/* Shared Vietnamese typography and a restrained visual refresh. No remote fonts. */
+﻿/* Shared Vietnamese typography and a restrained visual refresh. No remote fonts. */
 html{font-synthesis:none;text-size-adjust:100%;-webkit-text-size-adjust:100%}
 body{font-family:"Segoe UI",Tahoma,Arial,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font-family:inherit;letter-spacing:normal}
@@ -42,7 +42,7 @@ nav a{font-size:14px}nav a.active:after{bottom:23px;height:3px;border-radius:8px
 .site-footer{padding-top:27px;padding-bottom:27px}.site-footer .brand{font-size:13px;letter-spacing:.02em}
 /* Sprite cells remain square, preserving the original drink proportions. */
 .drink-photo{position:relative;overflow:hidden;background-image:none;background-color:#f5efe7}
-.drink-photo::before{content:"";position:absolute;height:100%;width:auto;aspect-ratio:1;top:0;left:50%;transform:translateX(-50%);background-image:url('/assets/coffee-sheet.png');background-size:300% 200%;background-position:inherit;background-repeat:no-repeat;pointer-events:none}
+.drink-photo[class*="sprite-"]::before{content:"";position:absolute;height:100%;width:auto;aspect-ratio:1;top:0;left:50%;transform:translateX(-50%);background-image:url('/assets/coffee-sheet.png');background-size:300% 200%;background-position:inherit;background-repeat:no-repeat;pointer-events:none}
 @media(min-width:1450px){.hero{height:255px}.hero h1{font-size:36px}.product-card .drink-photo{height:185px}}
 @media(max-width:1200px){.site-header{gap:25px}.brand-name{font-size:18px}.brand-name em{font-size:10px}.header-actions{gap:12px}.hero{padding:24px}.hero h1{font-size:29px}}
 @media(max-width:850px){.site-header{height:auto;min-height:100px;padding-top:16px;padding-bottom:16px}.order-sidebar{gap:18px}.hero h1{font-size:31px}.product-info h3{font-size:14px}.product-card .drink-photo{height:170px}.site-header nav a.active:after{bottom:-7px}}
@@ -100,3 +100,6 @@ body{background:radial-gradient(ellipse at 90% 0%,#fff8ed 0,transparent 48%),var
 
 /* Chi hien thong bao khi co loi, khong ve mot thanh trong tren form moi mo. */
 .auth-layout-v3 .validation-summary-valid{display:none}
+
+/* Ảnh riêng của món không có lớp sprite phủ lên và luôn vừa khung. */
+.product-card .drink-photo img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}

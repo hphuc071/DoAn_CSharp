@@ -1,4 +1,4 @@
-using FourChang.Desktop.Admin.Employees;
+﻿using FourChang.Desktop.Admin.Employees;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Database;
@@ -30,12 +30,22 @@ public sealed class MenuManagementPage : UserControl
         Height = 680;
         BackColor = CafeTheme.Cream;
         DoubleBuffered = true;
-        var definitions = new[] { ("dishes", "Món", "Danh sách món", "Quản lý thông tin và trạng thái hiển thị của món."), ("variants", "Cấu hình món", "Cấu hình và giá bán", "Size, nóng/lạnh và lựa chọn pha chế dùng chung Web/POS."), ("toppings", "Topping", "Topping và giá mỗi phần", "Quản lý giá, giới hạn và trạng thái sử dụng."), ("banners", "Banner", "Nội dung công bố", "Quản lý hình ảnh và thời gian hiển thị banner.") };
+        var definitions = new[] {
+            ("dishes", "Món", "Danh sách món", "Thông tin món, hiển thị và bật/tắt bán."),
+            ("variants", "Cấu hình món", "Cấu hình và giá bán", "Chọn riêng size/nóng-lạnh và giá dùng chung Web/POS."),
+            ("toppings", "Topping", "Topping dùng chung", "Giá/phần, giới hạn và trạng thái sử dụng."),
+            ("recipes", "Công thức", "Công thức pha chế", "Lưu áp dụng ngay, giữ nguyên định mức đơn cũ.") };
+
         var navigation = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty, Padding = new Padding(0, 0, 0, 12), Name = "MenuNavigation" };
         foreach (var (kind, caption, title, description) in definitions)
         {
             var page = new TabPage(caption) { BackColor = CafeTheme.Cream, Padding = Padding.Empty, Margin = Padding.Empty, AutoScroll = false };
-            page.Controls.Add(List(kind, title, description));
+            if (kind == "recipes")
+            {
+                page.AutoScroll = true;
+                page.Controls.Add(new FourChang.Desktop.Admin.Recipes.RecipesPage());
+            }
+            else page.Controls.Add(List(kind, title, description));
             tabs.TabPages.Add(page);
             var index = tabButtons.Count;
             var button = Ui.Button(caption, () => tabs.SelectedIndex = index);
@@ -100,12 +110,11 @@ public sealed class MenuManagementPage : UserControl
         var note = kind switch
         {
             "dishes" => "Món mới cần cấu hình và BOM hợp lệ trước khi công bố. Thiếu nguyên liệu vẫn tạm hết.",
-            "variants" => "Giá dùng chung Web/POS. BOM tại ADM-05; ghi chú không tự đổi định mức.",
-            "categories" => "Ẩn/ngừng danh mục ảnh hưởng các món thuộc nhóm; đơn cũ giữ nguyên.",
-            "toppings" => "Giá theo phần; topping đã có tham chiếu chỉ được ngừng.",
-            _ => "Chỉ banner hợp lệ, công bố và trong thời gian hiệu lực mới hiển thị."
+            "variants" => "Giá dùng chung Web/POS. Khai báo nguyên liệu tại tab Công thức.",
+            "toppings" => "Topping dùng chung; ngừng sử dụng để bảo toàn lịch sử.",
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
-        var pane = new MenuListLayout(kind, title, description, note, () => Edit(kind, null), () => Selected(kind, id => Edit(kind, id)), () => Selected(kind, id => _ = Delete(kind, id)), () => _ = LoadData());
+        var pane = new MenuListLayout(kind, title, description, note, () => Edit(kind, null), () => Selected(kind, id => Edit(kind, id)), () => _ = LoadData());
         panes[kind] = pane;
         lists[kind] = (pane.Grid, pane.Search, pane.Count);
         pane.Search.TextChanged += (_, _) => Render(kind);
@@ -141,19 +150,17 @@ public sealed class MenuManagementPage : UserControl
         var term = search.Text.Trim();
         var rows = kind switch
         {
-            "categories" => data.DanhMuc.Select(x => new[] { x.MaDanhMuc.ToString(), x.TenDanhMuc, x.ThuTuHienThi.ToString(), x.SoMon.ToString(), x.DaCongBo ? "Công bố" : "Ẩn", x.DangSuDung ? "Sử dụng" : "Ngừng" }),
-            "dishes" => data.Mon.Select(x => new[] { x.MaMon.ToString(), x.TenMon, data.DanhMuc.FirstOrDefault(c => c.MaDanhMuc == x.MaDanhMuc)?.TenDanhMuc ?? "", x.DaCongBo ? "Công bố" : "Nháp", x.DangBan ? "Bật bán" : "Tắt bán", x.CongBoTuLuc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Ngay khi công bố" }),
+            "dishes" => data.Mon.Select(x => new[] { x.MaMon.ToString(), x.TenMon, data.DanhMuc.FirstOrDefault(c => c.MaDanhMuc == x.MaDanhMuc)?.TenDanhMuc ?? "", x.DaCongBo ? "Hiển thị" : "Ẩn", x.DangBan ? "Bật bán" : "Tạm hết" }),
             "variants" => data.CauHinh.Select(x => new[] { x.MaCauHinhMon.ToString(), data.Mon.FirstOrDefault(m => m.MaMon == x.MaMon)?.TenMon ?? "", x.KichCo, x.NhietDo == "HOT" ? "Nóng" : "Lạnh", x.GiaBan.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), x.DangBan ? "Bật" : "Tắt", x.LaMacDinh ? "Mặc định" : "" }),
             "toppings" => data.MonThem.Select(x => new[] { x.MaMonThem.ToString(), x.TenMonThem, x.GiaMoiPhan.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), x.GioiHanMacDinhMoiLy.ToString(), x.DangSuDung ? "Sử dụng" : "Ngừng" }),
-            _ => data.Banner.Select(x => new[] { x.MaBanner.ToString(), x.TenBanner, x.BatDauLuc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"), x.KetThucLuc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Không giới hạn", x.DaCongBo ? "Công bố" : "Nháp" })
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
-        var columns = kind switch
+        string[] columns = kind switch
         {
-            "categories" => new[] { "Mã", "Loại món", "Thứ tự", "Số món", "Công bố", "Sử dụng" },
-            "dishes" => ["Mã", "Tên món", "Loại món", "Công bố", "Bán", "Công bố từ"],
+            "dishes" => ["Mã", "Tên món", "Loại món", "Hiển thị", "Bán"],
             "variants" => ["Mã", "Món", "Size", "Nhiệt độ", "Giá (đ)", "Bán", "Mặc định"],
             "toppings" => ["Mã", "Topping", "Giá/phần (đ)", "Giới hạn/ly", "Trạng thái"],
-            _ => ["Mã", "Banner", "Bắt đầu", "Kết thúc", "Trạng thái"]
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         var matches = rows.Where(r => term.Length == 0 || r.Any(s => s.Contains(term, StringComparison.CurrentCultureIgnoreCase))).ToArray();
         // Cấu hình cột trước khi bật Fill: tab chưa hiển thị có thể chưa đủ layout native của DataGridView.
@@ -164,18 +171,16 @@ public sealed class MenuManagementPage : UserControl
         {
             "dishes" => "món",
             "variants" => "cấu hình",
-            "categories" => "danh mục",
             "toppings" => "topping",
-            _ => "banner"
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         count.Text = $"{matches.Length} {unit}";
         var weights = kind switch
         {
-            "dishes" => new float[] { 8, 26, 15, 14, 14, 23 },
+            "dishes" => new float[] { 8, 38, 18, 18, 18 },
             "variants" => [8, 28, 9, 13, 16, 12, 14],
-            "categories" => [8, 30, 10, 12, 20, 20],
             "toppings" => [8, 32, 20, 16, 24],
-            _ => [8, 30, 22, 22, 18]
+            _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         for (int i = 0; i < grid.Columns.Count; i++)
         {
@@ -215,7 +220,23 @@ public sealed class MenuManagementPage : UserControl
             data = await LiveSession.Api.GetAdminMenuAsync();
             if (IsDisposed)
                 return;
-            using var form = new MenuEditorForm(kind, id, data);
+            if (kind == "variants" && id is null)
+            {
+                using var batch = new MenuVariantBatchForm(data);
+                if (batch.ShowDialog(FindForm()) == DialogResult.OK && batch.SavedDishId is { } dish)
+                {
+                    await LoadData();
+                    using var recipes = new FourChang.Desktop.Admin.Recipes.DishRecipeEditorForm(await LiveSession.Api.GetIngredientsAsync(),
+                        await LiveSession.Api.GetAdminMenuAsync(), await LiveSession.Api.GetRecipesAsync(), dish);
+                    recipes.ShowDialog(FindForm());
+                    await LoadData();
+                }
+                return;
+            }
+            using var form = kind == "toppings"
+                ? new MenuEditorForm(kind, id, data, await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetRecipesAsync())
+                : new MenuEditorForm(kind, id, data);
+            if (kind == "dishes" && id is null) form.SetRecipeTemplates(await LiveSession.Api.GetRecipesAsync());
             if (form.ShowDialog(FindForm()) == DialogResult.OK)
                 await LoadData();
         }
@@ -223,38 +244,4 @@ public sealed class MenuManagementPage : UserControl
         catch (InvalidOperationException) { MessageBox.Show(FindForm(), "Dòng không còn tồn tại. Tải lại danh sách."); }
     }
 
-    /// <summary>Xác nhận xóa; giữ nguyên mã thao tác khi timeout và tra receipt trước khi cho thử lại.</summary>
-    private async Task Delete(string kind, long id)
-    {
-        if (busy)
-            return;
-        try
-        {
-            data = await LiveSession.Api.GetAdminMenuAsync();
-            byte[] version = kind switch
-            {
-                "categories" => data.DanhMuc.Single(x => x.MaDanhMuc == id).PhienBanDuLieu,
-                "dishes" => data.Mon.Single(x => x.MaMon == id).PhienBanDuLieu,
-                "variants" => data.CauHinh.Single(x => x.MaCauHinhMon == id).PhienBanDuLieu,
-                "toppings" => data.MonThem.Single(x => x.MaMonThem == id).PhienBanDuLieu,
-                _ => data.Banner.Single(x => x.MaBanner == id).PhienBanDuLieu
-            };
-            if (MessageBox.Show(FindForm(), "Xóa dữ liệu chưa tham chiếu? Dữ liệu đang dùng phải ẩn/ngừng thay vì xóa.", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                return;
-            var input = new MenuDeleteInput(version, Guid.NewGuid());
-            bool retry;
-            do
-            {
-                retry = false;
-                try
-                {
-                    await AdminUi.Recover(() => LiveSession.Api.DeleteMenuAsync(kind, id, input), () => LiveSession.Api.MenuReceiptAsync(input.MaThaoTac));
-                }
-                catch (CafeApiException ex) when (ex.StatusCode is null) { retry = MessageBox.Show(FindForm(), ex.Message + "\nThử lại cùng mã thao tác?", "Chưa rõ kết quả", MessageBoxButtons.RetryCancel) == DialogResult.Retry; }
-            } while (retry);
-            await LoadData();
-        }
-        catch (CafeApiException ex) { AdminUi.Error(this, ex); }
-        catch (InvalidOperationException) { MessageBox.Show(FindForm(), "Dữ liệu đã thay đổi. Tải lại danh sách."); }
-    }
 }

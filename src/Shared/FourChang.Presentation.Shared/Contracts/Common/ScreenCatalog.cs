@@ -21,9 +21,8 @@ public static class ScreenCatalog
         new("UC-ADM-12", "Ca làm việc", "work-sessions", "Admin", "Đối chiếu ca, chốt, bàn giao và khôi phục theo phiên; không quản trị thiết bị."),
         new("UC-ADM-11", "Nhân viên", "employees", "Admin", "Hồ sơ nhân viên và trạng thái làm việc; không có tài khoản nhân viên."),
 
-        new("UC-ADM-02", "Thực đơn", "menu", "Admin", "Danh mục, món/size/giá, tùy chọn, topping, banner và bật/tắt bán."),
+        new("UC-ADM-02", "Thực đơn và công thức", "menu", "Admin", "Món, cấu hình giá, topping dùng chung và công thức pha chế."),
         new("UC-ADM-03", "Nguyên liệu", "ingredients", "Admin", "Đơn vị cơ sở, quy đổi, ngưỡng cảnh báo và ngừng sử dụng."),
-        new("UC-ADM-04", "Công thức BOM", "recipes", "Admin", "Định mức theo biến thể/topping, phiên bản, hiệu lực và mô phỏng."),
         new("UC-ADM-05", "Tồn kho", "inventory", "Admin", "Thực tế, giữ chỗ, an toàn, khả dụng, sổ kho và món bị ảnh hưởng."),
         new("UC-ADM-06", "Chứng từ kho", "stock", "Admin", "Nhập, xuất, kiểm kê/điều chỉnh, nháp, ghi sổ và đảo chứng từ."),
         new("UC-ADM-07", "Đơn hàng", "manage-orders", "Admin", "Đơn đa kênh, địa chỉ, truy vết ca và sự cố sau pha/giao thất bại."),

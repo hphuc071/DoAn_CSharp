@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -193,6 +193,7 @@ public sealed class TestApi : IAsyncDisposable
         }
 
         var env = ChildEnvironment();
+        env["MenuImages__Directory"] = Path.Combine(Artifacts, "menu-images");
         if (extra is not null)
         {
             foreach (var pair in extra)
@@ -288,6 +289,19 @@ public sealed class TestApi : IAsyncDisposable
         return TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", "adm" + stamp[..12] + suffix), ("HoTen", "Khách kiểm thử " + suffix), ("Email", stamp + "@example.test"), ("SoDienThoai", TestData.Phone()), ("MatKhauTam", TestData.Password()));
     }
 
+    /// <summary>Fixture đăng ký qua Web rồi nhờ Admin cấp mật khẩu tạm; không dùng route tạo khách đã bỏ.</summary>
+    public async Task<JsonNode> CustomerWithTemporaryPassword(JsonObject input, Dictionary<string, string> admin)
+    {
+        var original = TestData.Password();
+        var registration = TestData.Body(("MaThaoTac", TestData.NewId()), ("TenDangNhap", input.Text("TenDangNhap")),
+            ("HoTen", input.Text("HoTen")), ("Email", input.Text("Email")), ("SoDienThoai", input.Text("SoDienThoai")),
+            ("MatKhau", original), ("XacNhanMatKhau", original));
+        var receipt = (await Send("POST", "/api/auth/customer/register", registration)).Expect(200, "Đăng ký khách fixture").Json;
+        var account = await CustomerAccount(receipt.Number("maKhachHang"), admin);
+        return (await Send("POST", $"/api/admin/customers/{receipt.Number("maKhachHang")}/reset-password",
+            Action(account, ("MatKhauTam", input.Text("MatKhauTam"))), admin)).Expect(200, "Cấp mật khẩu tạm cho khách đã đăng ký").Json["account"]!;
+    }
+
     /// <summary>
     /// Tạo yêu cầu thao tác từ rowversion hiện tại, lý do và các trường bổ sung để không vô tình ghi đè dữ liệu mới.
     /// </summary>
@@ -299,6 +313,9 @@ public sealed class TestApi : IAsyncDisposable
             body[pair.Key] = System.Text.Json.JsonSerializer.SerializeToNode(pair.Value);
         }
 
+        // Các test reset mặc định gửi xác nhận khớp; test biên có thể xóa/đổi trường sau khi dựng body.
+        if (body["MatKhauTam"] is { } temporary && body["XacNhanMatKhau"] is null)
+            body["XacNhanMatKhau"] = temporary.DeepClone();
         return body;
     }
 

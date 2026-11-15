@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using FourChang.Api.Features.Admin.Menu;
 using FourChang.Infrastructure.Database.Context;
@@ -22,11 +22,14 @@ public static class CatalogEndpoints
                 (l, o) => new { l.MaCauHinhMon, Quantity = l.SoLuongDat - l.SoLuongDaHuy }).ToListAsync();
             var items = snapshot.Mon.Where(x => x.CauHinh.Count > 0).Select(m =>
             {
-                var v = m.CauHinh.FirstOrDefault(x => x.LaMacDinh && x.ConHang)
+                // Thẻ món và cấu hình chọn ban đầu cùng dùng giá size M; không sửa mặc định đã lưu hoặc giá đơn cũ.
+                var medium = m.CauHinh.Where(x => x.KichCo == "M").ToList();
+                var v = medium.FirstOrDefault(x => x.LaMacDinh) ?? medium.FirstOrDefault(x => x.ConHang) ?? medium.FirstOrDefault()
+                    ?? m.CauHinh.FirstOrDefault(x => x.LaMacDinh && x.ConHang)
                     ?? m.CauHinh.FirstOrDefault(x => x.ConHang)
                     ?? m.CauHinh.FirstOrDefault(x => x.LaMacDinh) ?? m.CauHinh.First();
                 var image = int.TryParse(m.DuongDanAnh?.Replace("sprite:", "", StringComparison.Ordinal), out var index) ? index : 0;
-                return new MenuProduct(v.MaCauHinhMon, m.MaMon, m.TenMon, m.TenDanhMuc, v.GiaBan, image, m.CauHinh.Any(x => x.ConHang), m.CauHinh.Any(x => x.ConHang) ? "" : "Tạm hết");
+                return new MenuProduct(v.MaCauHinhMon, m.MaMon, m.TenMon, m.TenDanhMuc, v.GiaBan, image, m.CauHinh.Any(x => x.ConHang), m.CauHinh.Any(x => x.ConHang) ? "" : "Tạm hết", m.DuongDanAnh);
             }).Where(x => string.IsNullOrWhiteSpace(category) || Normalize(x.Category) == Normalize(category))
               .Where(x => string.IsNullOrWhiteSpace(q) || Normalize(x.Name).Contains(Normalize(q), StringComparison.Ordinal) || Normalize(x.Category).Contains(Normalize(q), StringComparison.Ordinal))
               .Where(x => minPrice is null || x.Price >= minPrice).Where(x => maxPrice is null || x.Price <= maxPrice)
@@ -48,7 +51,7 @@ public static class CatalogEndpoints
             if (dish is null || !dish.DangBan) return Results.Problem(statusCode: 404, detail: "Món chưa công bố hoặc ngừng phục vụ.");
             return Results.Ok(dish.CauHinh.Select(v => new MenuVariantItem(v.MaCauHinhMon, v.KichCo, v.NhietDo, v.GiaBan, v.ConHang,
                 v.TuyChon.Select(c => new MenuBrewOption(c.PhanTramDuong, c.PhanTramDa)).ToList(),
-                v.MonThem.Select(t => new MenuToppingItem(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMoiLy, t.ConHang)).ToList())).ToList());
+                v.MonThem.Select(t => new MenuToppingItem(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMoiLy, t.ConHang)).ToList(), v.TuyChon.FirstOrDefault(x => x.LaMacDinh)?.PhanTramDuong ?? 50)).ToList());
         });
     }
 

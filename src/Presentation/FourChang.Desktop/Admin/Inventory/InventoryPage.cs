@@ -1,4 +1,4 @@
-using FourChang.Desktop.Shared.Controls;
+﻿using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shell;
@@ -13,7 +13,7 @@ public sealed class InventoryPage : AdminWorkspacePage<StockView>
     private readonly System.Windows.Forms.Timer refresh = new() { Interval = 3000 };
 
     /// <summary>Giữ bố cục Admin, phân biệt cảnh báo bằng nhãn và màu nền nhẹ.</summary>
-    public InventoryPage() : base("Tồn kho và cảnh báo", "Tồn thực tế − Giữ chỗ − Tồn an toàn = Khả dụng", true, "KHO / TỒN NGUYÊN LIỆU")
+    public InventoryPage() : base("Tồn kho và cảnh báo", "Tồn thực tế − Giữ chỗ = Khả dụng", true, "KHO / TỒN NGUYÊN LIỆU")
     {
         Column("MaNguyenLieu", "Mã", 35); Column("TenNguyenLieu", "Nguyên liệu", 150); Column("DonVi", "Đơn vị", 50);
         Column("TonThucTe", "Thực tế", 80); Column("GiuCho", "Giữ chỗ", 75); Column("TonAnToan", "An toàn", 75);

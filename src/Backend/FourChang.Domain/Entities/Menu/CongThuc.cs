@@ -1,4 +1,4 @@
-namespace FourChang.Domain.Entities.Menu;
+﻿namespace FourChang.Domain.Entities.Menu;
 
 public sealed class CongThuc
 {
@@ -6,6 +6,7 @@ public sealed class CongThuc
     public long? MaCauHinhMon { get; set; }
     public long? MaMonThem { get; set; }
     public int SoPhienBan { get; set; }
+    public int PhanTramDuongMacDinh { get; set; } = 50;
     public string TenCongThuc { get; set; } = string.Empty;
     public string TrangThai { get; set; } = string.Empty;
     public DateTime? HieuLucTu { get; set; }

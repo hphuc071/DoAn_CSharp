@@ -1,4 +1,4 @@
-# Từ điển dữ liệu: 30 bảng
+﻿# Từ điển dữ liệu: 30 bảng
 
 Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion được giữ để bảo vệ lịch sử. Hai mã lựa chọn MaDanhMuc/MaDonViCoSo trong DTO không phải cột SQL.
 
@@ -177,6 +177,7 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | Thuộc tính | Kiểu SQL | Bắt buộc | Khóa |
 | --- | --- | --- | --- |
 | MaCongThuc | bigint | Có | PK |
+| PhanTramDuongMacDinh | int | Có, mặc định50; chỉ0/25/50/75/100 |  |
 | MaCauHinhMon | bigint | Không | FK → CauHinhMon |
 | MaMonThem | bigint | Không | FK → MonThem |
 | SoPhienBan | int | Có |  |

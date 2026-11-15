@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using FourChang.Tests.Shared;
 using Microsoft.Data.SqlClient;
 
@@ -7,6 +7,26 @@ namespace FourChang.Tests.Integration;
 /// <summary>Kiểm chuyển đổi dữ liệu có đơn/tiền/giữ chỗ; không dùng database thật của quán.</summary>
 public sealed class Schema30MigrationTests
 {
+    /// <summary>Nâng schema30 cũ có công thức, thêm mặc định50 và giữ dữ liệu; chạy lại không thay đổi bản ghi.</summary>
+    [Fact, Trait("Layer", "Database"), Trait("UseCase", "Schema30")]
+    public async Task Schema30Cu_ThemDuongMacDinh_GiuCongThuc_ChayLaiAnToan()
+    {
+        await using var api = await TestApi.Start("Schema30-RecipeDefaults", beforeInitialize: async f =>
+        {
+            await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
+            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
+            schema = schema.Replace(" [PhanTramDuongMacDinh] int NOT NULL CONSTRAINT DF_CongThuc_PhanTramDuongMacDinh DEFAULT(50),", "")
+                .Replace(" CONSTRAINT [CK_CongThuc_DuongMacDinh] CHECK (PhanTramDuongMacDinh IN (0,25,50,75,100)),", "");
+            await f.Sql(schema);
+            await f.Sql("INSERT dbo.TaiKhoanQuanLy(TenDangNhapChuanHoa,HoTen,MatKhauBam,TrangThai,BatBuocDoiMatKhau,SoLanDangNhapSai) VALUES('quanly',N'Quản lý',REPLICATE('x',64),'ACTIVE',0,0); INSERT dbo.Mon(LoaiMon,TenMon,ThuTuHienThi,DaCongBo,DangBan) VALUES(N'Cà phê',N'Món đã có',1,0,0); INSERT dbo.CauHinhMon(MaMon,KichCo,NhietDo,GiaBan,DangBan,LaMacDinh) VALUES(1,'M','ICED',39000,0,1); INSERT dbo.CongThuc(MaCauHinhMon,SoPhienBan,TenCongThuc,TrangThai,MaQuanLyTao,GhiChu) VALUES(1,1,N'Công thức cũ','DRAFT',1,N'Giữ nguyên');");
+        });
+        Assert.Equal("Công thức cũ\tGiữ nguyên\t50", await api.Sql("SELECT TenCongThuc,GhiChu,PhanTramDuongMacDinh FROM dbo.CongThuc WHERE MaCongThuc=1"));
+        var before = await api.Sql("SELECT * FROM dbo.CongThuc FOR JSON PATH");
+        await api.RunApiCommand("--init-db");
+        Assert.Equal(before, await api.Sql("SELECT * FROM dbo.CongThuc FOR JSON PATH"));
+        await api.RunApiCommand("--check-db");
+    }
+
     /// <summary>Lỗi DDL ở cuối migration phải khôi phục đủ bảng, FK, tiền và trigger trước khi thử lại.</summary>
     [Fact, Trait("Layer", "Database"), Trait("UseCase", "Schema30")]
     public async Task LateDdlFailure_RollsBackAllChanges_ThenCanRetry()

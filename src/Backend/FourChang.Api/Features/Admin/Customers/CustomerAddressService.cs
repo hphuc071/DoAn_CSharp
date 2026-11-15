@@ -76,13 +76,12 @@ public sealed class CustomerAddressService(CafeDbContext db)
     /// <summary>Chuẩn hóa trường tùy chọn; trường rỗng không bị ghi thành chuỗi khoảng trắng.</summary>
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    /// <summary>Cùng giới hạn với sổ địa chỉ Web và cột SQL; tọa độ phải có cặp và đúng miền hợp lệ.</summary>
+    /// <summary>Kiểm tra thông tin liên hệ/địa chỉ theo BR-39; không yêu cầu hoặc lưu tọa độ.</summary>
     private static void Validate(SaveSelfAddress input)
     {
         if (string.IsNullOrWhiteSpace(input.TenNguoiNhan) || input.TenNguoiNhan.Trim().Length > 120 || input.DienThoaiNguoiNhan is null ||
             !Regex.IsMatch(input.DienThoaiNguoiNhan.Trim(), @"^[0-9]{10}$") || string.IsNullOrWhiteSpace(input.DiaChiChiTiet) ||
-            input.DiaChiChiTiet.Trim().Length > 500 || input.NhanDiaChi?.Length > 50 || input.GhiChuGiaoHang?.Length > 500 ||
-            input.ViDo is < -90 or > 90 || input.KinhDo is < -180 or > 180 || (input.ViDo is null) != (input.KinhDo is null))
+            input.DiaChiChiTiet.Trim().Length > 500 || input.NhanDiaChi?.Length > 50 || input.GhiChuGiaoHang?.Length > 500)
             throw new AdminRule(400, "Kiểm tra tên người nhận, điện thoại, địa chỉ và độ dài các trường.");
     }
 

@@ -1,4 +1,4 @@
-using FourChang.Presentation.Shared.ApiClients;
+﻿using FourChang.Presentation.Shared.ApiClients;
 
 namespace FourChang.Web.Services;
 
@@ -8,6 +8,17 @@ public static class CatalogUpdateEndpoints
     /// <summary>Đăng ký đọc snapshot và streaming sự kiện, giữ nguyên hợp đồng các API đặt hàng đang có.</summary>
     public static void MapCatalogUpdates(this WebApplication app)
     {
+        app.MapGet("/menu-images/{file}", async (string file, HttpContext context, CafeApiClient api) =>
+        {
+            try
+            {
+                var bytes = await api.GetMenuImageAsync(file, context.RequestAborted);
+                context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                context.Response.Headers.CacheControl = "public,max-age=31536000,immutable";
+                return Results.File(bytes, "image/png");
+            }
+            catch (CafeApiException ex) { return Results.Problem(statusCode: (int?)ex.StatusCode ?? 503, detail: ex.Message); }
+        });
         app.MapGet("/catalog/snapshot", async (CafeApiClient api) =>
         {
             try { return Results.Ok(await api.GetCatalogAsync()); }

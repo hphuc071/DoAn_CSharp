@@ -17,7 +17,7 @@ public sealed class TemporaryPasswordBrowserTests
         var admin = await f.Api.AdminLogin();
         var input = f.Api.CustomerInput();
         input["HoTen"] = "Khách kiểm tra đổi mật khẩu tạm";
-        (await f.Api.Send("POST", "/api/admin/customers", input, admin)).Expect(200, "Tạo tài khoản tạm");
+        await f.Api.CustomerWithTemporaryPassword(input, admin);
         await f.Login(input.Text("TenDangNhap"), input.Text("MatKhauTam"), "/Account/ChangeTemporaryPassword");
         await f.Screenshot("web-temporary-password");
         var password = Password();

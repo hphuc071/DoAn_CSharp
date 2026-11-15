@@ -1,5 +1,5 @@
 {
-  "description": "Danh mục theo dac-25-Uc.docx. Có test không đồng nghĩa đã triển khai đầy đủ mọi luồng.",
+  "description": "Danh mục chuyển tiếp: ADM01/02 theo đặc tả 8 UC tinh gọn; các mã khác còn giữ ánh xạ cũ và chưa được khẳng định đã chuyển sang đặc tả mới.",
   "useCases": [
     {
       "code": "UC-WEB-01",
@@ -145,7 +145,7 @@
     {
       "code": "UC-ADM-01",
       "actor": "QuanLy",
-      "name": "Quản lý tài khoản khách hàng",
+      "name": "Quản lý khách hàng",
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
@@ -161,14 +161,16 @@
     {
       "code": "UC-ADM-02",
       "actor": "QuanLy",
-      "name": "Quản lý thực đơn",
+      "name": "Quản lý thực đơn và công thức",
       "status": "DaCoTest",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
       "sources": [
         "FourChang.Tests/QuanLy/UC-ADM-02/MenuAdministrationTests.cs",
-        "FourChang.Tests/QuanLy/UC-ADM-02/MenuSynchronizationBrowserTests.cs"
+        "FourChang.Tests/QuanLy/UC-ADM-02/MenuSynchronizationBrowserTests.cs",
+        "FourChang.Tests/QuanLy/UC-ADM-04/RecipeAdministrationTests.cs"
       ],
-      "filter": "UseCase=UC-ADM-02"
+      "filter": "UseCase=UC-ADM-02",
+      "note": "Tái sử dụng thư mục BOM cũ UC-ADM-04; các test trong đó gắn Trait UC-ADM-02. WinForms dùng AdminFeaturesUiTests với route menu/recipes."
     },
     {
       "code": "UC-ADM-03",
@@ -184,13 +186,13 @@
     {
       "code": "UC-ADM-04",
       "actor": "QuanLy",
-      "name": "Quản lý công thức pha chế BOM",
-      "status": "DaCoTest",
+      "name": "BOM theo mã cũ — đã gộp vào UC-ADM-02",
+      "status": "DaGop",
       "project": "FourChang.Tests/FourChang.Tests.csproj",
-      "sources": [
-        "FourChang.Tests/QuanLy/UC-ADM-04/RecipeAdministrationTests.cs"
-      ],
-      "filter": "UseCase=UC-ADM-04"
+      "sources": [],
+      "filter": null,
+      "consolidatedInto": "UC-ADM-02",
+      "note": "Không phải UC-ADM-04 kho của đặc tả 8 UC mới; chưa triển khai chuyển đổi UC kho trong lượt này."
     },
     {
       "code": "UC-ADM-05",

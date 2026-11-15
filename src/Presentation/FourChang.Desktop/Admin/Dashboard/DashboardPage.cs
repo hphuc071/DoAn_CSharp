@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shared.Theme;
@@ -77,7 +77,7 @@ public static class DashboardPage
                 ("Nguyên liệu cảnh báo", data.LowIngredients.ToString(), "Theo tồn kho và lượng giữ"));
             var top = Ui.Columns(Card("Tổng quan doanh thu", "Số liệu thực thu hiện tại", Revenue(data), 278),
                 Card("Thực đơn đang bán", "Giá và trạng thái từ thực đơn chung", Products(menu), 278), 36);
-            var lower = Ui.Columns(Card("Nguyên liệu và tồn kho", "Khả dụng sau giữ chỗ và tồn an toàn", StockGrid(stock), 300),
+            var lower = Ui.Columns(Card("Nguyên liệu và tồn kho", "Khả dụng = tồn thực tế − giữ chỗ", StockGrid(stock), 300),
                 Card("Nhật ký gần đây", "Các thao tác mới nhất đã được ghi nhận", AuditGrid(audit), 300), 50);
             var body = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
             body.ColumnStyles.Add(new(SizeType.Percent, 100));
@@ -127,7 +127,8 @@ public static class DashboardPage
             for (var index = 0; index < items.Count; index++)
             {
                 var item = items[index]; rows.RowStyles.Add(new(SizeType.Percent, 100f / items.Count));
-                var image = new ProductImage { ImageIndex = item.ImageIndex, Size = new Size(52, 52), Margin = Padding.Empty };
+                var image = CatalogImage.Create(item.ImagePath ?? "sprite:" + item.ImageIndex, item.Name, 52);
+                image.Size = new Size(52, 52); image.Margin = Padding.Empty;
                 var text = Ui.Stack(Ui.Label(item.Name, 10, true), Ui.Label(MoneyDisplay.Format(item.Price), 9, true, CafeTheme.Coffee));
                 text.Dock = DockStyle.Fill; rows.Controls.Add(image, 0, index); rows.Controls.Add(text, 1, index);
             }

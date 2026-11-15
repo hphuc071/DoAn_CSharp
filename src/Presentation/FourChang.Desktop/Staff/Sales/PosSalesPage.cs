@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shared.Theme;
@@ -118,7 +118,7 @@ public sealed class PosSalesPage : UserControl
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,38));
             button.Anchor=AnchorStyles.None;footer.Controls.Add(caption,0,0);footer.Controls.Add(button,1,0);
             var card=new SurfacePanel{Width=180,Height=190,Padding=Padding.Empty,Margin=new Padding(0,0,12,12)};
-            card.Controls.Add(footer);card.Controls.Add(new ProductImage{ImageIndex=item.ImageIndex,Dock=DockStyle.Top,Height=115});
+            card.Controls.Add(footer);card.Controls.Add(CatalogImage.Create(item.ImagePath ?? "sprite:" + item.ImageIndex, item.Name, 115));
             if(!item.Available)caption.Text=item.Name+" · Hết"+Environment.NewLine+item.Price.ToString("N0")+"đ";
             products.Controls.Add(card);
         }

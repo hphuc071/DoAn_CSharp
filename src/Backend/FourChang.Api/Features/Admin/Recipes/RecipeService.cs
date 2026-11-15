@@ -1,4 +1,4 @@
-using FourChang.Domain.Shared;
+﻿using FourChang.Domain.Shared;
 using System.Text.Json;
 using System.Security.Claims;
 using FourChang.Api.Features.Admin.Menu;
@@ -10,178 +10,114 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.Recipes;
 
-/// <summary>ADM-04: quản trị phiên bản BOM; tính decimal và giữ đơn/giữ chỗ đã chốt bất biến.</summary>
+/// <summary>ADM-02: lưu công thức áp dụng ngay; tính decimal và giữ đơn/giữ chỗ đã chốt bất biến.</summary>
 public sealed class RecipeService(CafeDbContext db)
 {
-    /// <summary>Đọc cả bản nháp, lên lịch và lịch sử cùng định mức cơ sở để quản lý tra cứu.</summary>
+    /// <summary>Đọc công thức hiện hành/nháp còn xử lý; bản đã thay thế chỉ giữ cho lịch sử đơn.</summary>
     public async Task<IReadOnlyList<RecipeView>> Read()
     {
-        var recipes = await db.CongThuc.AsNoTracking().OrderByDescending(x => x.MaCongThuc).ToListAsync();
+        var recipes = await db.CongThuc.AsNoTracking().Where(x => x.TrangThai == "ACTIVE" || x.TrangThai == "DRAFT").OrderByDescending(x => x.MaCongThuc).ToListAsync();
+        var variants = await (from v in db.CauHinhMon.AsNoTracking()
+            join m in db.Mon.AsNoTracking() on v.MaMon equals m.MaMon
+            select new { v.MaCauHinhMon, m.TenMon, v.KichCo, v.NhietDo }).ToDictionaryAsync(x => x.MaCauHinhMon);
+        var toppings = await db.MonThem.AsNoTracking().ToDictionaryAsync(x => x.MaMonThem, x => x.TenMonThem);
         var lines = await (from l in db.ChiTietCongThuc.AsNoTracking()
                            join n in db.NguyenLieu.AsNoTracking() on l.MaNguyenLieu equals n.MaNguyenLieu
                            select new { l.MaCongThuc, Line = new RecipeLineView(l.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, l.DinhMucCoSo, l.LoaiDinhMuc, l.TyLeHaoHut) }).ToListAsync();
         return recipes.Select(r => new RecipeView(r.MaCongThuc, r.MaCauHinhMon, r.MaMonThem, r.SoPhienBan, r.TenCongThuc,
-            r.TrangThai, r.HieuLucTu, r.HieuLucDen, r.GhiChu, r.PhienBanDuLieu, lines.Where(l => l.MaCongThuc == r.MaCongThuc).Select(l => l.Line).ToList())).ToList();
+            r.TrangThai, r.HieuLucTu, r.HieuLucDen, r.GhiChu, r.PhienBanDuLieu, lines.Where(l => l.MaCongThuc == r.MaCongThuc).Select(l => l.Line).ToList(),
+            r.MaCauHinhMon is { } id ? variants.GetValueOrDefault(id)?.TenMon : toppings.GetValueOrDefault(r.MaMonThem ?? 0),
+            r.MaCauHinhMon is { } v ? variants.GetValueOrDefault(v)?.KichCo : null,
+            r.MaCauHinhMon is { } t ? variants.GetValueOrDefault(t)?.NhietDo : null, r.PhanTramDuongMacDinh)).ToList();
     }
 
-    /// <summary>Chỉ sửa bản nháp chưa được tham chiếu; số phiên bản do server cấp theo cấu hình/topping.</summary>
-    public Task<IResult> Save(long? id, RecipeInput input, HttpContext context) => Change(input.MaThaoTac, "SAVE", new { id, input }, context, async () =>
+    /// <summary>Lưu và áp dụng ngay; tự lưu bản mới bên trong khi cần giữ định mức lịch sử.</summary>
+    public Task<IResult> Save(long? id, RecipeInput input, HttpContext context) =>
+        Change(input.MaThaoTac, "SAVE", new { id, input }, context, () => SaveCore(id, input, context));
+
+    /// <summary>Lưu mọi size/nhiệt độ của một món trong cùng giao dịch; lỗi một ô hoàn tác cả bảng.</summary>
+    public Task<IResult> SaveDish(RecipeDishInput input, HttpContext context) => Change(input.MaThaoTac, "SAVE_DISH", input, context, async () =>
     {
-        if ((input.MaCauHinhMon is null) == (input.MaMonThem is null)) throw new AdminRule(400, "Chọn đúng một cấu hình món hoặc topping.");
-        if (input.MaCauHinhMon is not null && !await db.CauHinhMon.AnyAsync(x => x.MaCauHinhMon == input.MaCauHinhMon) ||
-            input.MaMonThem is not null && !await db.MonThem.AnyAsync(x => x.MaMonThem == input.MaMonThem)) throw new AdminRule(400, "Cấu hình hoặc topping không tồn tại.");
-        var recipe = id is null ? new CongThuc() : await Required(id.Value);
-        var before = id is null ? null : JsonSerializer.Serialize(new { CongThuc = recipe, ThanhPhan = await db.ChiTietCongThuc.AsNoTracking().Where(x => x.MaCongThuc == id).ToListAsync() });
-        if (id is not null)
+        if (input.CauHinh is null || input.CauHinh.Count is < 1 or > 100 ||
+            input.CauHinh.Any(x => x.CongThuc is null || x.CongThuc.ThanhPhan is null || x.CongThuc.MaMonThem is not null || x.CongThuc.MaCauHinhMon is null) ||
+            input.CauHinh.Select(x => x.CongThuc.MaCauHinhMon).Distinct().Count() != input.CauHinh.Count)
+            throw new AdminRule(400, "Bảng công thức không hợp lệ hoặc trùng size/nhiệt độ.");
+        var variants = await db.CauHinhMon.Where(v => v.MaMon == input.MaMon).Select(v => v.MaCauHinhMon).ToListAsync();
+        if (variants.Count == 0 || !variants.Order().SequenceEqual(input.CauHinh.Select(x => x.CongThuc.MaCauHinhMon!.Value).Order()))
+            throw new AdminRule(409, "Cấu hình món đã thay đổi. Mở lại bảng công thức để cập nhật đủ size/nóng lạnh.");
+        var before = new List<string?>();
+        (long Id, object Result, string? Before, string? Reason) first = default;
+        foreach (var entry in input.CauHinh)
         {
-            AdminOperation.Version(input.PhienBanDuLieu, recipe.PhienBanDuLieu);
-            if (recipe.TrangThai != "DRAFT" || await Used(recipe.MaCongThuc)) throw new AdminRule(409, "Bản đã công bố/được dùng không sửa trực tiếp; tạo phiên bản mới.");
-            if (recipe.MaCauHinhMon != input.MaCauHinhMon || recipe.MaMonThem != input.MaMonThem) throw new AdminRule(409, "Không đổi đối tượng của phiên bản đã tạo; tạo nháp mới.");
+            var temperature = await db.CauHinhMon.Where(v => v.MaCauHinhMon == entry.CongThuc.MaCauHinhMon).Select(v => v.NhietDo).SingleAsync();
+            if (temperature == "HOT" && entry.CongThuc.ThanhPhan.Any(l => l.LoaiDinhMuc == "ICE"))
+                throw new AdminRule(400, "Công thức nóng không dùng dòng theo % đá.");
+            var result = await SaveCore(entry.MaCongThuc, entry.CongThuc, context);
+            if (first.Id == 0) first = result;
+            before.Add(result.Before);
         }
-        var converted = await Convert(input.ThanhPhan);
-        recipe.TenCongThuc = MenuValidation.Text(input.TenCongThuc, 150, "Tên công thức");
-        recipe.GhiChu = MenuValidation.Optional(input.GhiChu, 500);
-        if (id is null)
+        return (first.Id, first.Result!, JsonSerializer.Serialize(before), null);
+    });
+
+    /// <summary>Nghiệp vụ ghi một cấu hình, dùng lại trong lệnh đơn và lệnh bảng nhiều size.</summary>
+    internal async Task<(long Id, object Result, string? Before, string? Reason)> SaveCore(long? id, RecipeInput input, HttpContext context)
+    {
+        if ((input.MaCauHinhMon is null) == (input.MaMonThem is null))
+            throw new AdminRule(400, "Chọn đúng một cấu hình món hoặc topping.");
+        if (input.MaCauHinhMon is { } variant && !await db.CauHinhMon.AnyAsync(x => x.MaCauHinhMon == variant) ||
+            input.MaMonThem is { } topping && !await db.MonThem.AnyAsync(x => x.MaMonThem == topping))
+            throw new AdminRule(400, "Cấu hình hoặc topping không tồn tại.");
+        var siblings = await db.CongThuc.Where(x => x.MaCauHinhMon == input.MaCauHinhMon && x.MaMonThem == input.MaMonThem).ToListAsync();
+        CongThuc? current = null;
+        if (id is { } recipeId)
         {
-            recipe.MaCauHinhMon = input.MaCauHinhMon; recipe.MaMonThem = input.MaMonThem; recipe.TrangThai = "DRAFT";
-            recipe.SoPhienBan = 1 + (await db.CongThuc.Where(x => x.MaCauHinhMon == input.MaCauHinhMon && x.MaMonThem == input.MaMonThem).MaxAsync(x => (int?)x.SoPhienBan) ?? 0);
-            recipe.MaQuanLyTao = long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            db.CongThuc.Add(recipe); await db.SaveChangesAsync();
+            current = await Required(recipeId);
+            AdminOperation.Version(input.PhienBanDuLieu, current.PhienBanDuLieu);
+            if (current.MaCauHinhMon != input.MaCauHinhMon || current.MaMonThem != input.MaMonThem)
+                throw new AdminRule(409, "Không đổi đối tượng áp dụng của công thức đã lưu.");
+            if (current.TrangThai is not ("ACTIVE" or "DRAFT"))
+                throw new AdminRule(409, "Công thức đã được thay thế. Tải lại trước khi sửa.");
         }
+        else if (siblings.Any(x => x.TrangThai is "ACTIVE" or "DRAFT" or "SCHEDULED"))
+            throw new AdminRule(409, "Đối tượng đã có công thức. Chọn sửa công thức hiện tại.");
+
+        // Kiểm toàn bộ trước khi thay hiệu lực; lỗi không để món đang bán mất công thức cũ.
+        if (input.PhanTramDuongMacDinh is not (0 or 25 or 50 or 75 or 100))
+            throw new AdminRule(400, "Mức đường mặc định chỉ có 0%,25%,50%,75%,100%.");
+        var lines = await Convert(input.ThanhPhan);
+        if (lines.Count == 0) throw new AdminRule(400, "Công thức phải có ít nhất một nguyên liệu.");
+        var name = MenuValidation.Text(input.TenCongThuc, 150, "Tên công thức");
+        var note = MenuValidation.Optional(input.GhiChu, 500);
+        var before = current is null ? null : JsonSerializer.Serialize(new { CongThuc = current,
+            ThanhPhan = await db.ChiTietCongThuc.AsNoTracking().Where(x => x.MaCongThuc == current.MaCongThuc).ToListAsync() });
+        var now = DateTime.UtcNow;
+        var actor = long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        // Giữ nguyên dòng định mức đã công bố; chỉ đóng hiệu lực và tạo bản kế tiếp tự động.
+        foreach (var old in siblings.Where(x => x.TrangThai is "ACTIVE" or "SCHEDULED"))
+        {
+            old.TrangThai = "RETIRED";
+            if (old.HieuLucTu < now) old.HieuLucDen = now;
+        }
+        await db.SaveChangesAsync();
+        var recipe = current?.TrangThai == "DRAFT" ? current : new CongThuc
+        {
+            MaCauHinhMon = input.MaCauHinhMon, MaMonThem = input.MaMonThem,
+            SoPhienBan = siblings.Select(x => x.SoPhienBan).DefaultIfEmpty(0).Max() + 1,
+            TrangThai = "DRAFT", MaQuanLyTao = actor
+        };
+        recipe.TenCongThuc = name; recipe.GhiChu = note; recipe.PhanTramDuongMacDinh = input.PhanTramDuongMacDinh;
+        if (recipe.MaCongThuc == 0) { db.CongThuc.Add(recipe); await db.SaveChangesAsync(); }
         else
         {
-            db.ChiTietCongThuc.RemoveRange(await db.ChiTietCongThuc.Where(x => x.MaCongThuc == id).ToListAsync());
-            await db.SaveChangesAsync(); // Xóa dòng nháp trong cùng transaction, tránh đụng khóa ghép khi thay định mức.
+            db.ChiTietCongThuc.RemoveRange(await db.ChiTietCongThuc.Where(x => x.MaCongThuc == recipe.MaCongThuc).ToListAsync());
+            await db.SaveChangesAsync();
         }
-        foreach (var line in converted) { line.MaCongThuc = recipe.MaCongThuc; db.ChiTietCongThuc.Add(line); }
-        // Chạm header để rowversion thay đổi ngay cả khi chỉ sửa các thành phần.
-        recipe.ThoiDiemCapNhat = DateTime.UtcNow;
-        db.Entry(recipe).Property(x => x.ThoiDiemCapNhat).IsModified = true;
+        foreach (var line in lines) { line.MaCongThuc = recipe.MaCongThuc; db.ChiTietCongThuc.Add(line); }
+        await db.SaveChangesAsync(); // Trigger chỉ cho ghi dòng khi header vẫn DRAFT.
+        recipe.TrangThai = "ACTIVE"; recipe.HieuLucTu = now; recipe.HieuLucDen = null;
+        recipe.MaQuanLyDuyet = actor; recipe.ThoiDiemCapNhat = now;
         await db.SaveChangesAsync();
         return Result(recipe, before);
-    });
-
-    /// <summary>Sao chép bản đã công bố thành nháp mới, giữ nguyên mã công thức và snapshot của đơn cũ.</summary>
-    public Task<IResult> Clone(long id, AdminDeleteInput input, HttpContext context) => Change(input.MaThaoTac, "CLONE", new { id, input }, context, async () =>
-    {
-        // Receipt được kiểm tra trong Change trước rowversion, nên retry sau khi nguồn đã đổi vẫn trả bản đã tạo.
-        var old = await Required(id); AdminOperation.Version(input.PhienBanDuLieu, old.PhienBanDuLieu);
-        var source = await db.ChiTietCongThuc.AsNoTracking().Where(x => x.MaCongThuc == id).ToListAsync();
-        var copy = new CongThuc
-        {
-            MaCauHinhMon = old.MaCauHinhMon,
-            MaMonThem = old.MaMonThem,
-            TenCongThuc = old.TenCongThuc,
-            GhiChu = old.GhiChu,
-            TrangThai = "DRAFT",
-            MaQuanLyTao = long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!),
-            SoPhienBan = 1 + (await db.CongThuc.Where(x => x.MaCauHinhMon == old.MaCauHinhMon && x.MaMonThem == old.MaMonThem).MaxAsync(x => (int?)x.SoPhienBan) ?? 0)
-        };
-        db.CongThuc.Add(copy); await db.SaveChangesAsync();
-        foreach (var line in source)
-            db.ChiTietCongThuc.Add(new() { MaCongThuc = copy.MaCongThuc, MaNguyenLieu = line.MaNguyenLieu, LoaiDinhMuc = line.LoaiDinhMuc, DinhMucCoSo = line.DinhMucCoSo, TyLeHaoHut = line.TyLeHaoHut });
-        await db.SaveChangesAsync(); return Result(copy, null);
-    });
-
-    /// <summary>Công bố ngay hoặc lên lịch; đóng hiệu lực phiên bản trước mà không sửa định mức lịch sử.</summary>
-    public Task<IResult> Publish(long id, RecipePublishInput input, HttpContext context) => Change(input.MaThaoTac, "PUBLISH", new { id, input }, context, async () =>
-    {
-        var recipe = await Required(id); AdminOperation.Version(input.PhienBanDuLieu, recipe.PhienBanDuLieu);
-        if (recipe.TrangThai != "DRAFT") throw new AdminRule(409, "Chỉ công bố bản nháp; phiên bản đã công bố không dùng lại lệnh mới.");
-        var start = MenuValidation.Utc(input.HieuLucTu);
-        DateTime? end = input.HieuLucDen is { } value ? MenuValidation.Utc(value) : null;
-        var now = DateTime.UtcNow;
-        if (end <= start || start < now.AddMinutes(-1)) throw new AdminRule(400, "Hiệu lực kết thúc phải sau bắt đầu; không công bố hồi tố.");
-        if (start < now) start = now;
-        var lines = await db.ChiTietCongThuc.Where(x => x.MaCongThuc == id).ToListAsync();
-        await ValidatePublish(recipe, lines);
-        var siblings = await db.CongThuc.Where(x => x.MaCongThuc != id && x.MaCauHinhMon == recipe.MaCauHinhMon && x.MaMonThem == recipe.MaMonThem
-            && (x.TrangThai == "ACTIVE" || x.TrangThai == "SCHEDULED")).ToListAsync();
-        // Bản đang ACTIVE được kết thúc tại mốc thay thế; lịch tương lai chồng nhau phải sửa trước.
-        if (siblings.Any(x => x.TrangThai == "SCHEDULED" && (x.HieuLucDen == null || x.HieuLucDen > start) && (end == null || x.HieuLucTu < end)))
-            throw new AdminRule(409, "Lịch công thức trùng phiên bản đã lên lịch; hãy ngừng/đổi lịch trước.");
-        var before = JsonSerializer.Serialize(recipe);
-        foreach (var old in siblings.Where(x => x.TrangThai == "ACTIVE" && (x.HieuLucDen == null || x.HieuLucDen > start)))
-        {
-            old.HieuLucDen = start;
-            if (start <= now) old.TrangThai = "RETIRED";
-        }
-        await db.SaveChangesAsync(); // Nhả unique ACTIVE trước khi kích hoạt phiên bản kế tiếp.
-        recipe.HieuLucTu = start; recipe.HieuLucDen = end;
-        recipe.TrangThai = start <= now ? "ACTIVE" : "SCHEDULED";
-        recipe.MaQuanLyDuyet = long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        await db.SaveChangesAsync();
-        return Result(recipe, before);
-    });
-
-    /// <summary>Ngừng bản có lịch sử bằng mốc hiệu lực; không sửa các snapshot hay tự hoàn nguyên liệu.</summary>
-    public Task<IResult> Stop(long id, RecipeStopInput input, HttpContext context) => Change(input.MaThaoTac, "RETIRE", new { id, input }, context, async () =>
-    {
-        AdminOperation.Reason(input.LyDo);
-        var recipe = await Required(id); AdminOperation.Version(input.PhienBanDuLieu, recipe.PhienBanDuLieu);
-        if (recipe.TrangThai is not ("ACTIVE" or "SCHEDULED")) throw new AdminRule(409, "Chỉ ngừng phiên bản đang hiệu lực hoặc lên lịch.");
-        var before = JsonSerializer.Serialize(recipe);
-        recipe.TrangThai = "RETIRED";
-        // Lịch chưa bắt đầu được hủy trạng thái, không đặt HieuLucDen trước HieuLucTu.
-        if (recipe.HieuLucTu < DateTime.UtcNow) recipe.HieuLucDen = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        return (recipe.MaCongThuc, (object)new AdminSaveReceipt(recipe.MaCongThuc, recipe.PhienBanDuLieu), before, input.LyDo.Trim());
-    });
-
-    /// <summary>Chỉ xóa nháp chưa dùng; bản đã công bố được ngừng để giữ lịch sử.</summary>
-    public Task<IResult> Delete(long id, AdminDeleteInput input, HttpContext context) => Change(input.MaThaoTac, "DELETE", new { id, input }, context, async () =>
-    {
-        var recipe = await Required(id); AdminOperation.Version(input.PhienBanDuLieu, recipe.PhienBanDuLieu);
-        if (recipe.TrangThai != "DRAFT" || await Used(id)) throw new AdminRule(409, "Chỉ xóa nháp chưa được tham chiếu.");
-        var before = JsonSerializer.Serialize(recipe);
-        db.ChiTietCongThuc.RemoveRange(await db.ChiTietCongThuc.Where(x => x.MaCongThuc == id).ToListAsync());
-        db.CongThuc.Remove(recipe); await db.SaveChangesAsync();
-        return (id, (object)new AdminSaveReceipt(id, null, true), before, (string?)null);
-    });
-
-    /// <summary>Mô phỏng món và topping, gom nguyên liệu rồi làm tròn lên một lần; không giữ/trừ kho.</summary>
-    public async Task<IReadOnlyList<RecipeDemand>> Simulate(RecipeSimulationInput input)
-    {
-        if (input.SoLy is < 1 or > 999 || !new[] { 0, 25, 50, 75, 100 }.Contains(input.PhanTramDuong) || !new[] { 0, 25, 50, 75, 100 }.Contains(input.PhanTramDa))
-            throw new AdminRule(400, "Số ly hoặc mức đường/đá không hợp lệ.");
-        var recipe = await Required(input.MaCongThuc);
-        if (recipe.MaCauHinhMon is not null && !CafeOptions.ValidBrew((await db.CauHinhMon.SingleAsync(x => x.MaCauHinhMon == recipe.MaCauHinhMon)).NhietDo, input.PhanTramDuong, input.PhanTramDa))
-            throw new AdminRule(400, "Cặp đường/đá không thuộc cấu hình; món nóng không tự được thêm đá.");
-        var totals = new Dictionary<long, decimal>();
-        await AddDemand(recipe.MaCongThuc, input.SoLy, input.PhanTramDuong, input.PhanTramDa, totals);
-        if (input.MonThem is null || input.MonThem.Select(x => x.MaMonThem).Distinct().Count() != input.MonThem.Count) throw new AdminRule(400, "Danh sách topping không hợp lệ hoặc trùng.");
-        foreach (var topping in input.MonThem)
-        {
-            if (recipe.MaCauHinhMon is null) throw new AdminRule(400, "Chỉ mô phỏng thêm topping khi chọn công thức cấu hình món.");
-            var top = await db.MonThem.AsNoTracking().SingleOrDefaultAsync(x => x.MaMonThem == topping.MaMonThem && x.DangSuDung);
-            if (top is null || topping.SoPhanMoiLy < 1 || topping.SoPhanMoiLy > top.GioiHanMacDinhMoiLy) throw new AdminRule(400, "Topping không hỗ trợ hoặc vượt số phần mỗi ly.");
-            var now = DateTime.UtcNow;
-            var topRecipe = await db.CongThuc.AsNoTracking().SingleOrDefaultAsync(x => x.MaMonThem == topping.MaMonThem && x.TrangThai == "ACTIVE" && x.HieuLucTu <= now && (x.HieuLucDen == null || x.HieuLucDen > now))
-                ?? throw new AdminRule(409, "Topping thiếu công thức hiệu lực.");
-            await AddDemand(topRecipe.MaCongThuc, input.SoLy * topping.SoPhanMoiLy, input.PhanTramDuong, input.PhanTramDa, totals);
-        }
-        var data = await (from n in db.NguyenLieu.AsNoTracking()
-                          join t in db.TonKho on n.MaNguyenLieu equals t.MaNguyenLieu into balance
-                          from t in balance.DefaultIfEmpty()
-                          select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DangSuDung, n.DonViCoSo, Available = t == null ? (decimal?)null : t.TonThucTe - t.TongGiuCho - n.TonAnToan }).ToListAsync();
-        return totals.Select(x =>
-        {
-            var n = data.Single(y => y.MaNguyenLieu == x.Key);
-            var amount = decimal.Ceiling(x.Value * 10000m) / 10000m;
-            return new RecipeDemand(x.Key, n.TenNguyenLieu, n.DonViCoSo, amount, n.Available, amount == 0 || n.DangSuDung && n.Available >= amount);
-        }).ToList();
-    }
-
-    /// <summary>Áp dụng hệ số đúng loại dòng và hao hụt đúng một lần trước khi cộng chung nguyên liệu.</summary>
-    private async Task AddDemand(long id, int quantity, int sugar, int ice, Dictionary<long, decimal> total)
-    {
-        var lines = await db.ChiTietCongThuc.AsNoTracking().Where(x => x.MaCongThuc == id).ToListAsync();
-        if (lines.Count == 0) throw new AdminRule(409, "Công thức chưa có thành phần, không giả định tiêu hao bằng 0.");
-        foreach (var line in lines)
-        {
-            var factor = line.LoaiDinhMuc == "SUGAR" ? sugar / 100m : line.LoaiDinhMuc == "ICE" ? ice / 100m : 1m;
-            total[line.MaNguyenLieu] = total.GetValueOrDefault(line.MaNguyenLieu) + line.DinhMucCoSo * factor * quantity / (1m - line.TyLeHaoHut);
-        }
     }
 
     /// <summary>Kiểm định mức nhập trực tiếp theo g/ml; khóa ghép gồm nguyên liệu và loại định mức.</summary>
@@ -191,7 +127,7 @@ public sealed class RecipeService(CafeDbContext db)
         var result = new List<ChiTietCongThuc>();
         foreach (var line in input)
         {
-            if (line.DinhMuc <= 0 || line.DinhMuc != decimal.Round(line.DinhMuc, 4) || line.TyLeHaoHut < 0 || line.TyLeHaoHut >= 1 || line.TyLeHaoHut != decimal.Round(line.TyLeHaoHut, 6) || line.LoaiDinhMuc is not ("FIXED" or "SUGAR" or "ICE")) throw new AdminRule(400, "Định mức dương, tối đa 4 số lẻ; hao hụt từ 0 đến dưới 1 và tối đa 6 số lẻ.");
+            if (line.DinhMuc <= 0 || line.DinhMuc != decimal.Round(line.DinhMuc, 4) || line.TyLeHaoHut != 0 || line.LoaiDinhMuc is not ("FIXED" or "SUGAR" or "ICE")) throw new AdminRule(400, "Lượng phải dương, tối đa 4 số lẻ. Nhập lượng thực dùng, không tính hao hụt riêng.");
             if (!await db.NguyenLieu.AnyAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung)) throw new AdminRule(400, "Nguyên liệu/đơn vị không hoạt động.");
             var ingredient = await db.NguyenLieu.AsNoTracking().SingleAsync(x => x.MaNguyenLieu == line.MaNguyenLieu);
             if (line.MaDonVi != ingredient.MaDonViCoSo)
@@ -203,21 +139,8 @@ public sealed class RecipeService(CafeDbContext db)
         return result;
     }
 
-    /// <summary>Chỉ công bố khi thành phần, đơn vị và tập lựa chọn cấu trúc đầy đủ; tồn thiếu không sửa công thức.</summary>
-    private async Task ValidatePublish(CongThuc recipe, List<ChiTietCongThuc> lines)
-    {
-        if (lines.Count == 0) throw new AdminRule(409, "Công thức thiếu thành phần.");
-        foreach (var line in lines)
-        {
-            var n = await db.NguyenLieu.AsNoTracking().SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung);
-            if (n is null || !IngredientUnits.IsSupported(n.DonViCoSo)) throw new AdminRule(409,"Nguyên liệu hoặc đơn vị cơ sở không hợp lệ.");
-        }
-    }
-
     /// <summary>Đọc một công thức theo khóa; lỗi 404 là lỗi nghiệp vụ có thể hiển thị.</summary>
     private async Task<CongThuc> Required(long id) => await db.CongThuc.SingleOrDefaultAsync(x => x.MaCongThuc == id) ?? throw new AdminRule(404, "Không tìm thấy công thức.");
-    /// <summary>Kiểm tra cả món chính và topping đã chốt để ngăn sửa/xóa công thức lịch sử.</summary>
-    private async Task<bool> Used(long id) => await db.ChiTietDonHang.AnyAsync(x => x.MaCongThuc == id) || await db.MonThemChiTietDonHang.AnyAsync(x => x.MaCongThuc == id);
     /// <summary>Đóng gói receipt và snapshot trước thay đổi, không trả entity để lộ dữ liệu không cần thiết.</summary>
     private static (long, object, string?, string?) Result(CongThuc recipe, string? before) => (recipe.MaCongThuc, new AdminSaveReceipt(recipe.MaCongThuc, recipe.PhienBanDuLieu), before, null);
     /// <summary>Transaction dùng chung cho audit, chống trùng, BOM và sự kiện thay đổi khả dụng.</summary>

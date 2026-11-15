@@ -31,7 +31,6 @@ internal sealed class MenuListLayout : Panel
     private readonly AdminLoadingStrip loading = new();
     private readonly ToolTip tooltip = new() { AutoPopDelay = 12000 };
     private readonly Button edit;
-    private readonly Button delete;
     private readonly Button add;
     private readonly Button reload;
     private readonly Label empty = Ui.Label("Chưa có dữ liệu phù hợp", 10, false, CafeTheme.Muted);
@@ -51,7 +50,7 @@ internal sealed class MenuListLayout : Panel
     }
 
     /// <summary>Tái sử dụng control, mã/tên và handler hiện có; chỉ cải tiến bố cục, trạng thái và trình bày.</summary>
-    internal MenuListLayout(string kind, string title, string subtitle, string note, Action create, Action change, Action remove, Action refresh)
+    internal MenuListLayout(string kind, string title, string subtitle, string note, Action create, Action change, Action refresh)
     {
         Dock = DockStyle.Fill;
         Margin = Padding.Empty;
@@ -92,17 +91,15 @@ internal sealed class MenuListLayout : Panel
         searchField.Controls.Add(search);
         add = new AdminActionButton("Thêm", AdminIcon.Add, true);
         edit = new AdminActionButton("Sửa", AdminIcon.Edit);
-        delete = new AdminActionButton("Xóa có điều kiện", AdminIcon.Delete, danger: true);
         reload = new AdminActionButton("Tải lại", AdminIcon.Refresh);
         add.Click += (_, _) => create();
         edit.Click += (_, _) => change();
-        delete.Click += (_, _) => remove();
         reload.Click += (_, _) => refresh();
-        foreach (var button in new[] { add, edit, delete, reload })
+        foreach (var button in new[] { add, edit, reload })
             button.Margin = new Padding(0, 0, 8, 0);
         reload.Margin = Padding.Empty;
         actions = new FlowLayoutPanel { Dock = DockStyle.Fill, WrapContents = false, AutoSize = false, Margin = Padding.Empty, Padding = new Padding(0, 24, 0, 0) };
-        actions.Controls.AddRange([add, edit, delete, reload]);
+        actions.Controls.AddRange([add, edit, reload]);
         toolbar = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
         toolbar.ColumnStyles.Add(new(SizeType.Percent, 100));
         toolbar.ColumnStyles.Add(new(SizeType.Absolute, ActionWidth()));
@@ -147,7 +144,7 @@ internal sealed class MenuListLayout : Panel
     }
 
     /// <summary>Tính từ độ rộng chữ/nút thật để action không xuống hàng hoặc bị cắt tại DPI khác nhau.</summary>
-    private int ActionWidth() => new[] { add, edit, delete, reload }.Sum(b => b.Width + b.Margin.Horizontal) + 4;
+    private int ActionWidth() => new[] { add, edit, reload }.Sum(b => b.Width + b.Margin.Horizontal) + 4;
 
     /// <summary>Khi vùng nội dung quá hẹp, xếp toolbar thành hai hàng có khoảng cách 8px; bảng vẫn cuộn riêng.</summary>
     private void ArrangeToolbar()
@@ -226,7 +223,7 @@ internal sealed class MenuListLayout : Panel
     private void UpdateSelection()
     {
         empty.Visible = !loadingData && Grid.Rows.Count == 0;
-        edit.Enabled = delete.Enabled = !loadingData && Grid.Rows.Count > 0;
+        edit.Enabled = !loadingData && Grid.Rows.Count > 0;
     }
 
     /// <summary>Giảm viền ô, ưu tiên tên/giá; trạng thái vẫn có chữ để không chỉ dựa vào màu.</summary>

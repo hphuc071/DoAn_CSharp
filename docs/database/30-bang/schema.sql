@@ -1,4 +1,4 @@
--- SQL Server: 30 bảng nghiệp vụ. Khởi tạo qua ChuanBi-Database.ps1.
+﻿-- SQL Server: 30 bảng nghiệp vụ. Khởi tạo qua ChuanBi-Database.ps1.
 
 SET XACT_ABORT ON; SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
 
@@ -217,6 +217,7 @@ CREATE TABLE dbo.[CongThuc] (
  [MaCauHinhMon] bigint NULL,
  [MaMonThem] bigint NULL,
  [SoPhienBan] int NOT NULL,
+ [PhanTramDuongMacDinh] int NOT NULL CONSTRAINT DF_CongThuc_PhanTramDuongMacDinh DEFAULT(50),
  [TenCongThuc] nvarchar(150) NOT NULL,
  [TrangThai] varchar(15) NOT NULL,
  [HieuLucTu] datetime2(3) NULL,
@@ -232,6 +233,7 @@ CREATE TABLE dbo.[CongThuc] (
  CONSTRAINT [CK_CongThuc_2] CHECK (SoPhienBan > 0),
  CONSTRAINT [CK_CongThuc_3] CHECK (HieuLucDen IS NULL OR (HieuLucTu IS NOT NULL AND HieuLucDen > HieuLucTu)),
  CONSTRAINT [CK_CongThuc_4] CHECK (TrangThai IN ('DRAFT','SCHEDULED','ACTIVE','RETIRED')),
+ CONSTRAINT [CK_CongThuc_DuongMacDinh] CHECK (PhanTramDuongMacDinh IN (0,25,50,75,100)),
  CONSTRAINT [CK_CongThuc_5] CHECK (TrangThai <> 'ACTIVE' OR (HieuLucTu IS NOT NULL AND MaQuanLyDuyet IS NOT NULL))
 );
 

@@ -1,4 +1,4 @@
-using FourChang.Tests.Shared;
+﻿using FourChang.Tests.Shared;
 
 namespace FourChang.Tests.Admin;
 
@@ -26,9 +26,9 @@ internal static class OperationsScenarioSeed
             INSERT dbo.ChiTietDonHang(MaDonHang,MaCauHinhMon,MaCongThuc,TenMonDaChot,KichCoDaChot,NhietDoDaChot,PhanTramDuong,PhanTramDa,GiaMonDaChot,SoLuongDat,SoLuongBatDauPha,SoLuongPhaXong,SoLuongDaHuy)
               SELECT @dh,@variant,@recipe,m.TenMon,c.KichCo,c.NhietDo,100,100,@price,2,{(state == "COMPLETED" ? 2 : 0)},{(state == "COMPLETED" ? 2 : 0)},0 FROM dbo.CauHinhMon c JOIN dbo.Mon m ON m.MaMon=c.MaMon WHERE c.MaCauHinhMon=@variant; SET @line=SCOPE_IDENTITY();
             INSERT dbo.NguyenLieuChiTietDonHang(MaChiTietDonHang,MaNguyenLieu,TenNguyenLieuDaChot,DonViCoSoDaChot,DinhMucMoiLy,SoLuongGiuCho,SoLuongDaTieuHao,SoLuongDaGiaiPhong,TrangThai)
-              SELECT @line,d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo,CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000,
-              2*CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000,
-              {(state == "COMPLETED" ? "2*CEILING(SUM(d.DinhMucCoSo/(1-d.TyLeHaoHut))*10000)/10000" : "0")},0,'{(state == "COMPLETED" ? "CONSUMED" : "RESERVED")}'
+              SELECT @line,d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo,CEILING(SUM(d.DinhMucCoSo)*10000)/10000,
+              2*CEILING(SUM(d.DinhMucCoSo)*10000)/10000,
+              {(state == "COMPLETED" ? "2*CEILING(SUM(d.DinhMucCoSo)*10000)/10000" : "0")},0,'{(state == "COMPLETED" ? "CONSUMED" : "RESERVED")}'
               FROM dbo.ChiTietCongThuc d JOIN dbo.NguyenLieu n ON n.MaNguyenLieu=d.MaNguyenLieu WHERE d.MaCongThuc=@recipe GROUP BY d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo;
             UPDATE t SET TongGiuCho=TongGiuCho+{(state == "COMPLETED" ? "0" : "g.SoLuongGiuCho")},TonThucTe=TonThucTe-{(state == "COMPLETED" ? "g.SoLuongDaTieuHao" : "0")}
               FROM dbo.TonKho t JOIN dbo.NguyenLieuChiTietDonHang g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;

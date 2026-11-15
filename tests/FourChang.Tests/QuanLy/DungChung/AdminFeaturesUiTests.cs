@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using FourChang.Desktop.Admin.Customers.Views;
 using FourChang.Desktop.Shared.Theme;
@@ -22,7 +22,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
     [InlineData("UC-ADM-01", "customers")]
     [InlineData("UC-ADM-02", "menu")]
     [InlineData("UC-ADM-03", "ingredients")]
-    [InlineData("UC-ADM-04", "recipes")]
+    [InlineData("UC-ADM-02", "recipes")]
     [InlineData("UC-ADM-05", "inventory")]
     [InlineData("DASHBOARD", "dashboard")]
     public Task GiaoDien_NamUseCase_DocApi_Resize_VaDialog(string code, string route) => RunRoute(fixture, code, route);
@@ -125,6 +125,130 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                         Assert.Equal(8, Descendants(report).Count(x => x.GetType().Name == "MetricCard"));
                     }
                 }
+                if (route == "menu")
+                {
+                    var tabs = Descendants(form).OfType<TabControl>().Single(t => t.Name == "MenuTabs");
+                    Assert.Equal(new[] { "Món", "Cấu hình món", "Topping", "Công thức" }, tabs.TabPages.Cast<TabPage>().Select(x => x.Text));
+                    Assert.DoesNotContain(Descendants(form).OfType<Button>(), b => b.Text == "Xóa có điều kiện");
+                    tabs.SelectedIndex = 3;
+                    await WaitUntil(() => Descendants(form).OfType<DataGridView>().Any(g => g.Name == "RecipesGrid" && g.Rows.Count > 0));
+                    Assert.DoesNotContain(Descendants(form).OfType<Button>(), b => b.Text is "Mô phỏng" or "Tạo phiên bản mới" or "Công bố / lên lịch" or "Xóa nháp");
+                    var recipeGrid = Descendants(form).OfType<DataGridView>().Single(g => g.Name == "RecipesGrid");
+                    foreach (DataGridViewRow row in recipeGrid.Rows)
+                    {
+                        var recipe = Assert.IsType<RecipeView>(row.DataBoundItem);
+                        Assert.Equal(recipe.ThanhPhan.Count.ToString(), row.Cells[recipeGrid.Columns.Cast<DataGridViewColumn>().Single(c => c.DataPropertyName == "ThanhPhan").Index].FormattedValue);
+                    }
+                    Capture(form, Path.Combine(output, "ADM02-recipes-integrated.png"));
+                    tabs.SelectedIndex = 0;
+                    var editorType = typeof(RecipeEditorForm).Assembly.GetType("FourChang.Desktop.Admin.Menu.MenuEditorForm")!;
+                    using var dishEditor = (Form)Activator.CreateInstance(editorType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                        new object?[] { "dishes", null, await LiveSession.Api.GetAdminMenuAsync() }, null)!;
+                    dishEditor.StartPosition = FormStartPosition.Manual; dishEditor.Location = new Point(-12000, -12000); dishEditor.Show();
+                    Assert.DoesNotContain(Descendants(dishEditor), c => c.Name == "Thứ tự" || c.Name.StartsWith("Ảnh (sprite:"));
+                    Assert.Contains(Descendants(dishEditor).OfType<Button>(), b => b.Name == "MenuChooseImage" && b.Text == "Chọn hình ảnh");
+                    var filter = (string)editorType.GetField("ImageFileFilter", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!.GetRawConstantValue()!;
+                    Assert.Contains("*.webp", filter);
+                    // WebP thật tải từ thiết bị phải giải mã được, xem trước và lưu qua cùng luồng nút chọn ảnh.
+                    var imageFile = Path.Combine(output, "menu-upload-source.webp");
+                    using (var bitmap = SkiaSharp.SKBitmap.Decode(MenuAdministrationTests.ImageBytes()))
+                    using (var source = SkiaSharp.SKImage.FromBitmap(bitmap))
+                    using (var webp = source.Encode(SkiaSharp.SKEncodedImageFormat.Webp, 90)) File.WriteAllBytes(imageFile, webp.ToArray());
+                    editorType.GetMethod("SelectImage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(dishEditor, new object[] { imageFile });
+                    var preview = Descendants(dishEditor).OfType<PictureBox>().Single(); Assert.NotNull(preview.Image);
+                    Assert.Equal(12, preview.Image.Width); Assert.Equal(12, preview.Image.Height);
+                    // Chỉ chạy thêm file thật nếu người thực thi chủ động cung cấp, vẫn lưu vào DB fixture.
+                    var downloadedImage = Environment.GetEnvironmentVariable("FOURCHANG_TEST_IMAGE_FILE");
+                    if (!string.IsNullOrWhiteSpace(downloadedImage) && File.Exists(downloadedImage))
+                    {
+                        editorType.GetMethod("SelectImage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(dishEditor, new object[] { downloadedImage });
+                        Assert.True(preview.IsDisposed);
+                        Assert.NotNull(Descendants(dishEditor).OfType<PictureBox>().Single().Image);
+                    }
+                    editorType.GetMethod("SetRecipeTemplates", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(dishEditor, new object[] { await LiveSession.Api.GetRecipesAsync() });
+                    var visibility = Descendants(dishEditor).OfType<CheckBox>().Single(x => x.Text == "Hiển thị món");
+                    var selling = Descendants(dishEditor).OfType<CheckBox>().Single(x => x.Text.StartsWith("Bật bán"));
+                    Assert.False(visibility.Checked); Assert.False(selling.Checked);
+                    visibility.Checked = selling.Checked = true;
+                    visibility.Checked = selling.Checked = false;
+                    var sourcePicker = Descendants(dishEditor).OfType<ComboBox>().Single(x => x.Name == "MenuDishTemplate");
+                    sourcePicker.SelectedIndex = 1;
+                    var imageDishName = "Món có ảnh UI " + Guid.NewGuid().ToString("N")[..8];
+                    Descendants(dishEditor).OfType<TextBox>().Single(x => x.Name == "Tên món").Text = imageDishName;
+                    Capture(dishEditor, Path.Combine(output, "ADM02-image-picker.png"));
+                    Descendants(dishEditor).OfType<Button>().Single(x => x.Name == "SaveMenu").PerformClick();
+                    await WaitUntil(() => !dishEditor.Visible);
+                    Assert.Equal(DialogResult.OK, dishEditor.DialogResult);
+                    var savedDish = (await LiveSession.Api.GetAdminMenuAsync()).Mon.Single(x => x.TenMon == imageDishName);
+                    Assert.False(savedDish.DaCongBo); Assert.False(savedDish.DangBan);
+                    Assert.StartsWith("/menu-images/", savedDish.DuongDanAnh);
+                    Assert.True(savedDish.ThuTuHienThi > 0);
+                    var savedMenu = await LiveSession.Api.GetAdminMenuAsync();
+                    var savedVariants = savedMenu.CauHinh.Where(v => v.MaMon == savedDish.MaMon).ToList();
+                    Assert.NotEmpty(savedVariants);
+                    var savedRecipes = await LiveSession.Api.GetRecipesAsync();
+                    Assert.All(savedVariants, v => Assert.Contains(savedRecipes, r => r.MaCauHinhMon == v.MaCauHinhMon));
+                }
+                if (route == "menu")
+                {
+                    var draft = await LiveSession.Api.SaveMenuAsync("dishes", null, new MenuDishInput(1, "Bảng cấu hình UI " + Guid.NewGuid().ToString("N")[..6], null, null, 0, false, false, null, null, Guid.NewGuid()));
+                    var batchType = typeof(RecipeEditorForm).Assembly.GetType("FourChang.Desktop.Admin.Menu.MenuVariantBatchForm")!;
+                    using var batch = (Form)Activator.CreateInstance(batchType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                        new object?[] { await LiveSession.Api.GetAdminMenuAsync(), draft.Ma }, null)!;
+                    batch.StartPosition = FormStartPosition.Manual; batch.Location = new Point(-12000, -12000); batch.Show();
+                    var prices = Descendants(batch).OfType<DataGridView>().Single(g => g.Name == "VariantPriceMatrix");
+                    Assert.False(prices.Columns["HOT"].Visible);
+                    for (var i = 0; i < 3; i++) { prices.Rows[i].Cells[0].Value = true; prices.Rows[i].Cells["ICED"].Value = 25000m + i * 5000; }
+                    Descendants(batch).OfType<ComboBox>().Single(c => c.Name == "VariantDefault").SelectedItem = "M – Lạnh";
+                    Capture(batch, Path.Combine(output, "ADM02-variant-batch.png"));
+                    batch.Size = batch.MinimumSize; await Task.Delay(100);
+                    var saveBatch = Descendants(batch).OfType<Button>().Single(b => b.Name == "VariantBatchSave");
+                    Assert.True(batch.ClientRectangle.Contains(batch.RectangleToClient(saveBatch.RectangleToScreen(saveBatch.ClientRectangle))));
+                    Assert.True(TextRenderer.MeasureText(saveBatch.Text, saveBatch.Font).Width + 24 < saveBatch.Width);
+                    Capture(batch, Path.Combine(output, "ADM02-variant-batch-compact.png"));
+                    saveBatch.PerformClick();
+                    await WaitUntil(() => !batch.Visible || Descendants(batch).Any(c => c.Name == "VariantBatchFeedback" && c.Text.Length > 0));
+                    Assert.True(!batch.Visible, "Lưu bảng giá: " + Descendants(batch).FirstOrDefault(c => c.Name == "VariantBatchFeedback")?.Text);
+                    var snapshot = await LiveSession.Api.GetAdminMenuAsync();
+                    var created = snapshot.CauHinh.Where(v => v.MaMon == draft.Ma).ToList();
+                    Assert.Equal(3, created.Count); Assert.All(created, v => Assert.False(v.DangBan)); Assert.Single(created, v => v.LaMacDinh && v.KichCo == "M");
+                    using var reopen = (Form)Activator.CreateInstance(batchType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                        new object?[] { snapshot, draft.Ma }, null)!;
+                    reopen.StartPosition = FormStartPosition.Manual; reopen.Location = new Point(-12000, -12000); reopen.Show();
+                    var next = Descendants(reopen).OfType<DataGridView>().Single(g => g.Name == "VariantPriceMatrix");
+                    Assert.Equal(30000m, next.Rows[1].Cells["ICED"].Value);
+                    Descendants(reopen).OfType<CheckBox>().Single(c => c.Name == "VariantHot").Checked = true;
+                    Assert.True(next.Columns["HOT"].Visible);
+                    for (var i = 0; i < 3; i++) next.Rows[i].Cells["HOT"].Value = 27000m + i * 5000;
+                    Descendants(reopen).OfType<Button>().Single(b => b.Name == "VariantBatchSave").PerformClick();
+                    await WaitUntil(() => !reopen.Visible || Descendants(reopen).Any(c => c.Name == "VariantBatchFeedback" && c.Text.Length > 0));
+                    Assert.True(!reopen.Visible, "Cập nhật bảng giá: " + Descendants(reopen).FirstOrDefault(c => c.Name == "VariantBatchFeedback")?.Text);
+                    var updated = (await LiveSession.Api.GetAdminMenuAsync()).CauHinh.Where(v => v.MaMon == draft.Ma).ToList(); Assert.Equal(6, updated.Count);
+                    foreach (var old in created) Assert.Equal(old.GiaBan, updated.Single(v => v.MaCauHinhMon == old.MaCauHinhMon).GiaBan);
+                }
+                if (route == "menu")
+                {
+                    var toppingType = typeof(RecipeEditorForm).Assembly.GetType("FourChang.Desktop.Admin.Menu.MenuEditorForm")!;
+                    using var toppingForm = (Form)Activator.CreateInstance(toppingType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                        new object?[] { "toppings", null, await LiveSession.Api.GetAdminMenuAsync(), await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetRecipesAsync() }, null)!;
+                    toppingForm.StartPosition = FormStartPosition.Manual; toppingForm.Location = new Point(-12000, -12000); toppingForm.Show();
+                    var toppingName = "Topping một phần UI " + Guid.NewGuid().ToString("N")[..6];
+                    Descendants(toppingForm).OfType<TextBox>().Single(t => t.Name == "Tên topping").Text = toppingName;
+                    var material = Descendants(toppingForm).OfType<ComboBox>().Single(c => c.Name == "ToppingIngredient");
+                    material.SelectedIndex = 1;
+                    Descendants(toppingForm).OfType<NumericUpDown>().Single(c => c.Name == "ToppingPortion").Value = 30;
+                    Assert.True(Descendants(toppingForm).OfType<CheckBox>().Single(c => c.Text == "Đang sử dụng").Checked);
+                    Capture(toppingForm, Path.Combine(output, "ADM02-topping-portion.png"));
+                    Descendants(toppingForm).OfType<Button>().Single(b => b.Name == "SaveMenu").PerformClick();
+                    await WaitUntil(() => !toppingForm.Visible);
+                    var savedTop = (await LiveSession.Api.GetAdminMenuAsync()).MonThem.Single(t => t.TenMonThem == toppingName);
+                    var savedRecipe = (await LiveSession.Api.GetRecipesAsync()).Single(r => r.MaMonThem == savedTop.MaMonThem);
+                    Assert.Equal(30m, Assert.Single(savedRecipe.ThanhPhan).DinhMucCoSo);
+                    using var reopened = (Form)Activator.CreateInstance(toppingType, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic, null,
+                        new object?[] { "toppings", savedTop.MaMonThem, await LiveSession.Api.GetAdminMenuAsync(), await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetRecipesAsync() }, null)!;
+                    reopened.StartPosition = FormStartPosition.Manual; reopened.Location = new Point(-12000, -12000); reopened.Show();
+                    Assert.Equal(30m, Descendants(reopened).OfType<NumericUpDown>().Single(c => c.Name == "ToppingPortion").Value);
+                }
                 if (route == "ingredients")
                 {
                     Assert.DoesNotContain(Descendants(form).OfType<Button>(), x => x.Text == "Đơn vị tính");
@@ -162,19 +286,145 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                 }
                 if (route == "recipes")
                 {
-                    using var editor = new RecipeEditorForm(await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetAdminMenuAsync(), null);
+                    // Dòng chưa có công thức phải hiện rõ và mở đúng món/size để thêm từ mẫu.
+                    var missingDish = await LiveSession.Api.SaveMenuAsync("dishes", null, new MenuDishInput(1, "Món chưa có công thức " + Guid.NewGuid().ToString("N")[..8], null, null, 0, false, true, null, null, Guid.NewGuid()));
+                    var missingVariant = await LiveSession.Api.SaveMenuAsync("variants", null, new MenuVariantInput(missingDish.Ma, "M", "ICED", 35000, false, true, [], [], null, Guid.NewGuid()));
+                    var recipePage = Descendants(form).OfType<RecipesPage>().Single();
+                    Assert.Contains(Descendants(recipePage).OfType<Button>(), x => x.Name == "RecipeAddVariant" && x.Text == "Thêm size / nóng-lạnh");
+                    await recipePage.Reload();
+                    var pageGrid = Descendants(recipePage).OfType<DataGridView>().Single(g => g.Name == "RecipesGrid");
+                    Descendants(recipePage).OfType<ComboBox>().Single(x => x.Name == "RecipeStateFilter").SelectedIndex = 1;
+                    var missing = pageGrid.Rows.Cast<DataGridViewRow>().Select(row => (RecipeView)row.DataBoundItem!).Single(x => x.MaCauHinhMon == missingVariant.Ma);
+                    Assert.Equal("MISSING", missing.TrangThai); Assert.Equal("M", missing.KichCo); Assert.Equal("Lạnh", missing.NhietDo);
+                    Assert.All(pageGrid.Rows.Cast<DataGridViewRow>(), row => Assert.Equal("MISSING", ((RecipeView)row.DataBoundItem!).TrangThai));
+                    Capture(form, Path.Combine(output, "ADM02-missing-recipes.png"));
+                    var sourceRecipe = (await LiveSession.Api.GetRecipesAsync()).First(x => x.TrangThai == "ACTIVE" && x.MaCauHinhMon is not null);
+                    using (var fromTemplate = new RecipeEditorForm(await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetAdminMenuAsync(), null, await LiveSession.Api.GetRecipesAsync(), missing))
+                    {
+                        fromTemplate.StartPosition = FormStartPosition.Manual; fromTemplate.Location = new Point(-12000,-12000); fromTemplate.Show();
+                        Assert.Equal(missingVariant.Ma, Descendants(fromTemplate).OfType<ComboBox>().Single(x => x.Name == "RecipeTarget").SelectedValue);
+                        Descendants(fromTemplate).OfType<ComboBox>().Single(x => x.Name == "RecipeTemplate").SelectedValue = sourceRecipe.MaCongThuc;
+                        Descendants(fromTemplate).OfType<Button>().Single(x => x.Name == "RecipeApplyTemplate").PerformClick();
+                        Assert.Equal(sourceRecipe.ThanhPhan.Count, Descendants(fromTemplate).OfType<DataGridView>().Single(g => g.Name == "RecipeLines").Rows.Count);
+                        Capture(fromTemplate, Path.Combine(output, "ADM02-recipe-from-template.png"));
+                        Descendants(fromTemplate).OfType<Button>().Single(x => x.Name == "RecipeSave").PerformClick();
+                        await WaitUntil(() => !fromTemplate.Visible);
+                        Assert.Equal(DialogResult.OK, fromTemplate.DialogResult);
+                    }
+                    var copiedRecipe = (await LiveSession.Api.GetRecipesAsync()).Single(x => x.MaCauHinhMon == missingVariant.Ma);
+                    Assert.NotEqual(sourceRecipe.MaCongThuc, copiedRecipe.MaCongThuc);
+                    Assert.Equal(sourceRecipe.ThanhPhan, copiedRecipe.ThanhPhan);
+                    await recipePage.Reload();
+                    Assert.DoesNotContain(pageGrid.Rows.Cast<DataGridViewRow>(), row => ((RecipeView)row.DataBoundItem!).MaCauHinhMon == missingVariant.Ma);
+                    Descendants(recipePage).OfType<ComboBox>().Single(x => x.Name == "RecipeStateFilter").SelectedIndex = 0;
+                    using var editor = new RecipeEditorForm(await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetAdminMenuAsync(), null, await LiveSession.Api.GetRecipesAsync());
                     editor.StartPosition = FormStartPosition.Manual; editor.Location = new Point(-12000, -12000); editor.Show(); await Task.Delay(100);
+                    // Tất cả cấu hình/topping seed đã có công thức: thêm mới không cho chọn trùng.
+                    var targetPicker = Descendants(editor).OfType<ComboBox>().Single(x => x.Name == "RecipeTarget");
+                    var configured = await LiveSession.Api.GetRecipesAsync();
+                    Assert.All(targetPicker.Items.Cast<object>(), option =>
+                    {
+                        var id = (long)option.GetType().GetProperty("Id")!.GetValue(option)!;
+                        Assert.DoesNotContain(configured, x => x.MaCauHinhMon == id);
+                    });
+                    if (targetPicker.Items.Count == 0)
+                        Assert.False(Descendants(editor).OfType<Button>().Single(x => x.Name == "RecipeSave").Enabled);
                     var materials = await LiveSession.Api.GetIngredientsAsync();
-                    var ml = materials.DonVi.Single(x => x.KyHieu == "ml");
-                    var liquid = materials.NguyenLieu.First(x => x.MaDonViCoSo == ml.MaDonVi && x.DangSuDung);
-                    Descendants(editor).OfType<ComboBox>().Single(x => x.Name == "RecipeIngredient").SelectedValue = liquid.MaNguyenLieu;
-                    var recipeUnit = Descendants(editor).OfType<ComboBox>().Single(x => x.Name == "RecipeIngredientUnit");
-                    Assert.False(recipeUnit.Enabled); Assert.Equal(ml.MaDonVi, recipeUnit.SelectedValue);
+                    var ingredientChoices = Descendants(editor).OfType<CheckedListBox>().Single(x => x.Name == "RecipeIngredientChoices");
+                    ingredientChoices.SetItemChecked(0, true); ingredientChoices.SetItemChecked(1, true);
+                    Descendants(editor).OfType<Button>().Single(x => x.Name == "RecipeLineAdd").PerformClick();
+                    var quantities = Descendants(editor).OfType<DataGridView>().Single(x => x.Name == "RecipeLines");
+                    Assert.Equal(2, quantities.Rows.Count); Assert.True(quantities.Columns[1].ReadOnly);
+                    Assert.Equal(new[] { "g", "ml" }, quantities.Rows.Cast<DataGridViewRow>().Select(x => x.Cells[1].Value?.ToString()));
+                    quantities.Rows[0].Cells[2].Value = 2m; quantities.Rows[1].Cells[2].Value = 2.5m;
+                    Assert.Equal("2", quantities.Rows[0].Cells[2].FormattedValue);
+                    Assert.Equal(2.5m.ToString("0.#"), quantities.Rows[1].Cells[2].FormattedValue);
+                    Assert.DoesNotContain(Descendants(editor), x => x.Name == "RecipeLossPercent");
                     AssertFooterVisible(editor);
                     Capture(editor, Path.Combine(output, code + "-editor.png"));
                     editor.Size = editor.MinimumSize; await Task.Delay(100);
                     AssertFooterVisible(editor);
-                    Capture(editor, Path.Combine(output, code + "-editor-compact.png")); editor.Close();
+                    Capture(editor, Path.Combine(output, code + "-editor-compact.png"));
+                    Descendants(editor).OfType<TextBox>().Single(x => x.Name == "RecipeName").Text = "Công thức UI " + Guid.NewGuid().ToString("N")[..8];
+                    var current = (await LiveSession.Api.GetRecipesAsync()).First(x => x.TrangThai == "ACTIVE" && x.MaCauHinhMon is not null);
+                    editor.Close();
+                    using var edit = new RecipeEditorForm(await LiveSession.Api.GetIngredientsAsync(), await LiveSession.Api.GetAdminMenuAsync(), current);
+                    edit.StartPosition = FormStartPosition.Manual; edit.Location = new Point(-12000,-12000); edit.Show();
+                    Assert.Equal(current.MaCauHinhMon, Descendants(edit).OfType<ComboBox>().Single(x => x.Name == "RecipeTarget").SelectedValue);
+                    var selectedIngredients = Descendants(edit).OfType<CheckedListBox>().Single(x => x.Name == "RecipeIngredientChoices");
+                    selectedIngredients.SetItemChecked(0, true); selectedIngredients.SetItemChecked(1, true);
+                    Descendants(edit).OfType<Button>().Single(x => x.Name == "RecipeLineAdd").PerformClick();
+                    var lineTable = Descendants(edit).OfType<DataGridView>().Single(x => x.Name == "RecipeLines");
+                    Assert.True(lineTable.Rows.Count >= 2);
+                    var ingredientId = materials.NguyenLieu.Single(x => x.TenNguyenLieu == (string)lineTable.Rows[0].Cells[0].Value!).MaNguyenLieu;
+                    lineTable.CurrentCell = lineTable.Rows[0].Cells[2]; lineTable.BeginEdit(true);
+                    ((DataGridViewTextBoxEditingControl)lineTable.EditingControl!).Text = "2,5";
+                    Assert.True(lineTable.EndEdit()); Assert.Equal(2.5m, lineTable.Rows[0].Cells[2].Value);
+                    lineTable.Rows[0].Cells[3].Value = "FIXED";
+                    lineTable.Rows[1].Cells[2].Value = 100m;
+                    Descendants(edit).OfType<ComboBox>().Single(x => x.Name == "RecipeDefaultSugar").SelectedValue = 75L;
+                    Assert.Equal(2.5m.ToString("0.#"), lineTable.Rows[0].Cells[2].FormattedValue);
+                    Assert.DoesNotContain(Descendants(edit), x => x.Name == "RecipeLossPercent");
+                    Capture(edit, Path.Combine(output, "ADM02-recipe-friendly.png"));
+                    Descendants(edit).OfType<TextBox>().Single(x => x.Name == "RecipeName").Text = "Công thức vừa lưu từ UI";
+                    Descendants(edit).OfType<Button>().Single(x => x.Name == "RecipeSave").PerformClick();
+                    await WaitUntil(() => !edit.Visible || Descendants(edit).Any(x => x.Name == "RecipeFeedback" && x.Text.Length > 0));
+                    if (edit.Visible)
+                    {
+                        Capture(edit, Path.Combine(output, "ADM02-recipe-save-error.png"));
+                        Assert.Fail("Lưu công thức: " + Descendants(edit).Single(x => x.Name == "RecipeFeedback").Text);
+                    }
+                    Assert.Equal(DialogResult.OK, edit.DialogResult);
+                    var savedRecipe = (await LiveSession.Api.GetRecipesAsync()).Single(x => x.TenCongThuc == "Công thức vừa lưu từ UI" && x.TrangThai == "ACTIVE");
+                    Assert.Equal(75, savedRecipe.PhanTramDuongMacDinh);
+                    Assert.Contains(savedRecipe.ThanhPhan, x => x.MaNguyenLieu == ingredientId && x.LoaiDinhMuc == "FIXED" && x.DinhMucCoSo == 2.5m && x.TyLeHaoHut == 0);
+                }
+                if (route == "recipes")
+                {
+                    // Một màn hình cho6 cấu hình: nhập số lẻ, bỏ đá ở nóng, lưu cả bảng qua API thật.
+                    var matrixDish = await LiveSession.Api.SaveMenuAsync("dishes", null, new MenuDishInput(1, "Món bảng size UI " + Guid.NewGuid().ToString("N")[..6], null, null, 0, false, false, null, null, Guid.NewGuid()));
+                    foreach (var size in new[] { "S", "M", "L" })
+                        foreach (var temp in new[] { "ICED", "HOT" })
+                            await LiveSession.Api.SaveMenuAsync("variants", null, new MenuVariantInput(matrixDish.Ma, size, temp, 35000, false, size == "S" && temp == "ICED", [], [], null, Guid.NewGuid()));
+                    var material = await LiveSession.Api.GetIngredientsAsync();
+                    var menuMatrix = await LiveSession.Api.GetAdminMenuAsync();
+                    using var matrix = new DishRecipeEditorForm(material, menuMatrix, await LiveSession.Api.GetRecipesAsync(), matrixDish.Ma);
+                    matrix.StartPosition = FormStartPosition.Manual; matrix.Location = new Point(-12000, -12000); matrix.Show();
+                    var picker = Descendants(matrix).OfType<CheckedListBox>().Single(x => x.Name == "RecipeDishIngredients");
+                    for (var i = 0; i < picker.Items.Count; i++)
+                        if ((picker.GetItemText(picker.Items[i]) ?? "").StartsWith("Sữa tươi") || (picker.GetItemText(picker.Items[i]) ?? "").StartsWith("Đá")) picker.SetItemChecked(i, true);
+                    Descendants(matrix).OfType<Button>().Single(x => x.Name == "RecipeDishAdd").PerformClick();
+                    var cold = Descendants(matrix).OfType<DataGridView>().Single(g => g.Name == "RecipeMatrixICED");
+                    var hot = Descendants(matrix).OfType<DataGridView>().Single(g => g.Name == "RecipeMatrixHOT");
+                    Assert.Equal(6, cold.Columns.Count); Assert.Equal(2, cold.Rows.Count); Assert.Single(hot.Rows.Cast<DataGridViewRow>());
+                    foreach (DataGridViewRow row in cold.Rows) for (var i = 3; i < 6; i++) row.Cells[i].Value = 100m + i;
+                    cold.CurrentCell = cold.Rows[0].Cells[3]; cold.BeginEdit(true);
+                    ((DataGridViewTextBoxEditingControl)cold.EditingControl!).Text = "2,5";
+                    Assert.True(cold.EndEdit()); Assert.Equal(2.5m, cold.Rows[0].Cells[3].Value);
+                    // Nóng đang trống nên sao chép không cần xác nhận thay dữ liệu.
+                    Descendants(matrix).OfType<Button>().Single(x => x.Name == "RecipeCopyCold").PerformClick();
+                    hot = Descendants(matrix).OfType<DataGridView>().Single(g => g.Name == "RecipeMatrixHOT");
+                    Assert.DoesNotContain(hot.Rows.Cast<DataGridViewRow>(), r => (string)r.Cells[0].Value! == "Đá");
+                    var matrixTabs = Descendants(matrix).OfType<TabControl>().Single(t => t.Name == "RecipeSizeTabs");
+                    matrixTabs.SelectedTab = matrixTabs.TabPages["HOT"];
+                    hot.Rows[0].Cells[3].Value = 120m;
+                    Descendants(matrix).OfType<ComboBox>().Single(c => c.Name == "RecipeDishSugar").SelectedValue = 75L;
+                    Capture(matrix, Path.Combine(output, "ADM02-matrix-hot.png"));
+                    matrixTabs.SelectedTab = matrixTabs.TabPages["ICED"];
+                    Capture(matrix, Path.Combine(output, "ADM02-matrix-cold.png"));
+                    AssertFooterVisible(matrix); matrix.Size = matrix.MinimumSize; await Task.Delay(100); AssertFooterVisible(matrix);
+                    Capture(matrix, Path.Combine(output, "ADM02-matrix-compact.png"));
+                    Descendants(matrix).OfType<Button>().Single(x => x.Name == "RecipeDishSave").PerformClick();
+                    await WaitUntil(() => !matrix.Visible || Descendants(matrix).Any(x => x.Name == "RecipeDishFeedback" && x.Text.Length > 0));
+                    Assert.True(!matrix.Visible, "Lưu bảng size: " + Descendants(matrix).FirstOrDefault(x => x.Name == "RecipeDishFeedback")?.Text);
+                    var ids = menuMatrix.CauHinh.Where(v => v.MaMon == matrixDish.Ma).Select(v => v.MaCauHinhMon).ToHashSet();
+                    var results = (await LiveSession.Api.GetRecipesAsync()).Where(r => r.MaCauHinhMon is { } v && ids.Contains(v)).ToList();
+                    Assert.Equal(6, results.Count); Assert.All(results, r => Assert.Equal(75, r.PhanTramDuongMacDinh));
+                    Assert.Contains(results, r => r.KichCo == "S" && r.NhietDo == "HOT" && r.ThanhPhan.Any(l => l.DinhMucCoSo == 120));
+                    await Descendants(form).OfType<RecipesPage>().Single().Reload();
+                    var list = Descendants(form).OfType<DataGridView>().Single(g => g.Name == "RecipesGrid");
+                    Descendants(form).OfType<ComboBox>().Single(c => c.Name == "RecipeStateFilter").SelectedIndex = 0;
+                    Assert.Single(list.Rows.Cast<DataGridViewRow>(), r => ((RecipeView)r.DataBoundItem!).TenDoiTuong == menuMatrix.Mon.Single(m => m.MaMon == matrixDish.Ma).TenMon);
                 }
                 if (route == "reports") await ReportNavigationUiChecks.Run(form, output);
                 if (route == "stock") await StockDocumentEditorChecks.Run(output);
@@ -241,9 +491,12 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
     /// <summary>Cấp lại mật khẩu qua form thật, xác nhận lưu/thu hồi phiên rồi khách đổi tạm và đăng nhập đầy đủ.</summary>
     private static async Task ResetPassword(string output)
     {
-        var original = TestData.Password(); var replacement = TestData.Password();
+        var original = TestData.Password(); var replacement = "reset";
         var input = new CustomerSaveInput(Guid.NewGuid(), "reset" + Guid.NewGuid().ToString("N")[..12], "Khách yêu cầu cấp lại mật khẩu", "reset" + Guid.NewGuid().ToString("N") + "@example.test", TestData.Phone(), original);
-        var account = (await LiveSession.Api.SaveCustomerAsync(null, input)).Account!;
+        // Fixture phải đăng ký qua Web; Admin chỉ reset khách đã tồn tại.
+        var registered = await LiveSession.Api.RegisterAsync(new(input.TenDangNhap, input.HoTen,
+            input.Email, input.SoDienThoai, original, Guid.NewGuid(), original));
+        var account = (await LiveSession.Api.GetCustomerAsync(registered.MaKhachHang)).Account;
         using var http = new HttpClient { BaseAddress = new Uri(Environment.GetEnvironmentVariable("FOURCHANG_API_URL")!) };
         var customer = new CafeApiClient(http);
         customer.Token = (await customer.LoginCustomerAsync(new(input.TenDangNhap, original))).Token;
@@ -253,7 +506,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
         var save = Descendants(editor).OfType<Button>().Single(x => x.Name == "CustomerSave");
         fields["CustomerTemporaryPassword"].Text = replacement;
         fields["CustomerPasswordConfirmation"].Text = replacement + "x";
-        fields["CustomerReason"].Text = "Khách yêu cầu cấp lại mật khẩu.";
+        Assert.DoesNotContain("CustomerReason", fields.Keys);
         save.PerformClick();
         Assert.Contains("chưa khớp", Descendants(editor).OfType<Label>().Single(x => x.Name == "CustomerFeedback").Text);
         fields["CustomerPasswordConfirmation"].Text = replacement;
@@ -279,7 +532,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
     /// <summary>Nút lưu phải thực sự nằm trong vùng cửa sổ ở cả kích thước thường và tối thiểu.</summary>
     private static void AssertFooterVisible(Form form)
     {
-        var save = Descendants(form).OfType<Button>().Single(x => x.Text is "Lưu nháp" or "Lưu nguyên liệu");
+        var save = Descendants(form).OfType<Button>().Single(x => x.Text is "Lưu công thức" or "Lưu nguyên liệu" or "Lưu tất cả size");
         var bounds = form.RectangleToClient(save.RectangleToScreen(save.ClientRectangle));
         Assert.True(form.ClientRectangle.Contains(bounds), "Nút lưu bị cắt hoặc nằm ngoài vùng nhìn thấy của dialog.");
     }

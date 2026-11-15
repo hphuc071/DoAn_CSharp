@@ -1,4 +1,4 @@
-/* ADM-02/05: cập nhật menu từ server; không xóa giỏ, không ghi đè form khách đang nhập. */
+﻿/* ADM-02/05: cập nhật menu từ server; không xóa giỏ, không ghi đè form khách đang nhập. */
 (() => {
   "use strict";
   const grid = document.getElementById("product-grid");
@@ -22,7 +22,8 @@
 
   /** Đổi phần hiển thị giá/còn hết, giữ nguyên ID để giỏ tiếp tục dùng mã cấu hình server. */
   function updateCard(card, dish) {
-    const variant = dish.cauHinh.find(x => x.laMacDinh && x.conHang) ?? dish.cauHinh.find(x => x.conHang) ?? dish.cauHinh.find(x => x.laMacDinh) ?? dish.cauHinh[0];
+    const medium = dish.cauHinh.filter(x => x.kichCo === "M");
+    const variant = medium.find(x => x.laMacDinh) ?? medium.find(x => x.conHang) ?? medium[0] ?? dish.cauHinh.find(x => x.laMacDinh && x.conHang) ?? dish.cauHinh.find(x => x.conHang) ?? dish.cauHinh.find(x => x.laMacDinh) ?? dish.cauHinh[0];
     const available = dish.dangBan && dish.cauHinh.some(x => x.conHang);
     Object.assign(card.dataset, { mamon: String(dish.maMon), name: dish.tenMon, category: dish.tenDanhMuc, price: String(variant.giaBan), available: String(available) });
     card.classList.toggle("sold-out", !available);
@@ -38,8 +39,8 @@
     if (/^sprite:[0-9]+$/.test(dish.duongDanAnh ?? "")) { photo.replaceChildren(); photo.className = "drink-photo sprite-" + dish.duongDanAnh.slice(7); }
     else if (dish.duongDanAnh?.startsWith("/") || dish.duongDanAnh?.startsWith("https://")) {
       photo.className = "drink-photo"; const image = document.createElement("img"); image.src = dish.duongDanAnh; image.alt = dish.tenMon;
-      image.style.cssText = "width:100%;height:100%;object-fit:cover"; photo.replaceChildren(image);
-    }
+      image.style.cssText = "width:100%;height:100%;object-fit:contain;object-position:center"; photo.replaceChildren(image);
+    } else { photo.replaceChildren(); photo.className = "drink-photo"; }
   }
 
   /** Tải snapshot hiện hành; xóa khỏi danh sách chỉ khi Admin chủ động bỏ công bố/danh mục bị ẩn. */

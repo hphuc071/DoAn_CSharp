@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Features.Customer.Orders;
 using FourChang.Api.Security;
@@ -87,12 +87,12 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
                 throw new AdminRule(409, "Công thức món chưa có định mức nguyên liệu.");
             foreach (var line in variantLines)
             {
-                if (line.TyLeHaoHut is < 0m or >= 1m || line.DinhMucCoSo <= 0m)
-                    throw new AdminRule(409, "Định mức hoặc tỷ lệ hao hụt món không hợp lệ.");
+                if (line.DinhMucCoSo <= 0m)
+                    throw new AdminRule(409, "Lượng nguyên liệu của món không hợp lệ.");
                 var factor = line.LoaiDinhMuc == "SUGAR" ? item.PhanTramDuong / 100m
                            : line.LoaiDinhMuc == "ICE" ? item.PhanTramDa / 100m : 1m;
                 // No rounding here. Same ingredient may appear in multiple recipe lines.
-                var perCup = line.DinhMucCoSo * factor / (1m - line.TyLeHaoHut);
+                var perCup = line.DinhMucCoSo * factor;
                 if (perCup > 0m)
                     itemReq[line.MaNguyenLieu] = itemReq.GetValueOrDefault(line.MaNguyenLieu) + perCup;
             }
@@ -109,13 +109,13 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
 
                 foreach (var line in toppingLines)
                 {
-                    if (line.TyLeHaoHut is < 0m or >= 1m || line.DinhMucCoSo <= 0m)
+                    if (line.DinhMucCoSo <= 0m)
                         throw new AdminRule(409, "Định mức nguyên liệu topping không hợp lệ.");
                     // Until configured otherwise, a topping recipe must be FIXED per topping serving.
                     // Do not silently treat SUGAR/ICE topping components as FIXED.
                     if (line.LoaiDinhMuc != "FIXED")
                         throw new AdminRule(409, "Công thức topping có tùy chọn đường/đá chưa được định nghĩa.");
-                    var perPortion = line.DinhMucCoSo / (1m - line.TyLeHaoHut);
+                    var perPortion = line.DinhMucCoSo;
                     if (perPortion > 0m)
                         itemReq[line.MaNguyenLieu] = itemReq.GetValueOrDefault(line.MaNguyenLieu)
                             + perPortion * top.SoPhanMoiLy;
@@ -141,7 +141,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
         {
             if (!ingredientsMap.TryGetValue(ingId, out var ing) || !ing.DangSuDung || !stocks.TryGetValue(ingId, out var stock))
                 throw new AdminRule(409, "Nguyên liệu pha chế hiện không khả dụng.");
-            var available = stock.TonThucTe - stock.TongGiuCho - ing.TonAnToan;
+            var available = stock.TonThucTe - stock.TongGiuCho;
             if (available < needed)
                 throw new AdminRule(409, $"Nguyên liệu '{ing.TenNguyenLieu}' vừa hết, vui lòng chỉnh lại giỏ hàng.");
         }

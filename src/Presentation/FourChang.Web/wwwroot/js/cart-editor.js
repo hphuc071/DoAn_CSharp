@@ -1,4 +1,4 @@
-// Shared Menu/Cart editor. Only GET catalog data; saving changes the local draft.
+﻿// Shared Menu/Cart editor. Only GET catalog data; saving changes the local draft.
 (() => {
   "use strict";
   const C = window.FourChangCart;
@@ -31,7 +31,7 @@
       }).sort((a, b) => a.id - b.id);
       if (new Set(tops.map(t => t.id)).size !== tops.length) throw new Error("Topping bị trùng mã.");
       return { id: v.maCauHinhMon, size: v.kichCo, temperature: v.nhietDo, price: v.giaBan,
-        available: v.available, pairs, tops, context: JSON.stringify([v.maCauHinhMon, v.kichCo, v.nhietDo, v.giaBan, pairs, tops]) };
+        available: v.available, defaultSugar: v.phanTramDuongMacDinh ?? 50, pairs, tops, context: JSON.stringify([v.maCauHinhMon, v.kichCo, v.nhietDo, v.giaBan, pairs, tops, v.phanTramDuongMacDinh ?? 50]) };
     });
   }
   window.FourChangCartEditor = async function(host, productId, old, onSave, onCancel = () => {}) {
@@ -142,7 +142,11 @@
       if (!v) { renderSugarAndIce(); refresh(); return; }
       for (const pair of v.pairs) brew.append(option(JSON.stringify(pair), `Đường ${pair[0]}% / đá ${pair[1]}%`));
       const previous = previousPair || (old ? JSON.stringify([Number(String(old.sugar).replace("%", "")), Number(String(old.ice).replace("%", ""))]) : "");
-      if ([...brew.options].some(o => o.value === previous)) brew.value = previous;
+      if (previous && [...brew.options].some(o => o.value === previous)) brew.value = previous;
+      else if (!old) {
+        const initial = v.pairs.find(p => p[0] === v.defaultSugar && p[1] === (v.temperature === "HOT" ? 0 : 50));
+        if (initial) brew.value = JSON.stringify(initial);
+      }
       let oldTops = rememberedTops || (Array.isArray(old?.toppings) ? old.toppings : old?.topping && old.topping !== "Không"
         ? [{ name: old.topping, portions: old.toppingQuantity }] : []);
       oldTops = oldTops.filter(t => t && typeof t === "object");

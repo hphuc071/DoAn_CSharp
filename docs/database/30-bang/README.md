@@ -1,4 +1,4 @@
-# Database hiện hành: 30 bảng
+﻿# Database hiện hành: 30 bảng
 
 Schema SQL Server và EF Core cùng ánh xạ **30 bảng nghiệp vụ, 64 khóa ngoại, 11 trigger**. Bảng `dbo.sysdiagrams` do SSMS tạo được giữ nguyên và không tính là bảng nghiệp vụ. Không tạo `__EFMigrationsHistory` hoặc view giả tên bảng đã bỏ.
 
@@ -54,3 +54,9 @@ Nếu cần phục hồi, dùng bản `.bak` vào database riêng để đối c
 `Schema30MigrationTests` dựng schema37 có đơn, hóa đơn, thanh toán và giữ chỗ trong database GUID riêng; kiểm chuyển đổi, chạy lại, bảo toàn tiền, đọc catalog và bất biến snapshot. `DatabaseTests` kiểm database rỗng và nâng cấp từ34 có sơ đồ SSMS. Các test POS, BOM, kho, hủy/hoàn, ca và báo cáo dùng schema30 do bootstrap tạo.
 
 Các thư mục 34-bang, 35-bang, 37-bang là tài liệu/migration lịch sử, không dùng chúng làm schema hiện hành.
+
+## Nâng cấp mức đường mặc định của công thức — 15/11/2026
+
+Migration009-recipe-default-sugar.sql thêm CongThuc.PhanTramDuongMacDinh int NOT NULL DEFAULT50, CHECK0/25/50/75/100; không thêm bảng. Bootstrap kiểm manifest30 cũ, sao lưu native COPY_ONLY/CHECKSUM và RESTORE VERIFYONLY trước nâng cấp rồi kiểm manifest mới. Database mới tạo thẳng schema hiện hành; nâng lại không thay dữ liệu. TyLeHaoHut giữ cho lịch sử, công thức mới/sửa dùng0; đơn mới trừ lượng thực dùng lúc bắt đầu pha, hoàn thành không trừ thêm.
+
+Database thật đã nâng cấp và kiểm đúng30 bảng/64FK. Đối chiếu số dòng/checksum dữ liệu cả30 bảng trước/sau (bỏ rowversion và cột mới) không có khác biệt. Bản sao lưu tại artifacts/database/recipe-defaults-before.bak; đối chiếu tại recipe-defaults-before.txt và recipe-defaults-after.txt cùng thư mục. Không reset khách hàng, đơn hoặc lịch sử.

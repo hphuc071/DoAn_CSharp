@@ -1,4 +1,4 @@
-using FourChang.Desktop.Shared.Theme;
+﻿using FourChang.Desktop.Shared.Theme;
 namespace FourChang.Desktop.Shared.Controls;
 
 /// <summary>Ảnh menu theo đường dẫn API; lỗi ảnh để trống nhẹ nhàng, không gán nhầm ảnh món khác.</summary>
@@ -20,6 +20,8 @@ internal static class CatalogImage
                 byte[] bytes;
                 if (path?.StartsWith("/assets/", StringComparison.Ordinal) == true && !path.Contains("..") && !path.Contains('\\'))
                     bytes = await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "Assets", Path.GetFileName(path)), token);
+                else if (path?.StartsWith("/menu-images/", StringComparison.Ordinal) == true)
+                    bytes = await FourChang.Desktop.Shared.Session.LiveSession.Api.GetMenuImageAsync(path[13..], token);
                 else if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && uri.Scheme == "https")
                 {
                     using var response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token); response.EnsureSuccessStatusCode();
@@ -32,7 +34,7 @@ internal static class CatalogImage
                 using var memory = new MemoryStream(bytes); using var decoded = Image.FromStream(memory); var image = new Bitmap(decoded);
                 if (box.IsDisposed) image.Dispose(); else box.Image = image;
             }
-            catch (Exception ex) when (ex is IOException or HttpRequestException or OperationCanceledException or ArgumentException or OutOfMemoryException) { }
+            catch (Exception ex) when (ex is IOException or HttpRequestException or OperationCanceledException or ArgumentException or OutOfMemoryException or FourChang.Presentation.Shared.ApiClients.CafeApiException) { }
         };
         box.Disposed += (_, _) => { if (disposed) return; disposed = true; lifetime.Cancel(); lifetime.Dispose(); box.Image?.Dispose(); }; return box;
     }

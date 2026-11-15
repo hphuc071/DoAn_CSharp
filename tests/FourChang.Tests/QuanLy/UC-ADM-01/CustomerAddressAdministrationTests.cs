@@ -20,10 +20,15 @@ public sealed class CustomerAddressAdministrationTests
         var request = Body(("MaThaoTac", NewId()), ("PhienBanHoSo", book["account"]!.Text("phienBanDuLieu")),
             ("NhanDiaChi", "Nhà riêng"), ("TenNguoiNhan", "Nguyễn Minh Anh"), ("DienThoaiNguoiNhan", "0912345678"),
             ("DiaChiChiTiet", "12 Đường Hoa, Phường An Bình, TP Hồ Chí Minh"), ("LaDiaChiMacDinh", true));
-        var bad = request.Copy(); bad["DienThoaiNguoiNhan"] = "abc";
-        (await api.Send("POST", url, bad, admin)).Expect(400, "Số điện thoại sai");
+        foreach (var invalid in new[] { "", "091234567", "09123456789", "+84912345678", "09123abc78", "０９１２３４５６７８" })
+        {
+            var bad = request.Copy(); bad["DienThoaiNguoiNhan"] = invalid;
+            (await api.Send("POST", url, bad, admin)).Expect(400, "Điện thoại người nhận đúng 10 số ASCII");
+        }
         book = (await api.Send("POST", url, request, admin)).Expect(200, "Thêm địa chỉ").Json;
         var first = book["diaChi"]![0]!; var firstId = first.Number("maDiaChi");
+        // Đơn giữ địa chỉ chốt riêng; sửa sổ địa chỉ sau đây không được đổi snapshot này.
+        await api.Sql($"INSERT dbo.DonHang(MaDonHienThi,MaKhachHang,KenhDatHang,HinhThucNhanMon,TenNguoiNhan,DienThoaiNguoiNhan,DiaChiGiaoDaChot,PhiGiaoHangBanDau,PhiGiaoHangHienTai,TrangThai) VALUES('ADM01-ADDRESS-HISTORY',{customer.Id},'WEB','DELIVERY',N'Nguyễn Minh Anh','0912345678',N'Địa chỉ đã chốt của đơn cũ',15000,15000,'COMPLETED')");
         (await api.Send("POST", url, request, admin)).Expect(200, "Gửi lặp không thêm trùng");
         var web = (await api.Send("GET", "/api/customer/profile", headers: user)).Expect(200, "Web thấy địa chỉ Admin vừa lưu").Json;
         Assert.Equal(firstId, web["diaChi"]![0]!.Number("maDiaChi"));
@@ -64,5 +69,8 @@ public sealed class CustomerAddressAdministrationTests
         web = (await api.Send("GET", "/api/customer/profile", headers: user)).Expect(200, "Web bỏ địa chỉ ngừng").Json;
         Assert.Single(web["diaChi"]!.AsArray());
         (await api.Send("GET", "/api/admin/customers/address-operations/" + remove.Text("MaThaoTac"), headers: admin)).Expect(200, "Receipt");
+        Assert.Equal("Địa chỉ đã chốt của đơn cũ", await api.Sql("SELECT DiaChiGiaoDaChot FROM dbo.DonHang WHERE MaDonHienThi='ADM01-ADDRESS-HISTORY'"));
+        Assert.Null(book["diaChi"]![0]!["viDo"]);
+        Assert.Null(book["diaChi"]![0]!["kinhDo"]);
     }
 }

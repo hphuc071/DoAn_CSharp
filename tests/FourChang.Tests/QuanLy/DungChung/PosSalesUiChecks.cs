@@ -1,4 +1,4 @@
-using FourChang.Desktop.Shell;
+﻿using FourChang.Desktop.Shell;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Presentation.Shared.Contracts.Staff;
@@ -13,11 +13,24 @@ internal static class PosSalesUiChecks
         var original=LiveSession.Current;var token=LiveSession.Api.Token;
         try
         {
+            // Ảnh Admin tải phải hiển thị được trên POS, không quay về sprite mặc định.
+            var dish = (await LiveSession.Api.GetAdminMenuAsync()).Mon.First();
+            var image = await LiveSession.Api.UploadMenuImageAsync(MenuAdministrationTests.ImageBytes());
+            await LiveSession.Api.SaveMenuAsync("dishes", dish.MaMon, new MenuDishInput(dish.MaDanhMuc, dish.TenMon, dish.MoTa, image.Path, dish.ThuTuHienThi,
+                dish.DaCongBo, dish.DangBan, null, dish.PhienBanDuLieu, Guid.NewGuid()));
+            var menu = await LiveSession.Api.GetAdminMenuAsync();
+            var defaultVariant = menu.CauHinh.First(v => v.MaMon == dish.MaMon && v.LaMacDinh);
+            var defaultRecipe = (await LiveSession.Api.GetRecipesAsync()).Single(r => r.MaCauHinhMon == defaultVariant.MaCauHinhMon);
+            var materials = (await LiveSession.Api.GetIngredientsAsync()).NguyenLieu;
+            await LiveSession.Api.SaveRecipeAsync(defaultRecipe.MaCongThuc, new RecipeInput(defaultVariant.MaCauHinhMon, null, defaultRecipe.TenCongThuc, defaultRecipe.GhiChu,
+                defaultRecipe.ThanhPhan.Select(l => new RecipeLineInput(l.MaNguyenLieu, materials.Single(n => n.MaNguyenLieu == l.MaNguyenLieu).MaDonViCoSo, l.DinhMucCoSo, l.LoaiDinhMuc, 0)).ToList(), defaultRecipe.PhienBanDuLieu, Guid.NewGuid(), 75));
             var employee=await LiveSession.Api.SaveEmployeeAsync(new EmployeeInput("Trần Hoàng Phúc","0912345678",DateTime.Today,"ACTIVE",MaThaoTac:Guid.NewGuid()));
             var session=await LiveSession.Api.OpenShiftAsync(new(employee.MaNhanVien,"Chiều","UI-POS-"+Guid.NewGuid().ToString("N")[..8],500000,employee.HoTen));
             LiveSession.Current=session;LiveSession.Api.Token=session.Token;LiveSession.ShiftLocked=false;
             using var shell=new MainForm("Staff",employee.HoTen){ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-14000,-14000)};shell.Show();
             await AdminFeaturesUiTests.WaitUntil(()=>Controls(shell).OfType<Button>().Count(x=>x.Name.StartsWith("PosProduct")&&x.Enabled)>=2);
+            await AdminFeaturesUiTests.WaitUntil(() => Controls(shell).OfType<PictureBox>().Any(x => x.AccessibleName == dish.TenMon && x.Image?.Width == 12));
+            AdminFeaturesUiTests.Capture(shell, Path.Combine(output, "POS-custom-menu-image.png"));
             // Hai chu kỳ có fetch thật nhưng không hủy/dựng lại các thẻ món không đổi.
             var cards=Controls(shell).OfType<Button>().Where(x=>x.Name.StartsWith("PosProduct")).ToArray();
             var disposed=0;foreach(var card in cards)card.Disposed+=(_,_)=>disposed++;
@@ -76,8 +89,10 @@ internal static class PosSalesUiChecks
         {
             var variants = await LiveSession.Api.GetMenuVariantsAsync(product.MaMon);
             var expected = variants.Single(x => x.MaCauHinhMon == product.Id);
+            if (variants.Any(v => v.KichCo == "M")) Assert.Equal("M", expected.KichCo);
             using var editor = new PosItemEditorForm(product, variants);
             editor.Show(owner); await Task.Delay(80);
+            Assert.Equal(expected.PhanTramDuongMacDinh + "%", Controls(editor).OfType<ComboBox>().Single(x => x.Name == "PosSugar").Text);
             Assert.Equal(expected.KichCo, Controls(editor).OfType<ComboBox>().Single(x => x.Name == "PosSize").Text);
             Assert.Equal(expected.NhietDo == "HOT" ? "Nóng" : "Lạnh", Controls(editor).OfType<ComboBox>().Single(x => x.Name == "PosTemperature").Text);
             Assert.Equal(product.Price, expected.GiaBan);

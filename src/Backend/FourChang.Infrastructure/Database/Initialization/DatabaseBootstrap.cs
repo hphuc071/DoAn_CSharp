@@ -1,4 +1,4 @@
-using FourChang.Infrastructure.Database.Context;
+﻿using FourChang.Infrastructure.Database.Context;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -33,7 +33,7 @@ public static class DatabaseBootstrap
                 schema.CommandText = await ReadResourceAsync("FourChang.Schema30.sql");
                 await schema.ExecuteNonQueryAsync();
             }
-            else if (await HasSchema30(connection)) await ValidateAsync(connection);
+            else if (await HasSchema30(connection)) await ValidateAsync(connection, await HasRecipeDefaults(connection) ? "FourChang.Model30.json" : "FourChang.Model30BeforeRecipeDefaults.json");
             else if (!existing.Contains("ThietBiPOS"))
             {
                 // Chỉ nâng cấp từ schema 34 bảng đã xác minh; không tự sửa database lạ hoặc xóa sysdiagrams.
@@ -108,6 +108,17 @@ public static class DatabaseBootstrap
                 simplify.CommandText = await ReadResourceAsync("FourChang.Upgrade30.sql");
                 await simplify.ExecuteNonQueryAsync();
             }
+            if (!await HasRecipeDefaults(connection))
+            {
+                await ValidateAsync(connection, "FourChang.Model30BeforeRecipeDefaults.json");
+                var path = $"/var/opt/mssql/data/{database}_beforeRecipeDefaults_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}.bak";
+                await using var backup = connection.CreateCommand(); backup.CommandTimeout = 180;
+                backup.CommandText = $"BACKUP DATABASE [{database}] TO DISK=@path WITH COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=@path WITH CHECKSUM;";
+                backup.Parameters.AddWithValue("@path", path); await backup.ExecuteNonQueryAsync();
+                Console.WriteLine("Backup trước mức đường công thức đã xác minh: " + path);
+                await using var defaults = connection.CreateCommand();
+                defaults.CommandText = await ReadResourceAsync("FourChang.RecipeDefaults.sql"); await defaults.ExecuteNonQueryAsync();
+            }
             await ValidateAsync(connection);
         }
         await CreateApplicationLoginAsync();
@@ -117,6 +128,14 @@ public static class DatabaseBootstrap
         await check.OpenAsync();
         await ValidateAsync(check);
     }
+    /// <summary>Nhận diện đúng cột mức đường trước khi đối chiếu manifest schema30.</summary>
+    private static async Task<bool> HasRecipeDefaults(SqlConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH(N'dbo.CongThuc',N'PhanTramDuongMacDinh') IS NOT NULL THEN 1 ELSE 0 END";
+        return Convert.ToInt32(await command.ExecuteScalarAsync()) == 1;
+    }
+
     /// <summary>Nhận diện schema gộp bằng cột mới trước khi so đầy đủ manifest 30 bảng.</summary>
     private static async Task<bool> HasSchema30(SqlConnection connection)
     {

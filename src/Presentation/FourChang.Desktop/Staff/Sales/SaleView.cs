@@ -1,4 +1,4 @@
-using FourChang.Desktop.Staff.Orders;
+﻿using FourChang.Desktop.Staff.Orders;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Theme;
 using FourChang.Desktop.Shared.Preview;

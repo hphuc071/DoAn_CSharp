@@ -1,4 +1,4 @@
-namespace FourChang.Presentation.Shared.Contracts.Admin;
+﻿namespace FourChang.Presentation.Shared.Contracts.Admin;
 
 /// <summary>Danh mục và quy đổi nguyên liệu; không chứa quyền sửa tồn trực tiếp.</summary>
 public sealed record IngredientView(long MaNguyenLieu, string TenNguyenLieu, long MaDonViCoSo,
@@ -19,9 +19,9 @@ public sealed record RecipeLineInput(long MaNguyenLieu, long MaDonVi, decimal Di
 public sealed record RecipeLineView(long MaNguyenLieu, string TenNguyenLieu, string DonViCoSo, decimal DinhMucCoSo, string LoaiDinhMuc, decimal TyLeHaoHut);
 public sealed record RecipeView(long MaCongThuc, long? MaCauHinhMon, long? MaMonThem, int SoPhienBan,
     string TenCongThuc, string TrangThai, DateTime? HieuLucTu, DateTime? HieuLucDen,
-    string? GhiChu, byte[] PhienBanDuLieu, IReadOnlyList<RecipeLineView> ThanhPhan);
+    string? GhiChu, byte[] PhienBanDuLieu, IReadOnlyList<RecipeLineView> ThanhPhan, string? TenDoiTuong = null, string? KichCo = null, string? NhietDo = null, int PhanTramDuongMacDinh = 50);
 public sealed record RecipeInput(long? MaCauHinhMon, long? MaMonThem, string TenCongThuc, string? GhiChu,
-    IReadOnlyList<RecipeLineInput> ThanhPhan, byte[]? PhienBanDuLieu, Guid MaThaoTac);
+    IReadOnlyList<RecipeLineInput> ThanhPhan, byte[]? PhienBanDuLieu, Guid MaThaoTac, int PhanTramDuongMacDinh = 50);
 public sealed record RecipePublishInput(DateTime HieuLucTu, DateTime? HieuLucDen, byte[] PhienBanDuLieu, Guid MaThaoTac);
 public sealed record RecipeStopInput(string LyDo, byte[] PhienBanDuLieu, Guid MaThaoTac);
 public sealed record RecipeToppingInput(long MaMonThem, int SoPhanMoiLy);
@@ -40,3 +40,8 @@ public sealed record StockReservationView(long MaChiTietDonHang, long MaDonHang,
 public sealed record StockAffectedView(long MaCongThuc, long? MaCauHinhMon, long? MaMonThem, string TenCongThuc, string TrangThai);
 public sealed record StockDetail(StockView NguyenLieu, DateTime DocLuc, IReadOnlyList<StockMovementView> BienDong,
     IReadOnlyList<StockReservationView> GiuCho, IReadOnlyList<StockAffectedView> AnhHuong);
+
+/// <summary>Một cột cấu hình trong bảng công thức; phiên bản bảo vệ dữ liệu đã đọc.</summary>
+public sealed record RecipeDishVariantInput(long? MaCongThuc, RecipeInput CongThuc);
+/// <summary>Lưu một lần tất cả size/nhiệt độ của món, không ghi dở từng cột.</summary>
+public sealed record RecipeDishInput(long MaMon, IReadOnlyList<RecipeDishVariantInput> CauHinh, Guid MaThaoTac);

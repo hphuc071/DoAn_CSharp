@@ -1,4 +1,4 @@
-using FourChang.Presentation.Shared.Contracts.Admin;
+﻿using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Presentation.Shared.ApiClients;
 
@@ -15,14 +15,12 @@ public sealed partial class CafeApiClient
     public Task<AdminSaveReceipt> SaveUnitAsync(long? id, UnitInput input) => SendAsync<AdminSaveReceipt>(id is null ? HttpMethod.Post : HttpMethod.Put, "/api/admin/ingredients/units" + (id is null ? "" : "/" + id), input);
     /// <summary>Xóa đơn vị chưa tham chiếu sau khi người dùng xác nhận.</summary>
     public Task<AdminSaveReceipt> DeleteUnitAsync(long id, AdminDeleteInput input) => SendAsync<AdminSaveReceipt>(HttpMethod.Post, $"/api/admin/ingredients/units/{id}/delete", input);
-    /// <summary>Đọc các phiên bản BOM, không thay dữ liệu server bằng dữ liệu mẫu.</summary>
+    /// <summary>Đọc công thức hiện hành để thêm/sửa; không lấy bản lịch sử làm dữ liệu chỉnh sửa.</summary>
     public Task<IReadOnlyList<RecipeView>> GetRecipesAsync() => SendAsync<IReadOnlyList<RecipeView>>(HttpMethod.Get, "/api/admin/recipes");
-    /// <summary>Lưu nháp BOM; server quyết định điều kiện sửa và cấp số phiên bản.</summary>
+    /// <summary>Lưu công thức và áp dụng ngay; server tự giữ các định mức lịch sử.</summary>
     public Task<AdminSaveReceipt> SaveRecipeAsync(long? id, RecipeInput input) => SendAsync<AdminSaveReceipt>(id is null ? HttpMethod.Post : HttpMethod.Put, "/api/admin/recipes" + (id is null ? "" : "/" + id), input);
-    /// <summary>Gửi hành động công bố/ngừng/sao chép/xóa với DTO và phiên bản đúng nghiệp vụ.</summary>
-    public Task<AdminSaveReceipt> RecipeActionAsync(long id, string action, object input) => SendAsync<AdminSaveReceipt>(HttpMethod.Post, $"/api/admin/recipes/{id}/{action}", input);
-    /// <summary>Mô phỏng nhu cầu từ server, không giữ hay trừ tồn.</summary>
-    public Task<IReadOnlyList<RecipeDemand>> SimulateRecipeAsync(RecipeSimulationInput input) => SendAsync<IReadOnlyList<RecipeDemand>>(HttpMethod.Post, "/api/admin/recipes/simulate", input);
+    /// <summary>Lưu nguyên tử bảng công thức tất cả size của một món.</summary>
+    public Task<AdminSaveReceipt> SaveDishRecipesAsync(RecipeDishInput input) => SendAsync<AdminSaveReceipt>(HttpMethod.Post, "/api/admin/recipes/dish", input);
     /// <summary>Đọc tồn tại thời điểm xác nhận; bộ lọc không sửa số dư.</summary>
     public Task<StockSnapshot> GetInventoryAsync(string? search = null, string? status = null) => SendAsync<StockSnapshot>(HttpMethod.Get, $"/api/admin/inventory?search={Uri.EscapeDataString(search ?? "")}&status={Uri.EscapeDataString(status ?? "")}");
     /// <summary>Truy vết nguyên liệu về biến động, đơn/phiếu và giữ chỗ.</summary>

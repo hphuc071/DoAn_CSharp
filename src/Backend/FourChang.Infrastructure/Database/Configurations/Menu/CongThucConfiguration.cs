@@ -1,4 +1,4 @@
-using FourChang.Domain.Entities.Accounts;
+﻿using FourChang.Domain.Entities.Accounts;
 using FourChang.Domain.Entities.Menu;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -13,6 +13,7 @@ public sealed class CongThucConfiguration : IEntityTypeConfiguration<CongThuc>
         {
             table.UseSqlOutputClause(false);
             table.HasCheckConstraint("CK_CongThuc_1", "(MaCauHinhMon IS NOT NULL AND MaMonThem IS NULL) OR (MaCauHinhMon IS NULL AND MaMonThem IS NOT NULL)");
+            table.HasCheckConstraint("CK_CongThuc_DuongMacDinh", "PhanTramDuongMacDinh IN (0,25,50,75,100)");
             table.HasCheckConstraint("CK_CongThuc_2", "SoPhienBan > 0");
             table.HasCheckConstraint("CK_CongThuc_3", "HieuLucDen IS NULL OR (HieuLucTu IS NOT NULL AND HieuLucDen > HieuLucTu)");
             table.HasCheckConstraint("CK_CongThuc_4", "TrangThai IN ('DRAFT','SCHEDULED','ACTIVE','RETIRED')");
@@ -23,6 +24,7 @@ public sealed class CongThucConfiguration : IEntityTypeConfiguration<CongThuc>
         b.Property(x => x.MaCongThuc).HasColumnType("bigint").IsRequired();
         b.Property(x => x.MaCauHinhMon).HasColumnType("bigint");
         b.Property(x => x.MaMonThem).HasColumnType("bigint");
+        b.Property(x => x.PhanTramDuongMacDinh).HasDefaultValue(50).HasSentinel(-1).IsRequired();
         b.Property(x => x.SoPhienBan).HasColumnType("int").IsRequired();
         b.Property(x => x.TenCongThuc).HasColumnType("nvarchar(150)").IsRequired();
         b.Property(x => x.TrangThai).HasColumnType("varchar(15)").IsRequired();

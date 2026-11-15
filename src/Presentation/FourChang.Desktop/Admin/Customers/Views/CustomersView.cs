@@ -1,13 +1,15 @@
 using FourChang.Desktop.Shared.Preview;
 using FourChang.Presentation.Shared.Preview;
 namespace FourChang.Desktop.Admin.Customers.Views;
+
+/// <summary>Bản xem trước giữ đúng nhóm chức năng của UC-ADM-01 tinh gọn.</summary>
 public static class CustomersView
 {
-    public static Control Create()=>ManagementPage.Create("Hồ sơ khách hàng",DemoCatalog.Customers,"Chỉ tài khoản Customer. Có lịch sử thì ngừng/khóa; không xóa mất đơn hoặc nghĩa vụ hoàn. Không có tài khoản nhân viên.",
-        ("Thêm khách hàng",["Họ tên","Email hoặc điện thoại","Mật khẩu tạm"]),
-        ("Sửa hồ sơ",["Họ tên","Email","Điện thoại"]),
-        ("Khóa / Mở",["Trạng thái","Lý do thay đổi"]),
-        ("Đặt lại mật khẩu",["Mật khẩu tạm","Lý do cấp lại"]),
-        ("Xóa có điều kiện",["Xác nhận chưa có tham chiếu","Lý do xóa"]),
-        ("Lịch sử giao dịch",["Mã khách hàng"]));
+    /// <summary>Dựng mẫu tìm/xem/sửa, khóa/mở và reset; không có tạo/xóa/ngừng khách.</summary>
+    public static Control Create() => ManagementPage.Create("Hồ sơ khách hàng", DemoCatalog.Customers,
+        "Khách tự đăng ký trên Website. Quản lý cập nhật hồ sơ, khóa/mở và cấp lại mật khẩu; giữ lịch sử.",
+        ("Xem hồ sơ", ["Mã khách hàng"]),
+        ("Sửa hồ sơ", ["Họ tên", "Email", "Điện thoại"]),
+        ("Khóa / mở tài khoản", ["Trạng thái"]),
+        ("Đặt lại mật khẩu", ["Mật khẩu tạm", "Xác nhận mật khẩu"]));
 }

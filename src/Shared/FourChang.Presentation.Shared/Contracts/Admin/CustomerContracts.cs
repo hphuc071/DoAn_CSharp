@@ -6,14 +6,13 @@ public sealed record CustomerAccount(long MaKhachHang, string TenDangNhap, strin
     DateTime ThoiDiemTao, byte[] PhienBanDuLieu);
 public sealed record CustomerPage(List<CustomerAccount> Items, int Page, int PageSize, int Total);
 public sealed record CustomerReference(string Loai, string Ma, string TrangThai);
-public sealed record CustomerReferenceCount(string Bang, long SoLuong);
-public sealed record CustomerDetails(CustomerAccount Account, bool CoTheXoa,
-    List<CustomerReferenceCount> ThamChieu, List<CustomerReference> GiaoDichGanDay);
+public sealed record CustomerDetails(CustomerAccount Account, List<CustomerReference> GiaoDichGanDay);
 
 // Mỗi lệnh giữ nguyên MaThaoTac khi thử lại: server có thể trả kết quả cũ thay vì ghi hai lần.
 public sealed record CustomerSaveInput(Guid MaThaoTac, string TenDangNhap, string HoTen,
     string? Email, string? SoDienThoai, string? MatKhauTam, byte[]? PhienBanDuLieu = null);
 public sealed record CustomerActionInput(Guid MaThaoTac, byte[] PhienBanDuLieu,
-    string LyDo, string? TrangThai = null, string? MatKhauTam = null);
+    string? LyDo = null, string? TrangThai = null, string? MatKhauTam = null, string? XacNhanMatKhau = null);
+// DaXoa chỉ để đọc receipt cũ; thao tác mới luôn false và không có API xóa.
 public sealed record CustomerMutation(Guid MaThaoTac, CustomerAccount? Account, bool DaXoa);
 

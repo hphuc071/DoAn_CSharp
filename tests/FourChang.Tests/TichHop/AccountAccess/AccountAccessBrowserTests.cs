@@ -39,6 +39,7 @@ public sealed class AccountAccessBrowserTests
         await f.Field("Họ tên").FillAsync("Khách kiểm tra liên phân hệ");
         await f.Field("Tên đăng nhập").FillAsync(username);
         await f.Field("Email").FillAsync(username + "@example.test");
+        await f.Field("Số điện thoại").FillAsync(Phone());
         await f.Field("Mật khẩu").FillAsync(password);
         await f.Field("Xác nhận mật khẩu").FillAsync(password);
         await f.Button("Tạo tài khoản").ClickAsync();
@@ -114,7 +115,7 @@ public sealed class AccountAccessBrowserTests
         var input = api.CustomerInput();
         input["TenDangNhap"] = username + "temp";
         input["HoTen"] = "Khách kiểm tra mật khẩu tạm";
-        (await api.Send("POST", "/api/admin/customers", input, admin)).Expect(200, "Admin tạo khách tạm");
+        await api.CustomerWithTemporaryPassword(input, admin);
         await f.Login(input.Text("TenDangNhap"), input.Text("MatKhauTam"), "/Account/ChangeTemporaryPassword");
         var limitedToken = await f.Token();
         (await api.Send("GET", "/api/customer/profile", headers: new() { ["Authorization"] = "Bearer " + limitedToken })).Expect(403, "Web phiên tạm không đọc hồ sơ");

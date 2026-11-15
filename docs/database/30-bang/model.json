@@ -966,6 +966,11 @@
           "name": "PhienBanDuLieu",
           "sql": "rowversion",
           "nullable": false
+        },
+        {
+          "name": "PhanTramDuongMacDinh",
+          "sql": "int",
+          "nullable": false
         }
       ],
       "checks": [
@@ -973,7 +978,8 @@
         "SoPhienBan > 0",
         "HieuLucDen IS NULL OR (HieuLucTu IS NOT NULL AND HieuLucDen > HieuLucTu)",
         "TrangThai IN ('DRAFT','SCHEDULED','ACTIVE','RETIRED')",
-        "TrangThai <> 'ACTIVE' OR (HieuLucTu IS NOT NULL AND MaQuanLyDuyet IS NOT NULL)"
+        "TrangThai <> 'ACTIVE' OR (HieuLucTu IS NOT NULL AND MaQuanLyDuyet IS NOT NULL)",
+        "PhanTramDuongMacDinh IN (0,25,50,75,100)"
       ],
       "unique": [],
       "indexes": [

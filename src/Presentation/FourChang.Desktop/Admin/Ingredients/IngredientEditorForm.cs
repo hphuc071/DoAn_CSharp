@@ -1,4 +1,4 @@
-using FourChang.Desktop.Shared.Controls;
+﻿using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shared.Theme;
@@ -58,7 +58,7 @@ public sealed class IngredientEditorForm : Form
     }
 
     /// <summary>Giữ độ chính xác 4 số lẻ; không làm tròn âm thầm các ngưỡng người quản lý nhập.</summary>
-    public static NumericUpDown Amount(decimal value) => new()
+    public static NumericUpDown Amount(decimal value) => new CompactAmountInput()
     {
         DecimalPlaces = 4, Maximum = 999999999999m, Minimum = 0,
         Value = Math.Clamp(value, 0, 999999999999m), ThousandsSeparator = true, Width = 180, Font = CafeTheme.Body()
@@ -91,5 +91,18 @@ public sealed class IngredientEditorForm : Form
         }
         catch (CafeApiException exception) { error.Text = exception.Message; error.Visible = true; }
         finally { if (!save.IsDisposed) save.Enabled = true; }
+    }
+}
+
+/// <summary>Ô lượng giữ nguyên decimal, chỉ bỏ số 0 thừa khi trình bày g/ml hoặc phần trăm.</summary>
+internal sealed class CompactAmountInput : NumericUpDown
+{
+    /// <summary>Giữ xử lý nhập liệu native rồi định dạng số lẻ tùy chọn, không làm tròn Value.</summary>
+    protected override void UpdateEditText()
+    {
+        base.UpdateEditText();
+        var format = (ThousandsSeparator ? "#,##0" : "0") + (DecimalPlaces > 0 ? "." + new string('#', DecimalPlaces) : "");
+        ChangingText = true;
+        Text = Value.ToString(format, System.Globalization.CultureInfo.CurrentCulture);
     }
 }

@@ -1,4 +1,4 @@
-using FourChang.Domain.Shared;
+﻿using FourChang.Domain.Shared;
 using FourChang.Domain.Entities.Menu;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Infrastructure.Database.Context;
@@ -14,6 +14,9 @@ public sealed class CatalogReadService(CafeDbContext db)
     private List<ChiTietCongThuc> lines = [];
     private List<NguyenLieu> ingredients = [];
     private List<TonKho> stocks = [];
+
+    /// <summary>Bỏ snapshot trong request sau khi món mới vừa được sao chép đủ công thức.</summary>
+    internal void ResetSnapshot() => recipes = null;
 
     /// <summary>Chụp dữ liệu đọc trong phạm vi request; không giữ cache giá/tồn qua các yêu cầu.</summary>
     private async Task Load()
@@ -38,7 +41,7 @@ public sealed class CatalogReadService(CafeDbContext db)
             return null;
         return recipe;
     }
-    /// <summary>ADM-02 chỉ kiểm tra liên kết; tạo và kích hoạt công thức thuộc ADM-04.</summary>
+    /// <summary>UC-ADM-02 kiểm tra công thức hiện hành của cấu hình/topping.</summary>
     public async Task<bool> HasRecipe(long? variant, long? topping)
     {
         await Load();
@@ -53,10 +56,10 @@ public sealed class CatalogReadService(CafeDbContext db)
             return false;
         foreach (var g in lines.Where(x => x.MaCongThuc == recipe.MaCongThuc).GroupBy(x => x.MaNguyenLieu))
         {
-            var required = decimal.Ceiling(g.Sum(l => l.DinhMucCoSo * (l.LoaiDinhMuc == "SUGAR" ? sugar / 100m : l.LoaiDinhMuc == "ICE" ? ice / 100m : 1) / (1 - l.TyLeHaoHut)) * 10000) / 10000;
+            var required = decimal.Ceiling(g.Sum(l => l.DinhMucCoSo * (l.LoaiDinhMuc == "SUGAR" ? sugar / 100m : l.LoaiDinhMuc == "ICE" ? ice / 100m : 1)) * 10000) / 10000;
             var n = ingredients.Single(x => x.MaNguyenLieu == g.Key);
             var stock = stocks.SingleOrDefault(x => x.MaNguyenLieu == g.Key);
-            if (required > 0 && (!n.DangSuDung || stock is null || stock.TonThucTe - stock.TongGiuCho - n.TonAnToan < required))
+            if (required > 0 && (!n.DangSuDung || stock is null || stock.TonThucTe - stock.TongGiuCho < required))
                 return false;
         }
         return true;
@@ -74,7 +77,8 @@ public sealed class CatalogReadService(CafeDbContext db)
         var result = dishes.Select(m => new CatalogDish(m.MaMon, m.MaDanhMuc, m.LoaiMon, m.TenMon, m.MoTa, m.DuongDanAnh, m.ThuTuHienThi, m.DangBan,
             variants.Where(v => v.MaMon == m.MaMon).OrderByDescending(v => v.LaMacDinh).ThenBy(v => v.MaCauHinhMon).Select(v =>
             {
-                var options = CafeOptions.BrewChoices(v.NhietDo).Select(x => new CatalogChoice(x.Sugar, x.Ice, x.Sugar == 50 && x.Ice == (v.NhietDo == "HOT" ? 0 : 50), m.DangBan && Available(v.MaCauHinhMon, null, x.Sugar, x.Ice))).ToList();
+                var defaultSugar = Recipe(v.MaCauHinhMon, null)?.PhanTramDuongMacDinh ?? 50;
+                var options = CafeOptions.BrewChoices(v.NhietDo).Select(x => new CatalogChoice(x.Sugar, x.Ice, x.Sugar == defaultSugar && x.Ice == (v.NhietDo == "HOT" ? 0 : 50), m.DangBan && Available(v.MaCauHinhMon, null, x.Sugar, x.Ice))).ToList();
                 return new CatalogVariant(v.MaCauHinhMon, v.KichCo, v.NhietDo, v.GiaBan, v.LaMacDinh, options.Any(x => x.ConHang), options,
                     tops.Select(t => new CatalogTopping(t.MaMonThem, t.TenMonThem, t.GiaMoiPhan, t.GioiHanMacDinhMoiLy, Available(null, t.MaMonThem))).ToList());
             }).ToList())).ToList();

@@ -1,4 +1,5 @@
-using FourChang.Domain.Shared;
+﻿using FourChang.Domain.Shared;
+using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;
 using FourChang.Domain.Entities.Menu;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace FourChang.Api.Features.Admin.Menu;
 
 /// <summary>UC-ADM-02: mọi lệnh menu nguyên tử cùng audit/receipt/outbox; không ghi vào đơn cũ.</summary>
-public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalog)
+public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalog, IConfiguration config, IWebHostEnvironment env)
 {
     /// <summary>Đọc dữ liệu quản trị gồm nháp/ẩn và phiên bản; UI không tự khai báo giá hoặc mã.</summary>
     public async Task<MenuAdminSnapshot> Read()
@@ -16,12 +17,11 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         var dishes = await db.Mon.AsNoTracking().OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaMon).ToListAsync();
         var variants = await db.CauHinhMon.AsNoTracking().OrderBy(x => x.MaCauHinhMon).ToListAsync();
         var toppings = await db.MonThem.AsNoTracking().OrderBy(x => x.MaMonThem).ToListAsync();
-        var banners = await db.Banner.AsNoTracking().OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaBanner).ToListAsync();
         return new(CafeOptions.Categories.Select(x => new MenuCategory(x.Id,x.Name,null,(int)x.Id,true,true,dishes.Count(m=>m.LoaiMon==x.Name),[])).ToList(),
-            dishes.Select(x => new MenuDish(x.MaMon, x.MaDanhMuc, x.TenMon, x.MoTa, x.DuongDanAnh, x.ThuTuHienThi, x.DaCongBo, x.DangBan, x.CongBoTuLuc, x.PhienBanDuLieu)).ToList(),
+            dishes.Select(x => new MenuDish(x.MaMon, x.MaDanhMuc, x.TenMon, x.MoTa, x.DuongDanAnh, x.ThuTuHienThi, x.DaCongBo, x.DangBan, null, x.PhienBanDuLieu)).ToList(),
             variants.Select(x => new MenuVariant(x.MaCauHinhMon, x.MaMon, x.KichCo, x.NhietDo, x.GiaBan, x.DangBan, x.LaMacDinh, x.PhienBanDuLieu, CafeOptions.BrewChoices(x.NhietDo).Select(c=>new MenuChoice(c.Sugar,c.Ice,c.Sugar==50&&c.Ice==(x.NhietDo=="HOT"?0:50))).ToList(), toppings.Where(t=>t.DangSuDung).Select(t=>new MenuToppingLink(t.MaMonThem,t.GioiHanMacDinhMoiLy)).ToList())).ToList(),
             toppings.Select(x => new MenuTopping(x.MaMonThem, x.TenMonThem, x.MoTa, x.GiaMoiPhan, x.GioiHanMacDinhMoiLy, x.DuongDanAnh, x.DangSuDung, x.PhienBanDuLieu)).ToList(),
-            banners.Select(x => new MenuBanner(x.MaBanner, x.TenBanner, x.NoiDung, x.DuongDanAnh, x.LienKet, x.ViTri, x.ThuTuHienThi, x.BatDauLuc, x.KetThucLuc, x.DaCongBo, x.PhienBanDuLieu)).ToList());
+            []);
     }
 
     /// <summary>Dùng transaction/chống trùng hiện có; thêm đúng một sự kiện trước commit cùng audit bắt buộc.</summary>
@@ -59,24 +59,40 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         var before = id is null ? null : JsonSerializer.Serialize(item);
         if (id is not null)
             AdminOperation.Version(input.PhienBanDuLieu, item.PhienBanDuLieu);
+        if (id is not null && input.MaMonMau is not null)
+            throw Bad("Chỉ chọn món mẫu khi thêm món mới; sửa công thức riêng ở tab Công thức.");
         if (!CafeOptions.Categories.Any(x => x.Id == input.MaDanhMuc))
             throw Bad("Danh mục không tồn tại.");
         item.TenMon = MenuValidation.Text(input.TenMon, 150, "Tên món");
         item.MaDanhMuc = input.MaDanhMuc;
         if (await db.Mon.AnyAsync(x => x.LoaiMon == item.LoaiMon && x.TenMon == item.TenMon && x.MaMon != item.MaMon))
             throw Bad("Tên món đã có trong danh mục.");
-        if (input.ThuTuHienThi < 0 || input.DuongDanAnh is { Length: > 0 } && !MenuValidation.Image(input.DuongDanAnh))
-            throw Bad("Thứ tự hoặc ảnh không hợp lệ.");
+        if (input.DuongDanAnh is { Length: > 0 } && !MenuValidation.Image(input.DuongDanAnh, MenuImages.Folder(config, env)))
+            throw Bad("Ảnh không hợp lệ.");
         item.MoTa = MenuValidation.Optional(input.MoTa, 1000);
         item.DuongDanAnh = MenuValidation.Optional(input.DuongDanAnh, 500);
-        item.ThuTuHienThi = input.ThuTuHienThi;
-        item.CongBoTuLuc = input.CongBoTuLuc is { } date ? MenuValidation.Utc(date) : null;
+        // Khóa quản trị bao quanh Change bảo đảm hai món mới không nhận cùng số thứ tự.
+        if (id is null)
+        {
+            var last = await db.Mon.Select(x => (int?)x.ThuTuHienThi).MaxAsync() ?? 0;
+            if (last == int.MaxValue) throw Bad("Danh sách món đã vượt giới hạn thứ tự.");
+            item.ThuTuHienThi = last + 1;
+        }
+        // Không tạo lịch mới; client đời cũ chỉ được gửi lại mốc đang có hoặc bỏ trống.
+        if (input.CongBoTuLuc is not null && input.CongBoTuLuc != item.CongBoTuLuc)
+            throw Bad("Không còn lên lịch công bố. Chọn hiển thị ngay hoặc ẩn món.");
+        item.CongBoTuLuc = null;
         item.DaCongBo = input.DaCongBo;
         item.DangBan = input.DangBan;
         if (id is null)
             db.Mon.Add(item);
         await db.SaveChangesAsync();
-        if (input.DaCongBo)
+        if (input.MaMonMau is { } source)
+        {
+            await CopyDishTemplate(item, source, context);
+            catalog.ResetSnapshot();
+        }
+        if (input.DaCongBo && input.DangBan)
             await CanPublish(item.MaMon);
         return (item.MaMon, item.PhienBanDuLieu, before);
     });
@@ -129,9 +145,45 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         if (id is null)
             db.CauHinhMon.Add(item);
         await db.SaveChangesAsync();
-        if (dish.DaCongBo)
+        if (dish.DaCongBo && dish.DangBan)
             await CanPublish(dish.MaMon);
         return (item.MaCauHinhMon, item.PhienBanDuLieu, before);
+    });
+
+    /// <summary>Nhập nhiều size cùng lúc; bảo toàn cấu hình cũ, mặc định duy nhất, rollback cả bảng nếu một ô lỗi.</summary>
+    public Task<IResult> VariantBatch(MenuVariantBatchInput input, HttpContext context) => Change(input.MaThaoTac, "VARIANT_BATCH", input.MaMon, input, context, async () =>
+    {
+        var dish = await db.Mon.SingleOrDefaultAsync(m => m.MaMon == input.MaMon) ?? throw Bad("Món không tồn tại.");
+        if (input.CauHinh is null || input.CauHinh.Count is < 1 or > 6 || input.CauHinh.Count(v => v.LaMacDinh) != 1 ||
+            input.CauHinh.GroupBy(v => new { v.KichCo, v.NhietDo }).Any(g => g.Count() > 1))
+            throw Bad("Chọn ít nhất một cấu hình, không trùng size/nhiệt độ và đúng một cấu hình mặc định.");
+        var current = await db.CauHinhMon.Where(v => v.MaMon == input.MaMon).ToListAsync();
+        if (!current.Select(v => v.MaCauHinhMon).Order().SequenceEqual(input.CauHinh.Where(v => v.MaCauHinhMon is not null).Select(v => v.MaCauHinhMon!.Value).Order()))
+            throw new AdminRule(409, "Cấu hình món đã thay đổi. Mở lại bảng trước khi lưu.");
+        foreach (var line in input.CauHinh)
+        {
+            MenuValidation.Price(line.GiaBan);
+            if (line.KichCo is not ("S" or "M" or "L") || line.NhietDo is not ("ICED" or "HOT")) throw Bad("Size/nhiệt độ không hợp lệ.");
+            if (line.MaCauHinhMon is { } id)
+            {
+                var old = current.Single(v => v.MaCauHinhMon == id);
+                AdminOperation.Version(line.PhienBanDuLieu, old.PhienBanDuLieu);
+                if (old.KichCo != line.KichCo || old.NhietDo != line.NhietDo) throw Bad("Không đổi size/nhiệt độ của cấu hình cũ.");
+            }
+        }
+        var before = JsonSerializer.Serialize(current);
+        // Gỡ mặc định trước để không va unique index khi chuyển từ S sang M/L.
+        foreach (var v in current) v.LaMacDinh = false;
+        await db.SaveChangesAsync();
+        foreach (var line in input.CauHinh)
+        {
+            var item = line.MaCauHinhMon is { } id ? current.Single(v => v.MaCauHinhMon == id) : new CauHinhMon { MaMon = input.MaMon, KichCo = line.KichCo, NhietDo = line.NhietDo, DangBan = false };
+            item.GiaBan = line.GiaBan; item.LaMacDinh = line.LaMacDinh;
+            if (line.MaCauHinhMon is null) db.CauHinhMon.Add(item);
+        }
+        await db.SaveChangesAsync();
+        if (dish.DaCongBo && dish.DangBan) await CanPublish(dish.MaMon);
+        return (dish.MaMon, dish.PhienBanDuLieu, before);
     });
 
     /// <summary>Topping có giá mỗi phần và giới hạn riêng; kích hoạt phải có BOM, thiếu tồn chỉ khóa khả dụng.</summary>
@@ -143,7 +195,7 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
             AdminOperation.Version(input.PhienBanDuLieu, item.PhienBanDuLieu);
         MenuValidation.Price(input.GiaMoiPhan);
         item.TenMonThem = MenuValidation.Text(input.TenMonThem, 100, "Tên topping");
-        if (input.GioiHanMacDinhMoiLy <= 0 || input.DuongDanAnh is { Length: > 0 } && !MenuValidation.Image(input.DuongDanAnh))
+        if (input.GioiHanMacDinhMoiLy <= 0 || input.DuongDanAnh is { Length: > 0 } && !MenuValidation.Image(input.DuongDanAnh, MenuImages.Folder(config, env)))
             throw Bad("Giới hạn hoặc ảnh không hợp lệ.");
         if (await db.MonThem.AnyAsync(x => x.TenMonThem == item.TenMonThem && x.MaMonThem != item.MaMonThem))
             throw Bad("Tên topping đã tồn tại.");
@@ -155,91 +207,57 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         if (id is null)
             db.MonThem.Add(item);
         await db.SaveChangesAsync();
+        if (input.DinhLuong is { } portion)
+        {
+            var ingredient = await db.NguyenLieu.AsNoTracking().SingleOrDefaultAsync(n => n.MaNguyenLieu == portion.MaNguyenLieu && n.DangSuDung)
+                ?? throw Bad("Chọn nguyên liệu đang sử dụng cho topping.");
+            var current = await db.CongThuc.AsNoTracking().Where(r => r.MaMonThem == item.MaMonThem && (r.TrangThai == "ACTIVE" || r.TrangThai == "DRAFT")).SingleOrDefaultAsync();
+            if (current?.MaCongThuc != portion.MaCongThuc) throw new AdminRule(409, "Định lượng topping đã thay đổi. Mở lại topping trước khi lưu.");
+            // Dùng chung logic giữ công thức cũ; cả topping và định lượng nằm trong transaction menu hiện tại.
+            await new FourChang.Api.Features.Admin.Recipes.RecipeService(db).SaveCore(current?.MaCongThuc,
+                new RecipeInput(null, item.MaMonThem, item.TenMonThem, current?.GhiChu,
+                    [new(portion.MaNguyenLieu, ingredient.MaDonViCoSo, portion.SoLuong, "FIXED", 0)], portion.PhienBanCongThuc, input.MaThaoTac), context);
+            catalog.ResetSnapshot();
+        }
         if (item.DangSuDung && !await catalog.HasRecipe(null, item.MaMonThem))
-            throw Bad("Thiếu BOM topping hợp lệ. Lưu ngừng sử dụng, gắn BOM tại ADM-04 rồi kích hoạt.");
+            throw Bad("Chọn nguyên liệu và nhập lượng mỗi phần trước khi bật sử dụng topping.");
         return (item.MaMonThem, item.PhienBanDuLieu, before);
     });
 
-    /// <summary>Banner chỉ công bố khi ảnh/liên kết đã kiểm tra và lịch chưa hết; lỗi rollback giữ bản công bố cũ.</summary>
-    public Task<IResult> Banner(long? id, MenuBannerInput input, HttpContext context) => Change(input.MaThaoTac, "BANNER", id, input, context, async () =>
+    /// <summary>Sao chép cấu hình và nguyên liệu sang món mới trong cùng transaction, không dùng chung header công thức.</summary>
+    private async Task CopyDishTemplate(Mon target, long sourceId, HttpContext context)
     {
-        var item = id is null ? new Banner() : await db.Banner.SingleOrDefaultAsync(x => x.MaBanner == id) ?? throw Missing();
-        var before = id is null ? null : JsonSerializer.Serialize(item);
-        if (id is not null)
-            AdminOperation.Version(input.PhienBanDuLieu, item.PhienBanDuLieu);
-        if (!MenuValidation.Image(input.DuongDanAnh) || !MenuValidation.Link(input.LienKet) || input.ViTri != "HOME_HERO" || input.ThuTuHienThi < 0)
-            throw Bad("Ảnh, liên kết, vị trí hoặc thứ tự banner không hợp lệ.");
-        var start = MenuValidation.Utc(input.BatDauLuc);
-        var end = input.KetThucLuc is { } date ? MenuValidation.Utc(date) : (DateTime?)null;
-        if (end <= start || input.DaCongBo && end <= DateTime.UtcNow)
-            throw Bad("Lịch banner không hợp lệ hoặc đã hết hạn.");
-        item.TenBanner = MenuValidation.Text(input.TenBanner, 150, "Tên banner");
-        item.NoiDung = MenuValidation.Optional(input.NoiDung, 1000);
-        item.DuongDanAnh = input.DuongDanAnh;
-        item.LienKet = MenuValidation.Optional(input.LienKet, 500);
-        item.ViTri = input.ViTri;
-        item.ThuTuHienThi = input.ThuTuHienThi;
-        item.BatDauLuc = start;
-        item.KetThucLuc = end;
-        item.DaCongBo = input.DaCongBo;
-        if (id is null)
-            db.Banner.Add(item);
-        await db.SaveChangesAsync();
-        return (item.MaBanner, item.PhienBanDuLieu, before);
-    });
-
-    /// <summary>Xóa chỉ khi chưa có quan hệ phụ thuộc, luôn kiểm tra lại trong transaction có phiên bản.</summary>
-    public Task<IResult> Delete(string kind, long id, MenuDeleteInput input, HttpContext context) => Change(input.MaThaoTac, "DELETE_" + kind, id, input, context, async () =>
-    {
-        object item;
-        byte[] version;
-        bool used;
-        switch (kind)
+        if (sourceId == target.MaMon || !await db.Mon.AnyAsync(x => x.MaMon == sourceId))
+            throw Bad("Món mẫu không tồn tại. Chọn lại món mẫu.");
+        var variants = await db.CauHinhMon.AsNoTracking().Where(x => x.MaMon == sourceId && x.DangBan).OrderBy(x => x.MaCauHinhMon).ToListAsync();
+        if (variants.Count == 0 || variants.Count(x => x.LaMacDinh) != 1)
+            throw Bad("Món mẫu phải có cấu hình mặc định đang dùng.");
+        var now = DateTime.UtcNow;
+        var actor = long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        foreach (var source in variants)
         {
-            case "categories": throw new AdminRule(409,"Loại món là danh sách cố định, không được xóa.");
-            case "dishes":
-                var m = await db.Mon.SingleOrDefaultAsync(x => x.MaMon == id) ?? throw Missing();
-                item = m;
-                version = m.PhienBanDuLieu;
-                used = await db.CauHinhMon.AnyAsync(x => x.MaMon == id);
-                break;
-            case "variants":
-                var v = await db.CauHinhMon.SingleOrDefaultAsync(x => x.MaCauHinhMon == id) ?? throw Missing();
-                item = v;
-                version = v.PhienBanDuLieu;
-                used = await db.CongThuc.AnyAsync(x => x.MaCauHinhMon == id) || await db.ChiTietDonHang.AnyAsync(x => x.MaCauHinhMon == id);
-                if (!used)
-                {
-                    var dish = await db.Mon.SingleAsync(x => x.MaMon == v.MaMon);
-                    if (dish.DaCongBo)
-                        throw new AdminRule(409, "Gỡ công bố món trước khi xóa cấu hình.");
-                }
-                break;
-            case "toppings":
-                var t = await db.MonThem.SingleOrDefaultAsync(x => x.MaMonThem == id) ?? throw Missing();
-                item = t;
-                version = t.PhienBanDuLieu;
-                used = await db.CongThuc.AnyAsync(x => x.MaMonThem == id) || await db.MonThemChiTietDonHang.AnyAsync(x => x.MaMonThem == id);
-                break;
-            case "banners":
-                var b = await db.Banner.SingleOrDefaultAsync(x => x.MaBanner == id) ?? throw Missing();
-                item = b;
-                version = b.PhienBanDuLieu;
-                used = false;
-                break;
-            default:
-                throw Bad("Loại dữ liệu không hợp lệ.");
+            if (!await catalog.HasRecipe(source.MaCauHinhMon, null))
+                throw Bad("Món mẫu có cấu hình thiếu công thức/nguyên liệu hợp lệ. Hoàn thiện món mẫu hoặc chọn món khác.");
+            var recipe = await db.CongThuc.AsNoTracking().SingleAsync(x => x.MaCauHinhMon == source.MaCauHinhMon && x.TrangThai == "ACTIVE" && x.HieuLucTu <= now && (x.HieuLucDen == null || x.HieuLucDen > now));
+            var ingredients = await db.ChiTietCongThuc.AsNoTracking().Where(x => x.MaCongThuc == recipe.MaCongThuc).ToListAsync();
+            var variant = new CauHinhMon { MaMon = target.MaMon, KichCo = source.KichCo, NhietDo = source.NhietDo,
+                GiaBan = source.GiaBan, DangBan = true, LaMacDinh = source.LaMacDinh };
+            db.CauHinhMon.Add(variant); await db.SaveChangesAsync();
+            var label = $"{target.TenMon} · {source.KichCo} · {(source.NhietDo == "HOT" ? "Nóng" : "Lạnh")}";
+            var copy = new CongThuc { MaCauHinhMon = variant.MaCauHinhMon, TenCongThuc = label[..Math.Min(150, label.Length)],
+                SoPhienBan = 1, TrangThai = "DRAFT", MaQuanLyTao = actor, GhiChu = recipe.GhiChu, PhanTramDuongMacDinh = recipe.PhanTramDuongMacDinh };
+            db.CongThuc.Add(copy); await db.SaveChangesAsync();
+            // Trigger chỉ cho ghi dòng khi DRAFT; hoàn thiện nguyên liệu trước khi bật hiệu lực.
+            foreach (var line in ingredients)
+                db.ChiTietCongThuc.Add(new() { MaCongThuc = copy.MaCongThuc, MaNguyenLieu = line.MaNguyenLieu,
+                    DinhMucCoSo = line.DinhMucCoSo, LoaiDinhMuc = line.LoaiDinhMuc, TyLeHaoHut = 0 });
+            await db.SaveChangesAsync();
+            copy.TrangThai = "ACTIVE"; copy.HieuLucTu = now; copy.MaQuanLyDuyet = actor;
+            await db.SaveChangesAsync();
         }
-        AdminOperation.Version(input.PhienBanDuLieu, version);
-        if (used)
-            throw new AdminRule(409, "Dữ liệu đã có tham chiếu. Hãy ẩn/ngừng thay vì xóa.");
-        var before = JsonSerializer.Serialize(item);
-        db.Remove(item);
-        await db.SaveChangesAsync();
-        return (id, null, before);
-    });
+    }
 
-    /// <summary>Điều kiện công bố không dựa trên cờ bật bán: đủ mặc định/giá/BOM/quy đổi; tồn thiếu được báo tạm hết.</summary>
+    /// <summary>Điều kiện công bố không dựa trên cờ bật bán: đủ mặc định/giá/công thức; tồn thiếu được báo tạm hết.</summary>
     private async Task CanPublish(long dish)
     {
         var variants = await db.CauHinhMon.AsNoTracking().Where(x => x.MaMon == dish).ToListAsync();
@@ -248,7 +266,7 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         foreach (var v in variants.Where(x => x.DangBan))
         {
             if (!await catalog.HasRecipe(v.MaCauHinhMon, null))
-                throw Bad("Thiếu BOM/quy đổi hợp lệ. Lưu nháp và hoàn thiện tại ADM-04.");
+                throw Bad("Thiếu công thức hợp lệ. Hoàn thiện trong tab Công thức trước khi bật bán.");
         }
     }
     /// <summary>Lỗi nhập liệu được trả rõ cho UI để giữ nháp sửa, không trả lỗi SQL/bí mật.</summary>

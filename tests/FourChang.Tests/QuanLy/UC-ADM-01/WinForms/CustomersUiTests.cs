@@ -82,29 +82,9 @@ public sealed class CustomersUiTests
             LiveSession.Current = session;
             LiveSession.Preview = false;
             var stamp = Guid.NewGuid().ToString("N")[..12];
-            var create = new CustomerEditorForm(null, "create");
-            {
-                Show(create);
-                Field<TextBox>(create, "CustomerUsername").Text = "uiqa" + stamp;
-                Field<TextBox>(create, "CustomerName").Text = "Khách kiểm tra giao diện";
-                Field<TextBox>(create, "CustomerEmail").Text = "uiqa" + stamp + "@example.test";
-                Field<TextBox>(create, "CustomerPhone").Text = TestData.Phone();
-                Check(Field<TextBox>(create, "CustomerTemporaryPassword").UseSystemPasswordChar, "Mật khẩu tạm được che trên biểu mẫu");
-                Capture(create, "customer-create");
-                Field<Button>(create, "CustomerSave").PerformClick();
-                PumpUntil(() => Field<Button>(create, "CustomerSave").Text == "Kiểm tra / thử lại" && Field<Button>(create, "CustomerSave").Enabled);
-                Check(!Field<TextBox>(create, "CustomerName").Enabled && Field<TextBox>(create, "CustomerName").Text == "Khách kiểm tra giao diện", "Mất phản hồi giữ nguyên nháp và khóa chỉnh sửa yêu cầu chưa rõ");
-                Capture(create, "customer-lost-reply");
-                Field<Button>(create, "CustomerSave").PerformClick();
-                PumpUntil(() => !Field<Button>(create, "CustomerSave").Visible);
-                Check(LostReplyProxy.CreatePosts == 1, "Thử lại sau mất phản hồi tra kết quả cũ, không POST tạo lần hai");
-                Check(Field<TextBox>(create, "CustomerTemporaryPassword").Enabled && Field<TextBox>(create, "CustomerTemporaryPassword").ReadOnly, "Sau lưu có thể bàn giao nhưng không sửa mật khẩu tạm");
-                create.Close();
-            }
-
-            create.Dispose();
-            var customer = Wait(LiveSession.Api.GetCustomersAsync("uiqa" + stamp, 1)).Items.Single();
-            Check(customer.BatBuocDoiMatKhau, "Tạo từ WinForms lưu đúng cờ bắt buộc đổi mật khẩu");
+            var fixturePassword = TestData.Password();
+            var registered = Wait(LiveSession.Api.RegisterAsync(new("uiqa" + stamp,
+                "Khách kiểm tra giao diện", "uiqa" + stamp + "@example.test", TestData.Phone(), fixturePassword, Guid.NewGuid(), fixturePassword)));
             using (var shell = new MainForm("Admin", "Quản lý"))
             {
                 Show(shell);
@@ -112,6 +92,7 @@ public sealed class CustomersUiTests
                 PumpUntil(() => All(shell).OfType<DataGridView>().Any(x => x.Name == "CustomersGrid" && x.Rows.Count > 0));
                 Capture(shell, "customer-list");
                 Check(All(shell).OfType<Button>().Any(x => x.Text == "Đặt lại mật khẩu"), "Màn hình Khách hàng có đúng thao tác reset");
+                Check(!All(shell).OfType<Button>().Any(x => x.Text is "Thêm khách hàng" or "Xóa có điều kiện" or "Khóa / mở / ngừng"), "Không còn nút tạo/xóa/ngừng khách");
                 var initialTotal = Wait(LiveSession.Api.GetCustomersAsync("", 1)).Total;
                 var customerGrid = Field<DataGridView>(shell, "CustomersGrid");
                 var search = Field<TextBox>(shell, "CustomerSearch");
@@ -142,7 +123,7 @@ public sealed class CustomersUiTests
                 shell.Close();
             }
 
-            var detail = Wait(LiveSession.Api.GetCustomerAsync(customer.MaKhachHang));
+            var detail = Wait(LiveSession.Api.GetCustomerAsync(registered.MaKhachHang));
             using (var info = new CustomerDetailsForm(detail))
             {
                 Show(info);
@@ -153,8 +134,7 @@ public sealed class CustomersUiTests
             foreach (var action in new[]
             {
                 "status",
-                "reset-password",
-                "delete"
+                "reset-password"
             }
 
             )
@@ -171,24 +151,31 @@ public sealed class CustomersUiTests
                 Field<TextBox>(update, "CustomerName").Text = "Khách đã sửa từ WinForms";
                 Capture(update, "customer-edit");
                 Field<Button>(update, "CustomerSave").PerformClick();
+                PumpUntil(() => Field<Button>(update, "CustomerSave").Text == "Kiểm tra / thử lại" && Field<Button>(update, "CustomerSave").Enabled);
+                Check(!Field<TextBox>(update, "CustomerName").Enabled, "Mất phản hồi giữ nguyên nội dung cập nhật");
+                Capture(update, "customer-lost-reply");
+                Field<Button>(update, "CustomerSave").PerformClick();
                 PumpUntil(() => !update.Visible);
+                Check(LostReplyProxy.UpdateWrites == 1, "Tra receipt không PUT lần hai");
                 Check(update.DialogResult == DialogResult.OK, "Sửa từ WinForms hoàn tất và đóng form đúng kết quả");
             }
 
-            detail = Wait(LiveSession.Api.GetCustomerAsync(customer.MaKhachHang));
+            detail = Wait(LiveSession.Api.GetCustomerAsync(registered.MaKhachHang));
             Check(detail.Account.HoTen == "Khách đã sửa từ WinForms", "Dữ liệu sửa từ giao diện có trong SQL qua API");
-            using (var delete = new CustomerEditorForm(detail, "delete"))
+            using (var locked = new CustomerEditorForm(detail, "status"))
             {
-                Show(delete);
-                Field<TextBox>(delete, "CustomerReason").Text = "Dọn hồ sơ kiểm tra giao diện chưa tham chiếu";
-                Field<Button>(delete, "CustomerSave").PerformClick();
-                PumpUntil(() => !delete.Visible);
-                Check(delete.DialogResult == DialogResult.OK, "Xóa có điều kiện từ WinForms hoàn tất");
+                Show(locked);
+                var options = Field<ComboBox>(locked, "CustomerStatus");
+                Check(options.Items.Count == 2, "Chỉ còn Hoạt động và Đã khóa");
+                Check(!All(locked).OfType<TextBox>().Any(x => x.Name == "CustomerReason"), "Khóa/mở không bắt nhập lý do");
+                options.SelectedIndex = 1;
+                Capture(locked, "customer-lock");
+                Field<Button>(locked, "CustomerSave").PerformClick();
+                PumpUntil(() => !locked.Visible);
             }
-
-            Check(Wait(LiveSession.Api.GetCustomersAsync("uiqa" + stamp, 1)).Total == 0, "Xóa từ giao diện cập nhật danh sách thật");
+            Check(Wait(LiveSession.Api.GetCustomerAsync(registered.MaKhachHang)).Account.TrangThai == "LOCKED", "Khóa từ form lưu đúng SQL");
             Wait(LiveSession.Api.LogoutAsync());
-            Console.WriteLine($"UI QA PASSED: {passed} checks, 12 screenshots.");
+            Console.WriteLine($"UI QA PASSED: {passed} checks, screenshots saved.");
             return 0;
         }
         catch (Exception ex)
@@ -296,17 +283,17 @@ public sealed class CustomersUiTests
     }
 }
 
-// Proxy chỉ phục vụ QA: cho server commit lần tạo đầu rồi chủ động cắt phần thân phản hồi.
+// Proxy chỉ phục vụ QA: cho server commit lần cập nhật đầu rồi chủ động cắt phần thân phản hồi.
 // Không dùng proxy này trong đồ án hoặc lưu nội dung request/mật khẩu.
 internal sealed class LostReplyProxy : IDisposable
 {
     private readonly System.Net.HttpListener listener = new();
     private readonly HttpClient http = new();
-    public static int CreatePosts;
+    public static int UpdateWrites;
     private readonly string sourceApi;
 
     /// <summary>
-    /// Mở proxy chỉ dành cho test tạo khách; lần tạo đầu được commit nhưng phản hồi bị cắt để kiểm tra chống tạo trùng.
+    /// Mở proxy chỉ dành cho test sửa khách; lần cập nhật đầu được commit nhưng phản hồi bị cắt để kiểm tra chống tạo trùng.
     /// </summary>
     public LostReplyProxy(string sourceApi, string proxyUrl)
     {
@@ -362,7 +349,7 @@ internal sealed class LostReplyProxy : IDisposable
             var bytes = await response.Content.ReadAsByteArrayAsync();
             context.Response.StatusCode = (int)response.StatusCode;
             context.Response.ContentType = "application/json";
-            if (context.Request.HttpMethod == "POST" && context.Request.Url!.AbsolutePath.TrimEnd('/') == "/api/admin/customers" && Interlocked.Increment(ref CreatePosts) == 1 && response.IsSuccessStatusCode)
+            if (context.Request.HttpMethod == "PUT" && System.Text.RegularExpressions.Regex.IsMatch(context.Request.Url!.AbsolutePath, @"^/api/admin/customers/[0-9]+$") && Interlocked.Increment(ref UpdateWrites) == 1 && response.IsSuccessStatusCode)
             {
                 context.Response.ContentLength64 = bytes.Length + 10;
                 await context.Response.OutputStream.WriteAsync(bytes.AsMemory(0, 10));

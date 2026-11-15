@@ -1,7 +1,7 @@
-namespace FourChang.Presentation.Shared.Contracts.Customer;
+﻿namespace FourChang.Presentation.Shared.Contracts.Customer;
 
 // Hợp đồng dữ liệu; giữ nguyên tên trường để các phân hệ tiếp tục dùng cùng API.
-public sealed record MenuProduct(long Id, long MaMon, string Name, string Category, decimal Price, int ImageIndex, bool Available, string Badge);
+public sealed record MenuProduct(long Id, long MaMon, string Name, string Category, decimal Price, int ImageIndex, bool Available, string Badge, string? ImagePath = null);
 
 public sealed record MenuBrewOption(int PhanTramDuong, int PhanTramDa);
 
@@ -14,7 +14,8 @@ public sealed record MenuVariantItem(
     decimal GiaBan,
     bool Available,
     List<MenuBrewOption> TuyChonPhaChe,
-    List<MenuToppingItem> Toppings);
+    List<MenuToppingItem> Toppings,
+    int PhanTramDuongMacDinh = 50);
 
 public sealed record OrderToppingInput(long MaMonThem, int SoPhanMoiLy);
 
