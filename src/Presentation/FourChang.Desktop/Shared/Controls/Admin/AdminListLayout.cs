@@ -9,14 +9,15 @@ internal sealed class AdminListLayout : UserControl
     private readonly AdminLoadingStrip loading = new();
     private readonly Panel tableArea;
     private readonly DataGridView grid;
+    private readonly bool fitTableToRows;
     private Form? host;
 
     /// <summary>Dùng số liệu thật từ API; khung chỉ trình bày, không tạo KPI hoặc thay đổi nghiệp vụ.</summary>
     internal AdminListLayout(string title, string description, Control filters, Control toolbar, Label error,
-        DataGridView grid, Control footer, string section = "QUẢN TRỊ NHÂN SỰ")
+        DataGridView grid, Control footer, string section = "QUẢN TRỊ NHÂN SỰ", bool fitTableToRows = true)
     {
-        this.grid = grid;
-        grid.DataBindingComplete += (_, _) => Fit(this, EventArgs.Empty);
+        this.grid = grid; this.fitTableToRows = fitTableToRows;
+        if (fitTableToRows) grid.DataBindingComplete += (_, _) => Fit(this, EventArgs.Empty);
         Name = "AdminListLayout";
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -55,7 +56,8 @@ internal sealed class AdminListLayout : UserControl
     {
         var top = host is null ? 0 : host.PointToClient(tableArea.PointToScreen(Point.Empty)).Y;
         var available = host is null ? 340 : host.ClientSize.Height - top - 90;
-        var content = grid.ColumnHeadersHeight + Math.Clamp(grid.Rows.Count, 4, 10) * grid.RowTemplate.Height + 4;
+        // Trang lọc khi gõ có thể giữ chiều cao theo cửa sổ, tránh co/giãn cả trang khi số dòng đổi.
+        var content = fitTableToRows ? grid.ColumnHeadersHeight + Math.Clamp(grid.Rows.Count, 4, 10) * grid.RowTemplate.Height + 4 : available;
         // Tôn trọng chiều cao tối thiểu của grid để không vẽ đè lên bộ đếm phía dưới.
         var minimum = Math.Max(220, grid.MinimumSize.Height + loading.Height);
         tableArea.Height = Math.Clamp(Math.Min(available, content), minimum, Math.Max(minimum, 650));

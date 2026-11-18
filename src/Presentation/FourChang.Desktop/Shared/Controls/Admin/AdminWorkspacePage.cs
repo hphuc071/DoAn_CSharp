@@ -18,7 +18,7 @@ public abstract class AdminWorkspacePage<T> : UserControl
     private readonly AdminListLayout? listLayout;
 
     /// <summary>Thiết lập layout Dock/Anchor thay vì tọa độ cố định để không tràn khi resize.</summary>
-    protected AdminWorkspacePage(string title, string description, bool polished = false, string section = "KHO / NGUYÊN LIỆU")
+    protected AdminWorkspacePage(string title, string description, bool polished = false, string section = "KHO / NGUYÊN LIỆU", bool fitTableToRows = true)
     {
         Message.Visible = false; Message.TextChanged += (_, _) => Message.Visible = !string.IsNullOrWhiteSpace(Message.Text);
         AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Dock = DockStyle.Top; BackColor = CafeTheme.Cream; Padding = new Padding(16); AutoScroll = true;
@@ -33,7 +33,7 @@ public abstract class AdminWorkspacePage<T> : UserControl
         // Danh sách nguyên liệu dùng khung đã chuẩn hóa; các trang khác giữ layout hiện có.
         if (polished)
         {
-            listLayout = new AdminListLayout(title, description, Filters, Actions, Message, Grid, Counter, section: section);
+            listLayout = new AdminListLayout(title, description, Filters, Actions, Message, Grid, Counter, section: section, fitTableToRows: fitTableToRows);
             Controls.Add(listLayout);
         }
         else Controls.Add(Ui.Panel(title, Ui.Label(description, 9, false, CafeTheme.Muted), Filters, Actions, Message, Grid, Counter));

@@ -44,3 +44,7 @@ Bảng công thức theo món: BangSize_NongLanh_LuuNguyenTu_Replay_LoiKhongLuuD
 Cấu hình nhiều size: CauHinhNhieuSize_Gia_MacDinh_Replay_Rollback kiểm3size lạnh, thêm3size nóng, đổi mặc định/giá, giữ ID/trạng thái cũ, đồng thời/replay, giá cuối sai rollback và snapshot cũ409. Harness menu kiểm ẩn/hiện cột nhiệt độ, mặc định M lạnh, nhập/lưu3size, mở lại thêm nóng không trùng, footer và tên nút đầy đủ khi thu nhỏ. Fixture riêng, ảnh ADM02-variant-batch.png và -compact.png.
 
 Định lượng topping: Topping_DinhLuongTrongForm_LuuCungLuc_Replay_Kho kiểm tạo đang dùng cùng BOM30g, replay, sửa45g giữ dòng cũ, lượng0 rollback tên, version BOM cũ409 và đơn2ly×2phần giữ180g. Harness menu nhập nguyên liệu/lượng trong form thật, lưu rồi mở lại hiện30, không phải qua Recipes. Fixture riêng, ảnh ADM02-topping-portion.png.
+
+- 18/11/2026: Danh sách công thức món tinh gọn (WinForms, route recipes): không hiện topping hoặc bộ lọc Món/Topping; còn 5 cột và 2 nút. Kiểm đủ S/M/L, số loại nguyên liệu không đếm trùng giữa size, trạng thái và mở/lưu bảng công thức; so sánh mã công thức topping trước/sau tải lại không đổi. Kết quả recipes-dishes-only.trx: 1/1 đạt, fixture SQL GUID riêng; ảnh ADM02-dish-recipes-clean.png.
+
+- 18/11/2026: recipes-auto-calculation.trx1/1 đạt (WinForms/API/SQL fixture riêng): bảng S/M/L không còn ComboBox Cách tính; nhập/lưu/mở lại lượng lẻ ở cột size đầu; tự nhận Đường=SUGAR, Đá=ICE, Sữa=FIXED; nóng không đá; lưu6cấu hình và đường mặc định75%. Ảnh ADM02-auto-calculation.png.

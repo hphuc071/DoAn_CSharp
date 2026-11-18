@@ -8,8 +8,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.StockDocuments;
 
-/// <summary>UC-ADM-06: nháp không đổi tồn; ghi sổ/đảo toàn phiếu nguyên tử cùng sổ kho, audit và outbox.</summary>
-public sealed class StockDocumentService(CafeDbContext db)
+/// <summary>UC-ADM-04: nháp không đổi tồn; ghi sổ/đảo toàn phiếu nguyên tử cùng sổ kho, audit và outbox.</summary>
+public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
 {
     /// <summary>Đọc danh sách có dòng và nguồn gốc; không trả entity EF để tránh ghi từ giao diện.</summary>
     public async Task<IReadOnlyList<StockDocumentView>> Read()
@@ -23,15 +23,18 @@ public sealed class StockDocumentService(CafeDbContext db)
             lines.Where(x => x.l.MaPhieuKho == p.MaPhieuKho).Select(x => new StockDocumentLineView(x.l.MaDongPhieuKho,
                 x.l.MaNguyenLieu, x.TenNguyenLieu, x.l.DonViNhapDaChot, x.l.SoLuongTheoDonViNhap,
                 x.l.ChenhLechDonViCoSo, x.l.DonGiaNhap, x.l.TonSoDaChot, x.l.SoLuongThucDem,
-                x.l.PhienBanTonKhoDaChot, x.l.GhiChu)).ToList())).ToList();
+                x.l.PhienBanTonKhoDaChot, x.l.GhiChu)).ToList(), p.NgayThucHien)).ToList();
     }
 
-    /// <summary>Tạo/sửa nháp, chốt đơn vị g/ml và mốc kiểm kê; không cộng trừ bất cứ nguyên liệu nào.</summary>
+    /// <summary>Tạo/sửa nháp nhập hoặc xuất với đơn vị g/ml; không cộng trừ bất cứ nguyên liệu nào.</summary>
     public Task<IResult> Save(long? id, StockDocumentInput input, HttpContext context) =>
         AdminOperation.Execute(db, input.MaThaoTac, "STOCK_DRAFT", "PhieuKho", new { id, input }, context, async () =>
         {
-            AdminOperation.Reason(input.LyDo);
-            if (input.LoaiPhieu is not ("RECEIPT" or "ISSUE" or "COUNT" or "ADJUSTMENT")) throw Bad("Loại phiếu không hợp lệ.");
+            var reason = string.IsNullOrWhiteSpace(input.LyDo) && input.LoaiPhieu == "RECEIPT" ? "Nhập nguyên liệu" : input.LyDo;
+            AdminOperation.Reason(reason);
+            var today = BusinessToday();
+            var date = input.NgayThucHien ?? today;
+            if (input.LoaiPhieu is not ("RECEIPT" or "ISSUE")) throw Bad("Chỉ lập phiếu nhập hoặc xuất kho. Kiểm kê/điều chỉnh cũ được giữ để xem lịch sử.");
             if (input.ThanhPhan is not { Count: > 0 and <= 500 } || input.ThanhPhan.Select(x => x.MaNguyenLieu).Distinct().Count() != input.ThanhPhan.Count)
                 throw Bad("Phiếu cần 1–500 nguyên liệu, không trùng nguyên liệu.");
             if (input.LoaiPhieu == "ISSUE" && input.MaMucDich is not ("DAMAGED" or "EXPIRED" or "INTERNAL"))
@@ -44,12 +47,13 @@ public sealed class StockDocumentService(CafeDbContext db)
             if (id is not null)
             {
                 AdminOperation.Version(input.PhienBanDuLieu, header.PhienBanDuLieu); Draft(header);
+                if (header.LoaiPhieu is not ("RECEIPT" or "ISSUE")) throw new AdminRule(409, "Phiếu kiểm kê/điều chỉnh cũ chỉ được xem lịch sử.");
                 db.ChiTietPhieuKho.RemoveRange(await db.ChiTietPhieuKho.Where(x => x.MaPhieuKho == id).ToListAsync());
                 await db.SaveChangesAsync(); // Xóa dòng nháp trước khi thêm cùng nguyên liệu; vẫn ở trong transaction.
             }
-            header.LoaiPhieu = input.LoaiPhieu; header.LyDo = input.LyDo.Trim(); header.TenNhaCungCapDaChot = input.Nguon?.Trim();
+            header.LoaiPhieu = input.LoaiPhieu; header.LyDo = reason.Trim(); header.NgayThucHien = date; header.TenNhaCungCapDaChot = input.Nguon?.Trim();
             header.MaMucDich = input.MaMucDich; header.ThoiDiemCapNhat = now;
-            header.MocKiemKe = input.LoaiPhieu is "COUNT" or "ADJUSTMENT" ? now : null;
+            header.MocKiemKe = null;
             if (id is null) db.PhieuKho.Add(header);
             await db.SaveChangesAsync();
             foreach (var line in input.ThanhPhan)
@@ -61,23 +65,18 @@ public sealed class StockDocumentService(CafeDbContext db)
                 if (line.SoLuong < 0 || line.SoLuong > 99999999999999m || decimal.Round(line.SoLuong, 4) != line.SoLuong ||
                     (header.MocKiemKe is null && line.SoLuong == 0) || line.DonGiaNhap < 0 || (line.GhiChu?.Length ?? 0) > 500)
                     throw Bad("Số lượng cần dương (thực đếm cho phép 0), tối đa 4 số lẻ; giá nhập không âm.");
-                var stock = await db.TonKho.SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu)
-                    ?? throw Bad("Chưa có số dư nguyên liệu để đối chiếu.");
-                if (header.MocKiemKe is not null)
-                {
-                    AdminOperation.Version(line.PhienBanTonKho, stock.PhienBanDuLieu);
-                    if (line.TonSoDaChot != stock.TonThucTe) throw new AdminRule(409, "Tồn sổ đã đổi. Đối chiếu và xác nhận lại số thực đếm.");
-                }
+                var stock = await db.TonKho.SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu);
+                if (stock is null && input.LoaiPhieu != "RECEIPT") throw Bad("Nguyên liệu chưa nhập kho. Hãy lập phiếu nhập trước.");
                 db.ChiTietPhieuKho.Add(new ChiTietPhieuKho { MaPhieuKho = header.MaPhieuKho, MaNguyenLieu = n.MaNguyenLieu,
                     DonViNhapDaChot = unit,
                     SoLuongTheoDonViNhap = line.SoLuong, DonGiaNhap = line.DonGiaNhap, GhiChu = line.GhiChu,
-                    TonSoDaChot = header.MocKiemKe is null ? null : stock.TonThucTe,
-                    SoLuongThucDem = header.MocKiemKe is null ? null : line.SoLuong,
-                    PhienBanTonKhoDaChot = header.MocKiemKe is null ? null : stock.PhienBanDuLieu.ToArray(),
+                    TonSoDaChot = null,
+                    SoLuongThucDem = null,
+                    PhienBanTonKhoDaChot = null,
                     ThoiDiemTao = now, ThoiDiemCapNhat = now });
             }
             await db.SaveChangesAsync();
-            return (header.MaPhieuKho, (object)new AdminSaveReceipt(header.MaPhieuKho, header.PhienBanDuLieu), before, input.LyDo);
+            return (header.MaPhieuKho, (object)new AdminSaveReceipt(header.MaPhieuKho, header.PhienBanDuLieu), before, reason);
         });
 
     /// <summary>Ghi sổ một lần; lỗi một dòng hoặc audit đều rollback toàn phiếu. Không đụng giữ chỗ của đơn.</summary>
@@ -85,27 +84,34 @@ public sealed class StockDocumentService(CafeDbContext db)
         AdminOperation.Execute(db, input.MaThaoTac, "STOCK_POST", "PhieuKho", new { id, input }, context, async () =>
         {
             var header = await Find(id); AdminOperation.Version(input.PhienBanDuLieu, header.PhienBanDuLieu); Draft(header);
-            AdminOperation.Reason(input.LyDo); var before = JsonSerializer.Serialize(header);
+            if (header.LoaiPhieu is not ("RECEIPT" or "ISSUE"))
+                throw new AdminRule(409, "Chức năng kiểm kê/điều chỉnh đã bỏ. Phiếu cũ chỉ xem lịch sử.");
+            // Xác nhận thủ công, chỉ khi đã đến ngày nghiệp vụ theo UTC+07.
+            var today = BusinessToday();
+            if (header.NgayThucHien > today) throw new AdminRule(409, "Chưa đến ngày nhập/xuất. Phiếu đang chờ xác nhận, chưa thay đổi tồn kho.");
+            var reason = string.IsNullOrWhiteSpace(input.LyDo) ? header.LyDo ?? "Xác nhận phiếu kho" : input.LyDo;
+            AdminOperation.Reason(reason); var before = JsonSerializer.Serialize(header);
             var lines = await db.ChiTietPhieuKho.Where(x => x.MaPhieuKho == id).ToListAsync();
             if (lines.Count == 0) throw Bad("Phiếu chưa có nguyên liệu.");
             foreach (var line in lines)
             {
-                var stock = await db.TonKho.SingleAsync(x => x.MaNguyenLieu == line.MaNguyenLieu);
-                decimal delta;
-                if (header.LoaiPhieu is "COUNT" or "ADJUSTMENT")
+                if (!await db.NguyenLieu.AnyAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung))
+                    throw new AdminRule(409, "Nguyên liệu đã ngừng sử dụng. Kiểm tra lại phiếu nháp.");
+                var stock = await db.TonKho.SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu);
+                if (stock is null)
                 {
-                    AdminOperation.Version(line.PhienBanTonKhoDaChot, stock.PhienBanDuLieu);
-                    if (line.TonSoDaChot != stock.TonThucTe || line.SoLuongThucDem is null) throw new AdminRule(409, "Có phát sinh sau mốc kiểm kê; cần đối chiếu lại.");
-                    delta = line.SoLuongThucDem.Value - stock.TonThucTe;
+                    if (header.LoaiPhieu != "RECEIPT") throw new AdminRule(409, "Nguyên liệu chưa có tồn kho.");
+                    stock = new TonKho { MaNguyenLieu = line.MaNguyenLieu, ThoiDiemTao = DateTime.UtcNow, ThoiDiemCapNhat = DateTime.UtcNow };
+                    db.TonKho.Add(stock);
                 }
-                else delta = header.LoaiPhieu == "RECEIPT" ? line.SoLuongTheoDonViNhap : -line.SoLuongTheoDonViNhap;
+                var delta = header.LoaiPhieu == "RECEIPT" ? line.SoLuongTheoDonViNhap : -line.SoLuongTheoDonViNhap;
                 await Move(header, line, stock, delta, input.MaThaoTac, null);
             }
             await db.SaveChangesAsync(); // Lưu dòng khi header còn DRAFT, sau đó mới đóng bất biến; vẫn cùng transaction.
             header.TrangThai = "POSTED"; header.GhiSoLuc = DateTime.UtcNow; header.MaQuanLyDuyet = Actor(context);
             header.ThoiDiemCapNhat = DateTime.UtcNow; Emit(input.MaThaoTac, id);
             await db.SaveChangesAsync();
-            return (id, (object)new AdminSaveReceipt(id, header.PhienBanDuLieu), before, input.LyDo);
+            return (id, (object)new AdminSaveReceipt(id, header.PhienBanDuLieu), before, reason);
         });
 
     /// <summary>Đảo bằng phiếu mới, giữ nguyên bản gốc; kiểm tra tồn/giữ chỗ hiện tại và chặn đảo hai lần.</summary>
@@ -141,6 +147,7 @@ public sealed class StockDocumentService(CafeDbContext db)
         AdminOperation.Execute(db, input.MaThaoTac, "STOCK_DELETE", "PhieuKho", new { id, input }, context, async () =>
         {
             var header = await Find(id); AdminOperation.Version(input.PhienBanDuLieu, header.PhienBanDuLieu); Draft(header);
+            if (header.LoaiPhieu is not ("RECEIPT" or "ISSUE")) throw new AdminRule(409, "Phiếu kiểm kê/điều chỉnh cũ chỉ được xem lịch sử.");
             if (await db.PhieuKho.AnyAsync(x => x.MaPhieuBiDao == id)) throw new AdminRule(409, "Phiếu đã được tham chiếu.");
             var before = JsonSerializer.Serialize(header);
             db.ChiTietPhieuKho.RemoveRange(await db.ChiTietPhieuKho.Where(x => x.MaPhieuKho == id).ToListAsync());
@@ -164,6 +171,8 @@ public sealed class StockDocumentService(CafeDbContext db)
     /// <summary>Outbox cùng transaction để menu Web/POS đọc lại khả dụng sau biến động kho.</summary>
     private void Emit(Guid operation, long id) => db.SuKienDongBo.Add(new()
     { MaSuKien = Guid.NewGuid(), MaThaoTac = operation, LoaiSuKien = "MENU_CHANGED", NoiDungJson = JsonSerializer.Serialize(new { PhieuKho = id }), PhatSinhLuc = DateTime.UtcNow });
+    /// <summary>Ngày nghiệp vụ quán theo UTC+07, độc lập múi giờ của máy chủ.</summary>
+    private DateOnly BusinessToday() => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(TimeSpan.FromHours(7)).DateTime);
     /// <summary>Tìm bản ghi hoặc trả lỗi nghiệp vụ 404.</summary>
     private async Task<PhieuKho> Find(long id) => await db.PhieuKho.SingleOrDefaultAsync(x => x.MaPhieuKho == id) ?? throw new AdminRule(404, "Không tìm thấy phiếu kho.");
     /// <summary>Không cho sửa/xóa/ghi sổ lại chứng từ đã ghi sổ.</summary>

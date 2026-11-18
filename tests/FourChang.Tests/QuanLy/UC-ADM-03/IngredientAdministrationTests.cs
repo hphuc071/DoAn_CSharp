@@ -1,15 +1,15 @@
-using FourChang.Presentation.Shared.Contracts.Admin;
+﻿using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Tests.Shared;
 
 namespace FourChang.Tests.Admin;
 
-/// <summary>ADM-03: test API/SQL thật cho danh mục, quy đổi, tham chiếu, đồng thời và rollback audit.</summary>
+/// <summary>UC-ADM-03 tinh gọn: một ngưỡng, đơn vị cố định, xác nhận ngừng, đồng thời và rollback trên SQL riêng.</summary>
 [Collection("AdminFeatures"), Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-03")]
 public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
 {
-    /// <summary>CRUD nguyên liệu nháp và quy đổi, chặn bản cũ/gửi khác nội dung, giữ tồn không bị chỉnh.</summary>
+    /// <summary>Thêm/sửa với một ngưỡng; replay không tạo trùng, bản cũ bị chặn, ngừng/kích hoạt không sinh kho.</summary>
     [Fact]
-    public async Task Crud_QuyDoi_Version_ChongTrung_VaXoaCoDieuKien()
+    public async Task ThemSua_MotNguong_Version_ChongTrung_VaNgungKichHoat()
     {
         var snap = await fixture.Ingredients(); var unit = snap.DonVi.First(x => x.DangSuDung);
         var input = new IngredientInput("Nguyên liệu " + Guid.NewGuid().ToString("N")[..8], unit.MaDonVi, 1, 5, "xUnit", true, [], null, Guid.NewGuid());
@@ -17,19 +17,26 @@ public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
         Assert.Equal(id, (await fixture.Send("POST", "/api/admin/ingredients", input)).Number("ma"));
         await fixture.Send("POST", "/api/admin/ingredients", input with { TenNguyenLieu = "Nội dung khác" }, 409);
         var item = (await fixture.Ingredients()).NguyenLieu.Single(x => x.MaNguyenLieu == id);
-        Assert.Empty(item.QuyDoi); Assert.Equal(unit.MaDonVi, item.MaDonViCoSo);
-        var edit = input with { TonAnToan = 2, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() };
+        Assert.Empty(item.QuyDoi); Assert.Equal(unit.MaDonVi, item.MaDonViCoSo); Assert.Equal(0, item.TonAnToan);
+        var edit = input with { NguongCanhBao = 6, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() };
         await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit);
         await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit with { MaThaoTac = Guid.NewGuid() }, 409);
         item = (await fixture.Ingredients()).NguyenLieu.Single(x => x.MaNguyenLieu == id);
         Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.TonKho WHERE MaNguyenLieu={id}"));
-        await fixture.Send("POST", $"/api/admin/ingredients/{id}/delete", new AdminDeleteInput(item.PhienBanDuLieu, Guid.NewGuid()));
-        Assert.DoesNotContain((await fixture.Ingredients()).NguyenLieu, x => x.MaNguyenLieu == id);
+        await fixture.Send("POST", $"/api/admin/ingredients/{id}/delete", new AdminDeleteInput(item.PhienBanDuLieu, Guid.NewGuid()), 409);
+        var impact = await fixture.Send("GET", $"/api/admin/ingredients/{id}/impact");
+        var stop = edit with { DangSuDung = false, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid(),
+            PhienBanAnhHuong = impact["phienBanAnhHuong"]!.GetValue<string>() };
+        await fixture.Send("PUT", $"/api/admin/ingredients/{id}", stop);
+        item = (await fixture.Ingredients()).NguyenLieu.Single(x => x.MaNguyenLieu == id); Assert.False(item.DangSuDung);
+        await fixture.Send("PUT", $"/api/admin/ingredients/{id}", stop with { DangSuDung = true, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid(), PhienBanAnhHuong = null });
+        Assert.True((await fixture.Ingredients()).NguyenLieu.Single(x => x.MaNguyenLieu == id).DangSuDung);
+        Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.TonKho WHERE MaNguyenLieu={id}"));
     }
 
-    /// <summary>Không cho ngừng/xóa nguyên liệu còn BOM hoặc thay đơn vị cơ sở sau phát sinh.</summary>
+    /// <summary>Thiếu xác nhận ảnh hưởng thì không ngừng; không xóa và không đổi đơn vị sau khi có dữ liệu tham chiếu.</summary>
     [Fact]
-    public async Task DuLieuThamChieu_KhongXoa_KhongDoiDonVi_KhongNgung()
+    public async Task DuLieuThamChieu_KhongXoa_KhongDoiDonVi_NgungCanXacNhan()
     {
         var snap = await fixture.Ingredients(); var item = snap.NguyenLieu.First(x => x.SoThamChieu > 0);
         var input = new IngredientInput(item.TenNguyenLieu, item.MaDonViCoSo, item.TonAnToan, item.NguongCanhBao, item.MoTa, false, item.QuyDoi, item.PhienBanDuLieu, Guid.NewGuid());
@@ -38,12 +45,12 @@ public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
         await fixture.Send("PUT", $"/api/admin/ingredients/{item.MaNguyenLieu}", input with { DangSuDung = true, MaDonViCoSo = snap.DonVi.First(x => x.MaDonVi != item.MaDonViCoSo).MaDonVi, MaThaoTac = Guid.NewGuid() }, 409);
     }
 
-    /// <summary>Đầu vào sai hoặc audit lỗi không tạo danh mục/quy đổi dở dang.</summary>
+    /// <summary>Ngưỡng sai hoặc audit lỗi không tạo hồ sơ hay sự kiện dở dang.</summary>
     [Fact]
-    public async Task Validation_VaLoiAudit_RollbackCaQuyDoi()
+    public async Task Validation_VaLoiAudit_RollbackHoSoVaSuKien()
     {
         var snap = await fixture.Ingredients(); var unit = snap.DonVi.First();
-        var input = new IngredientInput("Rollback " + Guid.NewGuid().ToString("N")[..8], unit.MaDonVi, 5, 3, null, true, [], null, Guid.NewGuid());
+        var input = new IngredientInput("Rollback " + Guid.NewGuid().ToString("N")[..8], unit.MaDonVi, 0, -1, null, true, [], null, Guid.NewGuid());
         await fixture.Send("POST", "/api/admin/ingredients", input, 400);
         input = input with { NguongCanhBao = 10, QuyDoi = [new(unit.MaDonVi, 0)] };
         await fixture.Send("POST", "/api/admin/ingredients", input, 400);
@@ -86,4 +93,66 @@ public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
         await fixture.Send("POST", "/api/admin/ingredients", input with { MaDonViCoSo = 999, QuyDoi = [], MaThaoTac = Guid.NewGuid() }, 400);
         Assert.Equal("0", await fixture.Api.Sql("SELECT COUNT(*) FROM dbo.NguyenLieu WHERE DonViCoSo NOT IN ('g','ml')"));
     }
+
+    /// <summary>Ngưỡng duy nhất có thể bằng 0; dữ liệu tương thích không được cản hạ ngưỡng và không làm thay số dư.</summary>
+    [Fact]
+    public async Task NguongDocLapTonAnToan_KhongAm_KhongLamTronNgam()
+    {
+        var name = "Một ngưỡng " + Guid.NewGuid().ToString("N")[..8];
+        var create = new IngredientInput(name, 1, 100, 12.5m, "Ghi chú", true, [], null, Guid.NewGuid());
+        var id = (await fixture.Send("POST", "/api/admin/ingredients", create)).Number("ma");
+        var item = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == id);
+        Assert.Equal(0, item.TonAnToan); Assert.Equal(12.5m, item.NguongCanhBao);
+        await fixture.Api.Sql($"UPDATE dbo.NguyenLieu SET TonAnToan=10 WHERE MaNguyenLieu={id}");
+        item = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == id);
+        var edit = create with { NguongCanhBao = 0, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() };
+        await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit);
+        item = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == id);
+        Assert.Equal(0, item.NguongCanhBao); Assert.Equal(0, item.TonAnToan);
+        foreach (var bad in new[] { -0.01m, 0.00001m })
+            await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit with { NguongCanhBao = bad, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() }, 400);
+        await fixture.Send("POST", "/api/admin/ingredients", create with { MaThaoTac = Guid.NewGuid() }, 409);
+        Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.TonKho WHERE MaNguyenLieu={id}"));
+    }
+
+    /// <summary>Xác nhận có phiên bản; ngừng/khôi phục chỉ đổi khả dụng, không thay BOM, số dư hoặc ghi trùng khi retry.</summary>
+    [Fact]
+    public async Task NgungSauXacNhan_ChanXacNhanCu_TamHetMenu_GiuKhoVaCongThuc()
+    {
+        var snapshot = await fixture.Ingredients();
+        var milk = snapshot.NguyenLieu.Single(n => n.TenNguyenLieu == "Sữa tươi");
+        var beforeStock = await fixture.Api.Sql($"SELECT * FROM dbo.TonKho WHERE MaNguyenLieu={milk.MaNguyenLieu} FOR JSON PATH");
+        var impact = await fixture.Send("GET", $"/api/admin/ingredients/{milk.MaNguyenLieu}/impact");
+        Assert.NotEmpty(impact["monPhuThuoc"]!.AsArray());
+        // Chỉ thay metadata trong DB fixture để chứng minh dấu xác nhận cũ không còn hợp lệ.
+        await fixture.Api.Sql($"UPDATE dbo.CongThuc SET GhiChu=N'Kiểm xác nhận cũ' WHERE MaCongThuc=(SELECT TOP(1) c.MaCongThuc FROM dbo.CongThuc c JOIN dbo.ChiTietCongThuc l ON l.MaCongThuc=c.MaCongThuc WHERE l.MaNguyenLieu={milk.MaNguyenLieu} AND c.TrangThai='ACTIVE' ORDER BY c.MaCongThuc)");
+        var input = new IngredientInput(milk.TenNguyenLieu, milk.MaDonViCoSo, 0, milk.NguongCanhBao, milk.MoTa, false, [], milk.PhienBanDuLieu, Guid.NewGuid(), impact["phienBanAnhHuong"]!.GetValue<string>());
+        await fixture.Send("PUT", $"/api/admin/ingredients/{milk.MaNguyenLieu}", input, 409);
+        Assert.True((await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == milk.MaNguyenLieu).DangSuDung);
+        impact = await fixture.Send("GET", $"/api/admin/ingredients/{milk.MaNguyenLieu}/impact");
+        input = input with { MaThaoTac = Guid.NewGuid(), PhienBanAnhHuong = impact["phienBanAnhHuong"]!.GetValue<string>() };
+        var beforeRecipes = await fixture.Api.Sql($"SELECT c.* FROM dbo.CongThuc c WHERE EXISTS(SELECT 1 FROM dbo.ChiTietCongThuc l WHERE l.MaCongThuc=c.MaCongThuc AND l.MaNguyenLieu={milk.MaNguyenLieu}) ORDER BY c.MaCongThuc FOR JSON PATH");
+        var beforeCatalog = await fixture.Send("GET", "/api/catalog");
+        try
+        {
+            await fixture.Send("PUT", $"/api/admin/ingredients/{milk.MaNguyenLieu}", input);
+            var stopped = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == milk.MaNguyenLieu);
+            await fixture.Send("PUT", $"/api/admin/ingredients/{milk.MaNguyenLieu}", input);
+            Assert.Equal(stopped.PhienBanDuLieu, (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == milk.MaNguyenLieu).PhienBanDuLieu);
+            var afterCatalog = await fixture.Send("GET", "/api/catalog");
+            Assert.NotEqual(beforeCatalog.ToJsonString(), afterCatalog.ToJsonString());
+            var dishes = afterCatalog["mon"]!.AsArray();
+            Assert.All(dishes.Where(d => d!["tenMon"]!.GetValue<string>() is "Bạc xỉu" or "Latte"), d =>
+                Assert.All(d!["cauHinh"]!.AsArray(), v => Assert.False(v!["conHang"]!.GetValue<bool>())));
+            Assert.Equal(beforeStock, await fixture.Api.Sql($"SELECT * FROM dbo.TonKho WHERE MaNguyenLieu={milk.MaNguyenLieu} FOR JSON PATH"));
+            Assert.Equal(beforeRecipes, await fixture.Api.Sql($"SELECT c.* FROM dbo.CongThuc c WHERE EXISTS(SELECT 1 FROM dbo.ChiTietCongThuc l WHERE l.MaCongThuc=c.MaCongThuc AND l.MaNguyenLieu={milk.MaNguyenLieu}) ORDER BY c.MaCongThuc FOR JSON PATH"));
+        }
+        finally
+        {
+            var current = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == milk.MaNguyenLieu);
+            await fixture.Send("PUT", $"/api/admin/ingredients/{milk.MaNguyenLieu}", input with { DangSuDung = true, PhienBanDuLieu = current.PhienBanDuLieu, PhienBanAnhHuong = null, MaThaoTac = Guid.NewGuid() });
+        }
+        Assert.Equal(beforeCatalog.ToJsonString(), (await fixture.Send("GET", "/api/catalog")).ToJsonString());
+    }
+
 }

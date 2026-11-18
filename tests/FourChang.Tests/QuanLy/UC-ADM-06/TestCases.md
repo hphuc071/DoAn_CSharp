@@ -1,20 +1,20 @@
-# UC-ADM-06 — Quản lý chứng từ kho
+# UC-ADM-04 — Tồn kho và chứng từ (tái sử dụng thư mục UC-ADM-06 cũ)
 
-Nguồn: `dac-25-Uc.docx`, giữ nguyên đánh số 25 UC. Quy tắc: BR-02, BR-03, BR-05, BR-08, BR-14, BR-23, BR-25, BR-26, BR-27, BR-28, BR-29.
-
-| Test xUnit | Kết quả cần bảo đảm |
+| Ca kiểm thử | Kết quả mong đợi |
 |---|---|
-| `NhapKho_NhapKhongDoiTon_GhiSoMotLan_DaoCoLienKet` | Nháp không đổi tồn; ghi sổ, đảo chống lặp; gốc bất biến. |
-| `XuatVuotTon_ChanToanPhieu_VaDoiNoiDungMaCuBiChan` | Một dòng vượt tồn rollback toàn phiếu; mã cũ không nhận nội dung khác. |
-| `KiemKe_MocDaDoiBiChan_ChenhLechKhongKhongTaoBienDong` | Mốc cũ chặn chốt; khớp không sinh biến động giả. |
-| `Nhap_SuaVaXoa_KhongDoiTon` | Sửa/xóa nháp theo version; không dòng mồ côi. |
-| `LoiAudit_KhongGhiSoMotPhan` | Chặn quyền audit trong fixture, kiểm tra rollback tồn/sổ/outbox. |
-| `Kho_YeuCauPhienAdmin` | 401/403 khi không có phiên Admin. |
+| Lưu/sửa/xóa nháp nhập | Không đổi tồn, được sửa/xóa với đúng phiên bản |
+| Xác nhận nhập, gửi lại cùng mã | Cộng đúng một lần, có sổ kho/audit/outbox |
+| Sửa/xóa sau xác nhận | API409; trigger SQL chặn sửa dòng đã ghi sổ |
+| Ngày tương lai (nhập và xuất) | Lưu được, chặn xác nhận, không đổi tồn |
+| Sửa ngày tương lai về ngày đã đến | Vẫn nháp, chỉ đổi tồn sau lệnh xác nhận |
+| Nguyên liệu mới chưa có số dư | Lưu nháp không tạo số dư; xác nhận mới tạo và cộng tồn |
+| Xuất vượt tồn ở một dòng | Rollback toàn phiếu, giữ nháp để sửa/xóa |
+| Hủy phiếu đã ghi sổ | Tạo phiếu ngược, giữ gốc, chặn hủy hai lần |
+| Kiểm kê/điều chỉnh cũ | Đọc lịch sử được; không sửa/xóa/xác nhận |
+| Lập kiểm kê/điều chỉnh qua API cũ | Bị từ chối400; chỉ nhận Nhập/Xuất |
+| Lỗi audit | Rollback trạng thái, tồn, sổ kho và outbox |
+| Khách/ẩn danh | Không truy cập chức năng Admin |
+| UI thật STA | 2 loại phiếu, chọn ngày, trường theo loại, thành tiền/tổng, lưu nháp không đổi tồn, thêm nhiều nguyên liệu, tự xóa ô nhập, chọn dòng sửa, chặn trùng không ghi đè, bỏ dòng và footer không bị cắt |
+| Nâng cấp schema30 cũ | Giữ dữ liệu/rowversion phiếu nháp và đã chốt; thêm ngày nullable; chạy lại an toàn |
 
-Test UI chung: `QuanLy/DungChung/OperationsUiTests.cs`, mở WinForms thật với API/SQL, chụp desktop/compact, kiểm tra wrap nút và chiều cao báo cáo; ADM-06 kiểm tra thêm/bỏ dòng và lưu nháp qua form thật.
-
-```powershell
-dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-06"
-```
-
-Database GUID riêng trong Docker; không chạy reset/seed trên database quán. Test không thay thế kiểm thử máy in thật và sao kê ngân hàng thực tế.
+Các test chỉ chạy trên database GUID riêng. Không reset database quán.

@@ -1,4 +1,4 @@
-﻿using FourChang.Desktop.Shared.Controls;
+using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shell;
@@ -13,10 +13,10 @@ public sealed class InventoryPage : AdminWorkspacePage<StockView>
     private readonly System.Windows.Forms.Timer refresh = new() { Interval = 3000 };
 
     /// <summary>Giữ bố cục Admin, phân biệt cảnh báo bằng nhãn và màu nền nhẹ.</summary>
-    public InventoryPage() : base("Tồn kho và cảnh báo", "Tồn thực tế − Giữ chỗ = Khả dụng", true, "KHO / TỒN NGUYÊN LIỆU")
+    public InventoryPage() : base("Tồn kho và cảnh báo", "Tồn thực tế − Giữ chỗ = Khả dụng", true, "KHO / TỒN NGUYÊN LIỆU", fitTableToRows: false)
     {
         Column("MaNguyenLieu", "Mã", 35); Column("TenNguyenLieu", "Nguyên liệu", 150); Column("DonVi", "Đơn vị", 50);
-        Column("TonThucTe", "Thực tế", 80); Column("GiuCho", "Giữ chỗ", 75); Column("TonAnToan", "An toàn", 75);
+        Column("TonThucTe", "Thực tế", 80); Column("GiuCho", "Giữ chỗ", 75);
         Column("KhaDung", "Khả dụng", 80); Column("CanhBao", "Cảnh báo", 100);
         Filters.Controls.Add(Ui.Field("Trạng thái", state)); state.SelectedIndexChanged += async (_, _) => await Reload();
         AddAction(Actions, "Xem truy vết", Details, true);
@@ -36,7 +36,21 @@ public sealed class InventoryPage : AdminWorkspacePage<StockView>
             if (Grid.Rows[e.RowIndex].DataBoundItem is StockView item && item.CanhBao is "LOW" or "OUT")
                 e.CellStyle!.BackColor = item.CanhBao == "OUT" ? Color.FromArgb(255, 235, 227) : Color.FromArgb(255, 246, 218);
         };
-        refresh.Tick += async (_, _) => await Reload(); refresh.Start();
+        refresh.Tick += async (_, _) => await RefreshQuietly(); refresh.Start();
+    }
+    private string? boundSnapshot;
+    /// <summary>Không bind lại cùng dữ liệu khi polling, giữ dòng đang chọn và vị trí đọc.</summary>
+    protected override void BindRows(IReadOnlyList<StockView> rows)
+    {
+        var snapshot = System.Text.Json.JsonSerializer.Serialize(rows);
+        if (snapshot == boundSnapshot) return;
+        var id = Selected()?.MaNguyenLieu;
+        var top = Grid.FirstDisplayedScrollingRowIndex;
+        Grid.DataSource = rows.ToList();
+        foreach (DataGridViewRow row in Grid.Rows)
+            if (row.DataBoundItem is StockView item && item.MaNguyenLieu == id) Grid.CurrentCell = row.Cells[0];
+        if (top >= 0 && Grid.RowCount > 0) Grid.FirstDisplayedScrollingRowIndex = Math.Min(top, Grid.RowCount - 1);
+        boundSnapshot = snapshot;
     }
     /// <summary>Lấy mốc và số liệu máy chủ; không tính lại số dư trên WinForms.</summary>
     protected override async Task<IReadOnlyList<StockView>> Fetch()

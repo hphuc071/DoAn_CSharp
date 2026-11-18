@@ -1,4 +1,4 @@
-﻿using FourChang.Infrastructure.Database.Context;
+using FourChang.Infrastructure.Database.Context;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -33,7 +33,7 @@ public static class DatabaseBootstrap
                 schema.CommandText = await ReadResourceAsync("FourChang.Schema30.sql");
                 await schema.ExecuteNonQueryAsync();
             }
-            else if (await HasSchema30(connection)) await ValidateAsync(connection, await HasRecipeDefaults(connection) ? "FourChang.Model30.json" : "FourChang.Model30BeforeRecipeDefaults.json");
+            else if (await HasSchema30(connection)) await ValidateAsync(connection, await HasStockDocumentDate(connection) ? "FourChang.Model30.json" : await HasRecipeDefaults(connection) ? "FourChang.Model30BeforeStockDate.json" : "FourChang.Model30BeforeRecipeDefaults.json");
             else if (!existing.Contains("ThietBiPOS"))
             {
                 // Chỉ nâng cấp từ schema 34 bảng đã xác minh; không tự sửa database lạ hoặc xóa sysdiagrams.
@@ -119,6 +119,18 @@ public static class DatabaseBootstrap
                 await using var defaults = connection.CreateCommand();
                 defaults.CommandText = await ReadResourceAsync("FourChang.RecipeDefaults.sql"); await defaults.ExecuteNonQueryAsync();
             }
+            if (!await HasStockDocumentDate(connection))
+            {
+                await ValidateAsync(connection, "FourChang.Model30BeforeStockDate.json");
+                // Bảo toàn database hiện hữu: backup và kiểm tra trước khi thêm cột nullable.
+                var path = $"/var/opt/mssql/data/{database}_beforeStockDate_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}.bak";
+                await using var backup = connection.CreateCommand(); backup.CommandTimeout = 180;
+                backup.CommandText = $"BACKUP DATABASE [{database}] TO DISK=@path WITH COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=@path WITH CHECKSUM;";
+                backup.Parameters.AddWithValue("@path", path); await backup.ExecuteNonQueryAsync();
+                Console.WriteLine("Backup trước ngày chứng từ đã xác minh: " + path);
+                await using var patch = connection.CreateCommand();
+                patch.CommandText = await ReadResourceAsync("FourChang.StockDocumentDate.sql"); await patch.ExecuteNonQueryAsync();
+            }
             await ValidateAsync(connection);
         }
         await CreateApplicationLoginAsync();
@@ -128,6 +140,14 @@ public static class DatabaseBootstrap
         await check.OpenAsync();
         await ValidateAsync(check);
     }
+    /// <summary>Nhận diện ngày nghiệp vụ để nâng cấp đúng manifest, không sửa chứng từ cũ.</summary>
+    private static async Task<bool> HasStockDocumentDate(SqlConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH(N'dbo.PhieuKho',N'NgayThucHien') IS NOT NULL THEN 1 ELSE 0 END";
+        return Convert.ToInt32(await command.ExecuteScalarAsync()) == 1;
+    }
+
     /// <summary>Nhận diện đúng cột mức đường trước khi đối chiếu manifest schema30.</summary>
     private static async Task<bool> HasRecipeDefaults(SqlConnection connection)
     {

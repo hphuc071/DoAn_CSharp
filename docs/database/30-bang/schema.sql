@@ -1,4 +1,4 @@
-﻿-- SQL Server: 30 bảng nghiệp vụ. Khởi tạo qua ChuanBi-Database.ps1.
+-- SQL Server: 30 bảng nghiệp vụ. Khởi tạo qua ChuanBi-Database.ps1.
 
 SET XACT_ABORT ON; SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
 
@@ -553,6 +553,7 @@ CREATE TABLE dbo.[HoaDon] (
 CREATE UNIQUE INDEX [UX_HoaDon_Goc] ON dbo.[HoaDon] ([MaDonHang]) WHERE LoaiHoaDon = 'ORIGINAL';
 
 CREATE TABLE dbo.[PhieuKho] (
+ [NgayThucHien] date NULL,
  [MaPhieuKho] bigint IDENTITY(1,1) NOT NULL,
  [SoPhieuKho] varchar(40) NOT NULL,
  [LoaiPhieu] varchar(20) NOT NULL,

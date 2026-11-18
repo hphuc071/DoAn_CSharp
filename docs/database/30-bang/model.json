@@ -2389,6 +2389,11 @@
           "name": "PhienBanDuLieu",
           "sql": "rowversion",
           "nullable": false
+        },
+        {
+          "name": "NgayThucHien",
+          "sql": "date",
+          "nullable": true
         }
       ],
       "checks": [

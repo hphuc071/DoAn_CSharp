@@ -13,7 +13,7 @@ public sealed class OperationsUiTests(AdminFeatureFixture fixture)
 
     /// <summary>Mở từng route với API thật, đổi kích thước và kiểm tra dialog chứng từ kho có thể lưu.</summary>
     [Theory]
-    [InlineData("UC-ADM-06", "stock")]
+    [InlineData("UC-ADM-04", "stock")]
     [InlineData("UC-ADM-07", "manage-orders")]
     [InlineData("UC-ADM-08", "invoices")]
     [InlineData("UC-ADM-09", "refunds")]

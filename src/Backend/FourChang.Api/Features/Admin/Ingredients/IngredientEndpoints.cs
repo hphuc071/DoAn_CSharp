@@ -1,4 +1,4 @@
-using FourChang.Api.Shared.Operations;
+﻿using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;
 
@@ -7,11 +7,12 @@ namespace FourChang.Api.Features.Admin.Ingredients;
 /// <summary>Biên API ADM-03; toàn nhóm yêu cầu Admin trước khi đọc hoặc ghi.</summary>
 public static class IngredientEndpoints
 {
-    /// <summary>Đăng ký danh mục, đơn vị, xóa có điều kiện và tra receipt sau timeout.</summary>
+    /// <summary>Đăng ký danh mục và xác nhận ngừng; các route cũ giữ lỗi tương thích sau kiểm quyền Admin.</summary>
     public static void MapIngredients(this WebApplication app)
     {
         var group = app.MapGroup("/api/admin/ingredients").RequireAuthorization("Admin");
         group.MapGet("", (IngredientService service) => service.Read());
+        group.MapGet("/{id:long}/impact", (long id, IngredientService service) => service.Impact(id));
         group.MapPost("", (IngredientInput input, HttpContext context, IngredientService service) => service.Save(null, input, context));
         group.MapPut("/{id:long}", (long id, IngredientInput input, HttpContext context, IngredientService service) => service.Save(id, input, context));
         group.MapPost("/{id:long}/delete", (long id, AdminDeleteInput input, HttpContext context, IngredientService service) => service.Delete(id, input, context));

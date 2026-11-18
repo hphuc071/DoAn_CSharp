@@ -242,11 +242,10 @@ public sealed class RecipeEditorForm : Form
 public sealed class DishRecipeEditorForm : Form
 {
     private sealed record Choice(long Id, string Label);
-    private sealed record Calculation(string Code, string Label);
     private sealed class Row(long ingredient, string type)
     {
         public long Ingredient { get; } = ingredient;
-        public string Type { get; set; } = type;
+        public string Type { get; } = type;
         public Dictionary<long, decimal> Amounts { get; } = [];
     }
     private readonly IngredientSnapshot ingredients;
@@ -263,7 +262,6 @@ public sealed class DishRecipeEditorForm : Form
     private List<MenuVariant> variants = [];
     private bool rendering, busy, uncertain;
     private RecipeDishInput? pending;
-    private static readonly Calculation[] Calculations = [new("FIXED", "Cố định"), new("SUGAR", "Theo % đường"), new("ICE", "Theo % đá")];
 
     /// <summary>Nạp các size đang khai báo của món; giữ công thức hiện có, không tạo cấu hình/giá mới.</summary>
     public DishRecipeEditorForm(IngredientSnapshot ingredients, MenuAdminSnapshot menu, IReadOnlyList<RecipeView> recipes, long? selectedDish = null)
@@ -287,7 +285,7 @@ public sealed class DishRecipeEditorForm : Form
         var copy = Ui.Button("Lấy lượng Lạnh sang Nóng", CopyCold); copy.Name = "RecipeCopyCold";
         save = Ui.Button("Lưu tất cả size", () => { }, true); save.Name = "RecipeDishSave";
         save.Click += async (_, _) => await Save();
-        var guide = Ui.Label("Nhập lượng cho 1 ly ở từng size. Ô 0 hoặc trống = không dùng nguyên liệu. Đường/đá nhập lượng ở mức 100%. Món nóng tự bỏ dòng theo % đá.", 9, false, CafeTheme.Muted);
+        var guide = Ui.Label("Nhập lượng cho 1 ly ở từng size; 0 hoặc trống = không dùng. Đường/đá nhập lượng ở mức 100%, hệ thống tự tính theo mức khách chọn. Nguyên liệu khác dùng lượng cố định; món nóng không có đá.", 9, false, CafeTheme.Muted);
         guide.MaximumSize = new Size(990, 0); feedback.Name = "RecipeDishFeedback"; feedback.MaximumSize = new Size(990, 0);
         AdminUi.Compose(this, Ui.Panel("Công thức theo món",
             Ui.Row(Ui.Field("Món", dish), Ui.Field("Đường mặc định cho các size", sugar)),
@@ -378,15 +376,13 @@ public sealed class DishRecipeEditorForm : Form
                 grid.DataSource = null; grid.Columns.Clear(); grid.ReadOnly = false; grid.AllowUserToAddRows = false;
                 grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Ingredient", HeaderText = "Nguyên liệu", ReadOnly = true, FillWeight = 30 });
                 grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Unit", HeaderText = "Đơn vị", ReadOnly = true, FillWeight = 10 });
-                grid.Columns.Add(new DataGridViewComboBoxColumn { Name = "Calculation", HeaderText = "Cách tính", FillWeight = 25,
-                    DataSource = Calculations.Where(c => temperature != "HOT" || c.Code != "ICE").ToList(), DisplayMember = "Label", ValueMember = "Code" });
                 foreach (var v in columns)
                     grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Size" + v.MaCauHinhMon, HeaderText = "Size " + v.KichCo, Tag = v,
                         ValueType = typeof(decimal), FillWeight = 20, DefaultCellStyle = new() { Format = "0.####", NullValue = "" } });
                 foreach (var row in rows.Where(r => temperature != "HOT" || r.Type != "ICE"))
                 {
                     var n = ingredients.NguyenLieu.Single(n => n.MaNguyenLieu == row.Ingredient);
-                    var values = new List<object?> { n.TenNguyenLieu, n.MaDonViCoSo == 1 ? "g" : "ml", row.Type };
+                    var values = new List<object?> { n.TenNguyenLieu, n.MaDonViCoSo == 1 ? "g" : "ml" };
                     values.AddRange(columns.Select(v => (object?)(row.Amounts.GetValueOrDefault(v.MaCauHinhMon) is var amount && amount > 0 ? amount : null)));
                     grid.Rows[grid.Rows.Add(values.ToArray())].Tag = row;
                 }
@@ -398,30 +394,22 @@ public sealed class DishRecipeEditorForm : Form
         finally { rendering = false; }
     }
 
-    /// <summary>Kiểm số thập phân và đồng bộ lượng/cách tính về nháp dùng chung giữa các tab.</summary>
+    /// <summary>Kiểm số thập phân và đồng bộ lượng về nháp dùng chung giữa các tab.</summary>
     private void WireGrid(DataGridView grid)
     {
         grid.CellValidating += (_, e) =>
         {
-            if (rendering || e.RowIndex < 0 || e.ColumnIndex < 3) return;
+            if (rendering || e.RowIndex < 0 || e.ColumnIndex < 2) return;
             if (!Amount(e.FormattedValue, out var parsedAmount)) { e.Cancel = true; feedback.Text = "Lượng không âm, tối đa 4 số thập phân. Để trống nếu không dùng."; }
         };
-        grid.CellParsing += (_, e) => { if (e.ColumnIndex >= 3 && Amount(e.Value, out var value)) { e.Value = value; e.ParsingApplied = true; } };
-        grid.CurrentCellDirtyStateChanged += (_, _) => { if (grid.IsCurrentCellDirty && grid.CurrentCell is DataGridViewComboBoxCell) grid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
+        grid.CellParsing += (_, e) => { if (e.ColumnIndex >= 2 && Amount(e.Value, out var value)) { e.Value = value; e.ParsingApplied = true; } };
         grid.CellValueChanged += (_, e) =>
         {
             if (rendering || e.RowIndex < 0 || grid.Rows[e.RowIndex].Tag is not Row row) return;
-            if (e.ColumnIndex >= 3 && grid.Columns[e.ColumnIndex].Tag is MenuVariant v && Amount(grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value, out var value)) row.Amounts[v.MaCauHinhMon] = value;
-            if (e.ColumnIndex == 2 && grid.Rows[e.RowIndex].Cells[2].Value is string code)
-            {
-                row.Type = code;
-                if (code == "ICE") foreach (var hot in variants.Where(v => v.NhietDo == "HOT")) row.Amounts[hot.MaCauHinhMon] = 0;
-                // Dựng lại sau sự kiện kết thúc để đồng bộ tab kia, không dispose control đang phát sự kiện.
-                BeginInvoke((Action)(() => { if (!IsDisposed && !busy) Render(); }));
-            }
+            if (e.ColumnIndex >= 2 && grid.Columns[e.ColumnIndex].Tag is MenuVariant v && Amount(grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value, out var value)) row.Amounts[v.MaCauHinhMon] = value;
             feedback.Text = "";
         };
-        grid.DataError += (_, e) => { e.ThrowException = false; e.Cancel = true; feedback.Text = "Kiểm tra lượng hoặc cách tính nguyên liệu."; };
+        grid.DataError += (_, e) => { e.ThrowException = false; e.Cancel = true; feedback.Text = "Kiểm tra lượng nguyên liệu."; };
     }
 
     /// <summary>Nhận dấu phẩy/chấm thập phân; ô trống tương đương không dùng, không nhận phân cách hàng nghìn.</summary>

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../FourChang.Domain/FourChang.Domain.csproj" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.33" />
@@ -28,6 +28,8 @@
   <ItemGroup>
     <EmbeddedResource Include="../../../docs/database/30-bang/model-before-recipe-default.json" LogicalName="FourChang.Model30BeforeRecipeDefaults.json" />
     <EmbeddedResource Include="../../../docs/database/30-bang/009-recipe-default-sugar.sql" LogicalName="FourChang.RecipeDefaults.sql" />
+    <EmbeddedResource Include="../../../docs/database/30-bang/model-before-stock-date.json" LogicalName="FourChang.Model30BeforeStockDate.json" />
+    <EmbeddedResource Include="../../../docs/database/30-bang/010-stock-document-date.sql" LogicalName="FourChang.StockDocumentDate.sql" />
     <EmbeddedResource Include="../../../docs/database/30-bang/model.json" LogicalName="FourChang.Model30.json" />
     <EmbeddedResource Include="../../../docs/database/30-bang/schema.sql" LogicalName="FourChang.Schema30.sql" />
     <EmbeddedResource Include="../../../docs/database/30-bang/008-simplify-to-30.sql" LogicalName="FourChang.Upgrade30.sql" />
