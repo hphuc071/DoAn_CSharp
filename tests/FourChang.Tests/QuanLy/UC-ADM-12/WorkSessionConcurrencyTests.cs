@@ -8,7 +8,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Admin;
 
 /// <summary>Các biên đồng thời và phục hồi không được xác minh bằng mã máy hoặc họ tên đơn thuần.</summary>
-[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-12"), Trait("Actor", "QuanLy")]
+[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-08"), Trait("Actor", "QuanLy")]
 public sealed class WorkSessionConcurrencyTests(AdminFeatureFixture fixture)
 {
     /// <summary>Mở ca và ngừng hồ sơ cùng lúc chỉ một bên thành công, không để INACTIVE có ca mới.</summary>

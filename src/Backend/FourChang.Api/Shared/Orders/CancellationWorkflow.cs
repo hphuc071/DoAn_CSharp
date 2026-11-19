@@ -68,7 +68,8 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
                 var actor = long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!);
                 if (input.HanhDong == "APPROVE")
                 {
-                    if (!input.DaKiemTraNguoiNhan) throw new AdminRule(400, "Cần xác minh người nhận trước duyệt hoàn tại quầy.");
+                    var hasPayment = await db.ThanhToan.AnyAsync(x => x.MaDonHang == id && x.SoTienDaXacMinh > 0);
+                    if (hasPayment && !input.DaKiemTraNguoiNhan) throw new AdminRule(400, "Cần kiểm tra thông tin người nhận trước duyệt khoản hoàn tại quầy.");
                     if(staffRequest)
                     {
                         // Duyệt đúng phần nhân viên đã yêu cầu, dùng chung tính giá/kho và chống hoàn trùng.

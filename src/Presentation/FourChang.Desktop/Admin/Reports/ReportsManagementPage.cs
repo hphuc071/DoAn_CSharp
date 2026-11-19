@@ -1,4 +1,5 @@
 using System.Data;
+using System.Globalization;
 using FourChang.Desktop.Shell;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
@@ -9,169 +10,122 @@ using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Desktop.Admin.Reports;
 
-/// <summary>UC-ADM-10: chỉ hiển thị số server đã tính, giữ mốc khi lỗi và xuất đúng snapshot đang xem.</summary>
+/// <summary>UC-ADM-07: ba chỉ tiêu, ba bảng và xuất Excel từ đúng snapshot đang xem.</summary>
 public sealed class ReportsManagementPage : UserControl
 {
-    private readonly DateTimePicker from = new() { Value = DateTime.Today.AddDays(-30), Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 140 };
-    private readonly DateTimePicker to = new() { Value = DateTime.Today, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 140 };
+    private readonly DateTimePicker from = new() { Value = DateTime.Today.AddDays(-30), Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 150, Name = "ReportFrom" };
+    private readonly DateTimePicker to = new() { Value = DateTime.Today, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 150, Name = "ReportTo" };
     private readonly ComboBox channel = Ui.Select("Tất cả", "WEB", "POS");
     private readonly ComboBox fulfillment = Ui.Select("Tất cả", "DINE_IN", "TAKEAWAY", "DELIVERY");
-    private readonly NumericUpDown shift = new() { Maximum = 999999999, Width = 120 };
+    private readonly NumericUpDown shift = new() { Maximum = 999999999, Width = 150 };
     private readonly Label status = Ui.Label("", 9, false, CafeTheme.Muted);
     private readonly Label definition = Ui.Label("", 9, false, CafeTheme.Muted);
-    private readonly TableLayoutPanel cards = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4, RowCount = 2, Height = 240 };
-    private readonly Panel tables = new() { Dock = DockStyle.Top, Height = 510 };
+    private readonly TableLayoutPanel cards = new() { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, RowCount = 1, Name = "ReportMetrics" };
+    private readonly Panel tables = new() { Dock = DockStyle.Top, Height = 350 };
     private readonly Button load;
     private readonly Button excel;
-    private readonly Button pdf;
     private readonly Button relatedPage;
     private ReportSnapshot? snapshot;
-    private readonly Dictionary<string, ReportExportInput> exportDrafts = [];
+    private ReportExportInput? exportDraft;
+    private Form? host;
+    private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
 
-    /// <summary>Giữ khu vực lọc, KPI và bảng chi tiết; không dùng biểu đồ/trend giả khi chưa có dữ liệu.</summary>
+    /// <summary>Giữ màu nâu/kem và card/bảng cùng phong cách các trang giao dịch; không tạo số minh họa.</summary>
     public ReportsManagementPage()
     {
+        Dock = DockStyle.Top; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Padding = new Padding(16); BackColor = CafeTheme.Cream; Name = "ReportsManagementPage";
+        for (var i = 0; i < 3; i++) cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / 3));
         status.Visible = false; status.TextChanged += (_, _) => status.Visible = !string.IsNullOrWhiteSpace(status.Text);
-        Dock = DockStyle.Top; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; AutoScroll = false; Padding = new Padding(16); BackColor = CafeTheme.Cream; Name = "ReportsManagementPage";
-        for (var i = 0; i < 4; i++) cards.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        load = Ui.Button("Xem báo cáo", () => { }, true); load.Click += async (_, _) => await Reload();
-        excel = Ui.Button("Xuất Excel", () => { }); excel.Click += async (_, _) => await Export("EXCEL");
-        pdf = Ui.Button("Xuất PDF", () => { }); pdf.Click += async (_, _) => await Export("PDF");
-        var audit = Ui.Button("Nhật ký hệ thống", OpenAudit);
-        var filterRow = Ui.Row(Ui.Field("Từ ngày", from), Ui.Field("Đến ngày", to), Ui.Field("Nguồn", channel), Ui.Field("Nhận món", fulfillment), Ui.Field("Mã ca (0: tất cả)", shift));
-        var jobs = Ui.Button("Tệp đã xuất", () => { }); jobs.Click += async (_, _) => await OpenJobs();
-        relatedPage = Ui.Button("Đến trang liên quan", OpenRelatedPage);
-        relatedPage.Name = "ReportRelatedPage";
-        relatedPage.Enabled = false;
-        var actionRow = Ui.Row(load, excel, pdf, audit, jobs, relatedPage); OperationsPresentation.FitRows(filterRow); OperationsPresentation.FitRows(actionRow);
-        Controls.Add(Ui.Panel("Báo cáo hoạt động", filterRow, actionRow, status, cards, definition, tables));
-        HandleCreated += async (_, _) => await Reload();
+        channel.Width = fulfillment.Width = 150; fulfillment.FormattingEnabled = true;
+        fulfillment.Format += (_, e) => e.Value = OperationsPresentation.Label(e.ListItem?.ToString() ?? "");
+        load = Ui.Button("Xem báo cáo", () => { }, true); load.Name = "ReportLoad"; load.Click += async (_, _) => await Reload();
+        excel = Ui.Button("Xuất Excel", () => { }); excel.Name = "ReportExcel"; excel.Enabled = false; excel.Click += async (_, _) => await Export();
+        var audit = Ui.Button("Nhật ký hệ thống", OpenAudit); audit.Name = "ReportAudit";
+        relatedPage = Ui.Button("Đến Đơn hàng", OpenRelatedPage); relatedPage.Name = "ReportRelatedPage"; relatedPage.Enabled = false;
+        var filters = Ui.Row(Ui.Field("Từ ngày", from), Ui.Field("Đến ngày", to), Ui.Field("Nguồn đơn", channel), Ui.Field("Nhận món", fulfillment), Ui.Field("Ca (0: tất cả)", shift));
+        var actions = Ui.Row(load, excel, audit, relatedPage);
+        OperationsPresentation.FitRows(filters); OperationsPresentation.FitRows(actions);
+        var header = Ui.Stack(Ui.Label("4CHANG  /  BÁO CÁO VÀ NHẬT KÝ", 8, true, CafeTheme.Coffee), Ui.Label("Báo cáo hoạt động", 18, true), Ui.Label("Đơn hoàn thành • Món bán chạy • Tiền đã hoàn", 9));
+        var filterCard = new AdminSurface { AutoSize = true, Padding = new Padding(18, 16, 18, 8), Name = "AdminFilterSurface" };
+        filters.SetFlowBreak(filters.Controls[filters.Controls.Count - 1], true); actions.Dock = DockStyle.None; filters.Controls.Add(actions);
+        filterCard.Controls.Add(filters);
+        var tableCard = new AdminSurface { AutoSize = true, Padding = new Padding(16) };
+        tableCard.Controls.Add(AdminListLayout.Column(definition, tables));
+        Controls.Add(AdminListLayout.Column(header, filterCard, status, cards, tableCard));
+        HandleCreated += async (_, _) => { host = FindForm(); if (host is not null) host.Resize += ResizeTables; await Reload(); };
     }
 
-    /// <summary>Không dùng 0 thay lỗi; bảng cũ giữ lại với thời điểm và nhãn dữ liệu chưa cập nhật.</summary>
+    /// <summary>Đọc kỳ có cận cuối loại trừ; lỗi giữ nguyên báo cáo cũ, không thay bằng số 0.</summary>
     private async Task Reload()
     {
-        load.Enabled = false; status.Text = "Đang tính dữ liệu…";
+        if (!load.Enabled) return;
+        load.Enabled = excel.Enabled = false; status.Text = "Đang tính báo cáo…";
         try
         {
             var result = await LiveSession.Api.GetReportAsync(new(from.Value.Date.ToUniversalTime(), to.Value.Date.AddDays(1).ToUniversalTime(),
-                channel.SelectedIndex == 0 ? null : channel.Text, fulfillment.SelectedIndex == 0 ? null : fulfillment.Text, shift.Value == 0 ? null : (long)shift.Value));
-            if (IsDisposed) return; snapshot = result; Render(result);
+                channel.SelectedIndex == 0 ? null : channel.SelectedItem?.ToString(), fulfillment.SelectedIndex == 0 ? null : fulfillment.SelectedItem?.ToString(), shift.Value == 0 ? null : (long)shift.Value));
+            if (IsDisposed) return;
+            snapshot = result; exportDraft = null; Render(result); status.Text = "";
         }
-        catch (CafeApiException ex) { if (!IsDisposed) status.Text = ex.Message + (snapshot is null ? " Chưa có báo cáo." : " · Đang hiển thị báo cáo đã tải trước đó."); }
-        finally { if (!load.IsDisposed) load.Enabled = true; }
+        catch (CafeApiException error) { if (!IsDisposed) status.Text = error.Message + (snapshot is null ? " Chưa có báo cáo." : " Đang giữ báo cáo đã tải trước đó."); }
+        finally { if (!IsDisposed) { load.Enabled = true; excel.Enabled = snapshot is not null; } }
     }
-    /// <summary>KPI có định nghĩa riêng; không cộng doanh thu với thực thu hoặc dùng cùng ngày cho cả thu và hoàn.</summary>
+
+    /// <summary>Không cộng chồng tổng đơn với tiền thu/tiền hoàn; món chỉ lấy ly thuộc đơn đã hoàn thành.</summary>
     private void Render(ReportSnapshot data)
     {
         foreach (Control child in cards.Controls.Cast<Control>().ToArray()) child.Dispose(); cards.Controls.Clear();
-        var x = data.ChiSo;
-        var values = new (string, string, string, int)[] { ("Doanh thu thuần", $"{x.DoanhThuThuan:N0}đ", "Đơn hoàn tất, điều chỉnh tại mốc", 0),
-            ("Thu tiền mặt", $"{x.ThuTienMat:N0}đ", "Theo ngày thu đã xác minh", 1), ("Thu chuyển khoản", $"{x.ThuChuyenKhoan:N0}đ", "Theo ngày thu đã xác minh", 1),
-            ("Hoàn thành công", $"{x.HoanTienMat + x.HoanChuyenKhoan:N0}đ", "Theo ngày chi thành công", 2),
-            ("Dòng tiền ròng", $"{x.DongTienRong:N0}đ", "Thực thu trừ thực hoàn trong kỳ", 0), ("Đơn hoàn tất", x.HoanTat.ToString("N0"), "Theo ngày hoàn tất", 1),
-            ("Đơn hết hạn", x.HetHan.ToString("N0"), "Tách khỏi hủy chủ động", 3), ("Tỷ lệ hoàn tất", x.TyLeHoanTat?.ToString("P1") ?? "Không áp dụng", "Mẫu số: đơn tạo trong kỳ", 1) };
-        for (var i = 0; i < values.Length; i++)
-        {
-            var v = values[i]; cards.Controls.Add(new MetricCard(v.Item1, v.Item2, v.Item3, v.Item4) { Dock = DockStyle.Fill, Height = 116, Margin = new Padding(0, 0, 12, 12) }, i % 4, i / 4);
-        }
+        var values = new[] {
+            ("Tổng tiền đơn hoàn thành", data.ChiSo.DoanhThuThuan.ToString("N0", Vietnamese) + "đ", "Gồm phí giao và giảm trừ hợp lệ"),
+            ("Số đơn hoàn thành", data.ChiSo.HoanTat.ToString("N0", Vietnamese), "Theo ngày hoàn thành trong kỳ"),
+            ("Tiền đã hoàn", (data.ChiSo.HoanTienMat + data.ChiSo.HoanChuyenKhoan).ToString("N0", Vietnamese) + "đ", "Chỉ khoản đã trả thành công") };
+        for (var i = 0; i < values.Length; i++) cards.Controls.Add(new MetricCard(values[i].Item1, values[i].Item2, values[i].Item3, i) { Dock = DockStyle.Fill, Height = 116, Margin = new Padding(0, 0, i == 2 ? 0 : 12, 12) }, i, 0);
         foreach (Control child in tables.Controls.Cast<Control>().ToArray()) child.Dispose(); tables.Controls.Clear();
-        var tabs = Ui.Tabs(data.Bang.Select(t => (t.Ten, (Control)Table(t))).ToArray());
-        tabs.Name = "ReportTables";
-        tabs.Dock = DockStyle.Fill;
-        tabs.SelectedIndexChanged += (_, _) => UpdateRelatedPage();
-        tables.Controls.Add(tabs);
-        UpdateRelatedPage();
-        status.Text = "";
-        definition.MaximumSize = new Size(Math.Max(600, Width - 100), 0); definition.Text = data.DinhNghia;
+        var tabs = Ui.Tabs(data.Bang.Select(table => (table.Ten, (Control)Table(table))).ToArray()); tabs.Name = "ReportTables"; tabs.Dock = DockStyle.Fill;
+        tabs.SelectedIndexChanged += (_, _) => UpdateRelatedPage(); tables.Controls.Add(tabs); UpdateRelatedPage();
+        definition.MaximumSize = new Size(Math.Max(500, Width - 100), 0);
+        definition.Text = $"Kỳ báo cáo: {data.BoLoc.TuLuc.ToLocalTime():dd/MM/yyyy} – {data.BoLoc.DenLuc.ToLocalTime().AddDays(-1):dd/MM/yyyy}. Tổng đơn và tiền hoàn là hai chỉ tiêu riêng.";
+        ResizeTables(this, EventArgs.Empty);
     }
-    /// <summary>Tạo bảng đúng số dòng/cột của snapshot, không thay dữ liệu thật bằng số minh họa.</summary>
+
+    /// <summary>Giá trị số vẫn là decimal để định dạng/tính đúng; tên món/khách là text, không công thức.</summary>
     internal static DataGridView Table(ReportTable source)
     {
-        var table = new DataTable(); foreach (var column in source.Cot) table.Columns.Add(column.Ten);
-        foreach (var row in source.Dong) table.Rows.Add(row.Select(x => (object?)x ?? DBNull.Value).ToArray());
-        var grid = Ui.Grid(new([], []), 440); grid.DataSource = table; grid.Dock = DockStyle.Fill; grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells; return grid;
-    }
-    /// <summary>Tạo job xuất đúng mốc; dialog cho xem tiến độ, hủy và chỉ lưu file READY.</summary>
-    private async Task Export(string format)
-    {
-        if (snapshot is null) return; excel.Enabled = pdf.Enabled = false;
-        var key = snapshot.MaSnapshot + ":" + format;
-        try
+        var data = new DataTable();
+        foreach (var column in source.Cot) data.Columns.Add(column.Ten, column.Kieu == "number" ? typeof(decimal) : column.Kieu == "datetime" ? typeof(DateTime) : typeof(string));
+        foreach (var row in source.Dong) data.Rows.Add(row.Select((value, index) => value is null ? DBNull.Value : source.Cot[index].Kieu switch
+        { "number" => (object)decimal.Parse(value, CultureInfo.InvariantCulture), "datetime" => DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind), _ => value }).ToArray());
+        var grid = Ui.Grid(new([], []), 320); grid.DataSource = data; grid.Dock = DockStyle.Fill; grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        CommerceWorkspaceVisuals.FormatGrid(grid); grid.RowTemplate.Height = 56; grid.ColumnHeadersHeight = 48;
+        grid.CellFormatting += (_, e) =>
         {
-            if (!exportDrafts.TryGetValue(key, out var input)) exportDrafts[key] = input = new(snapshot.MaSnapshot, format, Guid.NewGuid());
-            var job = await AdminUi.Recover(() => LiveSession.Api.StartReportExportAsync(input), () => LiveSession.Api.ReportExportReceiptAsync(input.MaThaoTac));
-            exportDrafts.Remove(key); using var form = new ReportExportDialog(job); form.ShowDialog(FindForm());
-        }
-        catch (CafeApiException ex) { status.Text = ex.Message; if (ex.StatusCode is not null && (int)ex.StatusCode < 500) exportDrafts.Remove(key); }
-        finally { if (!IsDisposed) excel.Enabled = pdf.Enabled = true; }
-    }
-    /// <summary>Ánh xạ tab báo cáo đến trang hiện có; không lấy số thứ tự dòng làm mã bản ghi.</summary>
-    private (string Route, string Caption)? RelatedDestination()
-    {
-        var tab = tables.Controls.OfType<TabControl>().FirstOrDefault()?.SelectedTab;
-        return tab?.Text switch
-        {
-            "Món đã phục vụ" => ("menu", "Thực đơn"),
-            "Tỷ lệ đơn theo ngày tạo" => ("manage-orders", "Đơn hàng"),
-            "Nguyên liệu cảnh báo" => ("inventory", "Tồn kho"),
-            "Nguồn thu trong kỳ" => ("manage-orders", "Đơn hàng"),
-            "Hoàn thành công trong kỳ" => ("refunds", "Hoàn tiền"),
-            "Hủy món trong kỳ" => ("manage-orders", "Đơn hàng"),
-            _ => null
+            if (e.ColumnIndex < 0) return;
+            if (e.Value is decimal number) { e.Value = number.ToString("N0", Vietnamese) + (source.Cot[e.ColumnIndex].Ten.Contains("tiền", StringComparison.OrdinalIgnoreCase) ? "đ" : ""); e.FormattingApplied = true; }
+            if (e.Value is DateTime at) { e.Value = at.ToLocalTime().ToString("dd/MM/yyyy HH:mm"); e.FormattingApplied = true; }
         };
+        return grid;
     }
 
-    /// <summary>Cho biết trang sẽ mở ngay trên nút; tab chưa có đích được vô hiệu thay vì bấm không phản hồi.</summary>
-    private void UpdateRelatedPage()
+    /// <summary>Tái sử dụng worker/receipt chống gửi trùng; chỉ Excel, không có màn hình quản lý tệp đã xuất.</summary>
+    private async Task Export()
     {
-        var destination = RelatedDestination();
-        relatedPage.Enabled = destination is not null;
-        relatedPage.Text = destination is { } target ? "Đến " + target.Caption : "Đến trang liên quan";
-        relatedPage.AccessibleDescription = destination is { } page
-            ? "Chuyển sang trang " + page.Caption + ". Không yêu cầu chọn dòng trong báo cáo."
-            : "Chưa có trang liên quan cho tab hiện tại.";
-    }
-
-    /// <summary>Chuyển trang bằng router và sidebar hiện có, không mở popup hoặc sửa dữ liệu nguồn.</summary>
-    private void OpenRelatedPage()
-    {
-        var destination = RelatedDestination();
-        if (destination is null)
-        {
-            status.Text = "Chọn một tab báo cáo có trang liên quan.";
-            return;
-        }
-        if (FindForm() is not MainForm shell)
-        {
-            status.Text = "Hãy mở báo cáo từ cửa sổ Quản lý để chuyển trang.";
-            return;
-        }
-        // Navigate tự cập nhật tiêu đề/sidebar và giải phóng trang cũ. Không đọc control sau lệnh này.
-        shell.Navigate(destination.Value.Route);
-    }
-
-    /// <summary>Mở lại công việc đã tạo, không xuất lại số liệu mới hoặc tạo thêm job khi người dùng chỉ muốn tải tệp cũ.</summary>
-    private async Task OpenJobs()
-    {
+        if (snapshot is null) return;
+        excel.Enabled = false;
         try
         {
-            var jobs = await LiveSession.Api.GetReportExportsAsync();
-            using var form = AdminUi.Dialog("Tệp đã xuất", 1000, 650);
-            var grid = Ui.Grid(new([], []), 440); grid.DataSource = jobs.ToList();
-            var open = Ui.Button("Mở tác vụ đã chọn", () =>
-            {
-                if (grid.CurrentRow?.DataBoundItem is not ReportExportJob selected) return;
-                using var dialog = new ReportExportDialog(selected); dialog.ShowDialog(form);
-            }, true);
-            form.Controls.Add(Ui.Panel("Công việc xuất theo snapshot", grid, Ui.Row(open))); form.ShowDialog(FindForm());
+            exportDraft ??= new(snapshot.MaSnapshot, "EXCEL", Guid.NewGuid());
+            var input = exportDraft;
+            var job = await AdminUi.Recover(() => LiveSession.Api.StartReportExportAsync(input), () => LiveSession.Api.ReportExportReceiptAsync(input.MaThaoTac));
+            exportDraft = null; using var dialog = new ReportExportDialog(job); dialog.ShowDialog(FindForm());
         }
-        catch (CafeApiException ex) { status.Text = ex.Message; }
+        catch (CafeApiException error) { status.Text = error.Message; if (error.StatusCode is not null && (int)error.StatusCode < 500) exportDraft = null; }
+        finally { if (!IsDisposed) excel.Enabled = snapshot is not null; }
     }
-
-    /// <summary>Audit có màn hình/bộ lọc và quyền riêng, không buộc có quyền báo cáo mới được tra cứu.</summary>
-    private void OpenAudit()
-    {
-        using var form = AdminUi.Dialog("Nhật ký hệ thống", 1240, 840); form.Controls.Add(new AuditManagementPage()); form.ShowDialog(FindForm());
-    }
+    private (string Route, string Caption)? RelatedDestination() => tables.Controls.OfType<TabControl>().FirstOrDefault()?.SelectedTab?.Text switch
+    { "Đơn hoàn thành" => ("manage-orders", "Đơn hàng"), "Món bán chạy" => ("menu", "Thực đơn"), "Tiền đã hoàn" => ("refunds", "Hoàn tiền"), _ => null };
+    private void UpdateRelatedPage() { var target = RelatedDestination(); relatedPage.Enabled = target is not null; relatedPage.Text = target is { } item ? "Đến " + item.Caption : "Đến trang liên quan"; }
+    private void OpenRelatedPage() { if (RelatedDestination() is { } target && FindForm() is MainForm shell) shell.Navigate(target.Route); }
+    private void OpenAudit() { using var form = AdminUi.Dialog("Nhật ký hệ thống", 1220, 820); form.Controls.Add(new AuditManagementPage()); form.ShowDialog(FindForm()); }
+    private void ResizeTables(object? sender, EventArgs args) { if (host is not null && tables.IsHandleCreated) tables.Height = Math.Clamp(host.ClientSize.Height - host.PointToClient(tables.PointToScreen(Point.Empty)).Y - 55, 180, 520); }
+    protected override void Dispose(bool disposing) { if (disposing && host is not null) host.Resize -= ResizeTables; base.Dispose(disposing); }
 }

@@ -22,7 +22,7 @@ public sealed class StockDocumentEditorForm : Form
     private readonly StockAmountInput price = new(2) { Maximum = 999999999999m, Width = 160, ThousandsSeparator = true };
     private readonly DataGridView grid = Ui.Grid(new([], []), 180);
     private readonly Label title = Ui.Label("", 16, true);
-    private readonly Label workflow = Ui.Label("Lưu nháp để kiểm tra trước khi xác nhận nhập / xuất kho.", 9, false, CafeTheme.Muted);
+    private readonly Label workflow = Ui.Label("Xác nhận để khóa phiếu. Ngày tương lai: chờ đến ngày mới cập nhật kho.", 9, false, CafeTheme.Muted);
     private readonly Label stockHint = Ui.Label("", 9, false, CafeTheme.Muted);
     private readonly Label feedback = Ui.Label("", 9, false, CafeTheme.Danger);
     private readonly Label lineCount = Ui.Label("Nguyên liệu trong phiếu", 11, true);
@@ -36,8 +36,14 @@ public sealed class StockDocumentEditorForm : Form
     private readonly TableLayoutPanel ingredientFields;
     private readonly List<StockDocumentLineInput> lines = [];
     private readonly IReadOnlyList<StockView> stocks;
-    private readonly StockDocumentView? existing;
     private readonly Button save;
+    private readonly Button confirm;
+    private readonly Button close;
+    private readonly Control entryContent;
+    private long? workingId;
+    private byte[]? workingVersion;
+    private StockDocumentAction? pendingPost;
+    private bool saving;
     private readonly Button add;
     private readonly Button remove;
     private readonly Button newLine;
@@ -58,11 +64,11 @@ public sealed class StockDocumentEditorForm : Form
         Font = CafeTheme.Body();
         BackColor = CafeTheme.Cream;
         Name = "StockDocumentEditor";
-        Text = document is null ? "Lập phiếu kho" : "Sửa nháp " + document.SoPhieuKho;
+        Text = document is null ? "Lập phiếu kho" : (document.TrangThai == "FAILED" ? "Sửa phiếu cần kiểm tra " : "Sửa nháp ") + document.SoPhieuKho;
         if (document is not null && document.LoaiPhieu is not ("RECEIPT" or "ISSUE"))
             throw new ArgumentException("Phiếu lịch sử này chỉ được xem chi tiết.", nameof(document));
         stocks = inventory.NguyenLieu;
-        existing = document;
+        workingId = document?.MaPhieuKho; workingVersion = document?.PhienBanDuLieu;
 
         ingredient.BindingContext = new BindingContext();
         ingredient.DataSource = stocks.ToList();
@@ -82,7 +88,7 @@ public sealed class StockDocumentEditorForm : Form
         stockHint.Name = "StockDocumentStockHint";
         grid.Name = "StockDocumentLines";
 
-        save = Ui.Button("Lưu phiếu nháp", () => { }, true);
+        save = Ui.Button("Lưu phiếu nháp", () => { });
         save.Name = "StockDocumentSave";
         add = Ui.Button("Thêm vào phiếu", AddLine, true);
         add.Name = "StockDocumentAddLine";
@@ -91,7 +97,9 @@ public sealed class StockDocumentEditorForm : Form
         newLine = Ui.Button("Nhập dòng mới", ResetLine);
         newLine.Name = "StockDocumentNewLine";
         lineTotal.Name = "StockDocumentLineTotal";
-        var cancel = Ui.Button("Đóng", () => Close());
+        confirm = Ui.Button("Xác nhận phiếu", () => { }, true);
+        confirm.Name = "StockDocumentConfirm";
+        close = Ui.Button("Đóng", () => Close());
 
         sourceField = AdminListLayout.Field("Nguồn nhập (tùy chọn)", source);
         reasonField = AdminListLayout.Field("Ghi chú (tùy chọn)", reason);
@@ -125,14 +133,22 @@ public sealed class StockDocumentEditorForm : Form
             lineTotal, feedback, Ui.Row(add, newLine, remove), lineCount, grid, empty, total);
         var body = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(20), BackColor = CafeTheme.Surface };
         body.Controls.Add(content);
+        entryContent = body;
         body.SizeChanged += (_, _) => WrapLabels(body);
         ingredient.SelectedIndexChanged += (_, _) => ShowStock();
         type.SelectedIndexChanged += (_, _) => ShowStock();
         grid.CurrentCellChanged += (_, _) => LoadSelectedLine();
         quantity.ValueChanged += (_, _) => UpdateLineTotal();
         price.ValueChanged += (_, _) => UpdateLineTotal();
-        save.Click += async (_, _) => await Save();
-        AdminUi.Compose(this, body, save, cancel);
+        save.Click += async (_, _) => await Save(false);
+        confirm.Click += async (_, _) => await Save(true);
+        FormClosing += (_, e) =>
+        {
+            if (saving) { e.Cancel = true; return; }
+            // Nếu ghi sổ lỗi nhưng nháp đã lưu, trang ngoài vẫn tải lại đúng phiếu này khi đóng.
+            if (SavedDocumentId is not null && DialogResult == DialogResult.None) DialogResult = DialogResult.OK;
+        };
+        AdminUi.Compose(this, body, save, confirm, close);
         Render();
         ShowStock();
         ResetLine();
@@ -142,6 +158,7 @@ public sealed class StockDocumentEditorForm : Form
     private void ConfigureGrid()
     {
         grid.AutoGenerateColumns = false;
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         foreach (var (name, caption, weight) in new[]
         {
             ("MaNguyenLieu", "Mã", 30f), ("NguyenLieu", "Nguyên liệu", 180f), ("DonVi", "Đơn vị", 55f),
@@ -160,7 +177,25 @@ public sealed class StockDocumentEditorForm : Form
             grid.Columns[name].DefaultCellStyle.Format = "#,##0.####";
             grid.Columns[name].DefaultCellStyle.FormatProvider = CultureInfo.GetCultureInfo("vi-VN");
             grid.Columns[name].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+            grid.Columns[name].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+            // Cùng lề phải cho tiêu đề và giá trị, tránh cảm giác dữ liệu lệch sang cột kế bên.
+            grid.Columns[name].DefaultCellStyle.Padding = new Padding(10, 4, 14, 4);
+            grid.Columns[name].HeaderCell.Style.Padding = new Padding(10, 0, 14, 0);
         }
+        grid.Columns["NguyenLieu"].MinimumWidth = 160;
+        grid.Columns["NguyenLieu"].DefaultCellStyle.Padding = new Padding(12, 4, 12, 4);
+        grid.Columns["NguyenLieu"].HeaderCell.Style.Padding = new Padding(12, 0, 12, 0);
+        grid.Columns["DonVi"].MinimumWidth = 85;
+        grid.Columns["DonVi"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        grid.Columns["DonVi"].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        grid.Columns["DonVi"].DefaultCellStyle.Padding = grid.Columns["DonVi"].HeaderCell.Style.Padding = new Padding(1);
+        grid.Columns["SoLuong"].MinimumWidth = 120;
+        grid.Columns["DonGiaNhap"].MinimumWidth = 160;
+        grid.Columns["ThanhTien"].MinimumWidth = 135;
+        grid.Columns["DonGiaNhap"].HeaderText = "Đơn giá (đ)";
+        grid.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+        grid.ColumnHeadersHeight = 50;
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
     }
 
     /// <summary>Chỉ hiện trường cần thiết: nhập có nguồn/giá; xuất có lý do hỏng/hết hạn.</summary>
@@ -294,34 +329,72 @@ public sealed class StockDocumentEditorForm : Form
         }
     }
 
-    /// <summary>Lưu online và giữ nguyên payload/mã khi chưa rõ kết quả; nháp thành công vẫn chưa cập nhật tồn.</summary>
-    private async Task Save()
+    /// <summary>Đóng cả form modal và modeless sau khi API đã trả kết quả thành công.</summary>
+    private void Complete()
     {
-        if (pending is null && (lines.Count == 0 || (type.SelectedIndex != 0 && string.IsNullOrWhiteSpace(reason.Text))))
+        saving = false;
+        DialogResult = DialogResult.OK;
+        Close();
+    }
+
+    /// <summary>Lưu nháp trước, rồi xác nhận bằng đúng ID/rowversion. Thử lại không tạo thêm phiếu hoặc ghi sổ hai lần.</summary>
+    private async Task Save(bool post)
+    {
+        if (saving) return;
+        if (pending is null && pendingPost is null)
         {
-            feedback.Text = lines.Count == 0 ? "Hãy thêm ít nhất một nguyên liệu vào phiếu." : "Hãy nhập lý do lập phiếu.";
-            if (lines.Count == 0) quantity.Focus(); else reason.Focus();
-            return;
+            // Không bỏ sót dòng đang nhập khi người dùng bấm Lưu hoặc Xác nhận trực tiếp.
+            if (quantity.Value > 0 || editingIngredient is not null)
+            {
+                AddLine();
+                if (!string.IsNullOrEmpty(feedback.Text)) return;
+            }
+            if (lines.Count == 0 || (type.SelectedIndex != 0 && string.IsNullOrWhiteSpace(reason.Text)))
+            {
+                feedback.Text = lines.Count == 0 ? "Hãy thêm ít nhất một nguyên liệu hoặc nhập số lượng cho dòng mới." : "Hãy nhập lý do lập phiếu.";
+                return;
+            }
         }
-        save.Enabled = false;
+        saving = true;
+        save.Enabled = confirm.Enabled = close.Enabled = entryContent.Enabled = false;
         try
         {
-            pending ??= new(new[] { "RECEIPT", "ISSUE" }[type.SelectedIndex], source.Text,
-                type.SelectedIndex == 1 ? new[] { "DAMAGED", "EXPIRED" }[purpose.SelectedIndex] : null,
-                reason.Text, lines.ToList(), existing?.PhienBanDuLieu, Guid.NewGuid(), DateOnly.FromDateTime(date.Value));
-            var receipt = await AdminUi.Recover(() => LiveSession.Api.SaveStockDocumentAsync(existing?.MaPhieuKho, pending),
-                () => LiveSession.Api.StockDocumentReceiptAsync(pending.MaThaoTac));
-            SavedDocumentId = receipt.Ma;
-            DialogResult = DialogResult.OK;
-            Close();
+            if (pendingPost is null)
+            {
+                pending ??= new(new[] { "RECEIPT", "ISSUE" }[type.SelectedIndex], source.Text,
+                    type.SelectedIndex == 1 ? new[] { "DAMAGED", "EXPIRED" }[purpose.SelectedIndex] : null,
+                    reason.Text, lines.ToList(), workingVersion, Guid.NewGuid(), DateOnly.FromDateTime(date.Value));
+                var receipt = await AdminUi.Recover(() => LiveSession.Api.SaveStockDocumentAsync(workingId, pending),
+                    () => LiveSession.Api.StockDocumentReceiptAsync(pending.MaThaoTac));
+                workingId = SavedDocumentId = receipt.Ma;
+                workingVersion = receipt.PhienBanDuLieu;
+                pending = null;
+                if (!post) { Complete(); return; }
+                pendingPost = new("Xác nhận phiếu " + type.Text.ToLower(CultureInfo.GetCultureInfo("vi-VN")), workingVersion!, Guid.NewGuid());
+            }
+            var posted = await AdminUi.Recover(() => LiveSession.Api.ActStockDocumentAsync(workingId!.Value, "post", pendingPost),
+                () => LiveSession.Api.StockDocumentReceiptAsync(pendingPost.MaThaoTac));
+            workingVersion = posted.PhienBanDuLieu;
+            pendingPost = null;
+            Complete();
         }
         catch (FourChang.Presentation.Shared.ApiClients.CafeApiException ex)
         {
-            feedback.Text = ex.Message;
-            if (ex.StatusCode is not null && (int)ex.StatusCode < 500) pending = null;
+            feedback.Text = (SavedDocumentId is null ? "" : "Đã lưu nháp, chưa xác nhận được. ") + ex.Message;
+            if (ex.StatusCode is not null && (int)ex.StatusCode < 500) { pending = null; pendingPost = null; }
         }
-        finally { if (!save.IsDisposed) save.Enabled = true; }
+        finally
+        {
+            saving = false;
+            if (!IsDisposed)
+            {
+                entryContent.Enabled = pending is null && pendingPost is null;
+                save.Enabled = pendingPost is null;
+                confirm.Enabled = close.Enabled = true;
+            }
+        }
     }
+
 }
 
 /// <summary>Ô số riêng của phiếu kho: phân nhóm hàng nghìn bằng dấu chấm, dấu phẩy thập phân và không số 0 thừa.</summary>

@@ -13,7 +13,7 @@ public sealed class PhieuKhoConfiguration : IEntityTypeConfiguration<PhieuKho>
         {
             table.UseSqlOutputClause(false);
             table.HasCheckConstraint("CK_PhieuKho_1", "LoaiPhieu IN ('RECEIPT','ISSUE','COUNT','ADJUSTMENT','REVERSAL')");
-            table.HasCheckConstraint("CK_PhieuKho_2", "TrangThai IN ('DRAFT','POSTED')");
+            table.HasCheckConstraint("CK_PhieuKho_2", "TrangThai IN ('DRAFT','SCHEDULED','FAILED','POSTED','CANCELLED')");
             table.HasCheckConstraint("CK_PhieuKho_3", "TrangThai <> 'POSTED' OR (GhiSoLuc IS NOT NULL AND MaQuanLyDuyet IS NOT NULL)");
             table.HasCheckConstraint("CK_PhieuKho_4", "MaPhieuBiDao IS NULL OR MaPhieuBiDao <> MaPhieuKho");
         });
@@ -26,6 +26,7 @@ public sealed class PhieuKhoConfiguration : IEntityTypeConfiguration<PhieuKho>
         b.Property(x => x.TenNhaCungCapDaChot).HasColumnType("nvarchar(200)");
         b.Property(x => x.MaMucDich).HasColumnType("varchar(30)");
         b.Property(x => x.LyDo).HasColumnType("nvarchar(500)");
+        b.Property(x => x.LoiXuLy).HasColumnType("nvarchar(500)");
         b.Property(x => x.NgayThucHien).HasColumnType("date");
         b.Property(x => x.MocKiemKe).HasColumnType("datetime2(3)");
         b.Property(x => x.MaPhieuBiDao).HasColumnType("bigint");

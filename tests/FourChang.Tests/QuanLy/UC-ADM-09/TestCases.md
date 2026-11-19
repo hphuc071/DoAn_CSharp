@@ -1,19 +1,8 @@
-# UC-ADM-09 — Xử lý và xác nhận hoàn tiền
-
-Nguồn: `dac-25-Uc.docx`, giữ nguyên đánh số 25 UC. Quy tắc: BR-04, BR-08, BR-14, BR-18, BR-19, BR-20, BR-21, BR-22, BR-26, BR-29, BR-36.
-
-| Test xUnit | Kết quả cần bảo đảm |
-|---|---|
-| `Duyet_DangChi_DoiChieuThuCong_MoiTinhDaHoan` | PROCESSING chưa tăng R; thủ công xác minh mới SUCCEEDED, chống trùng. |
-| `HaiHoSo_KhongDuyetVuotThu_ChuaRoKhongChiLai` | Hạn mức giữ ngăn vượt thu; RECONCILING không cho chi lại. |
-| `TienThieu_KhongNhan_DuTienMoiNhan_KhongCongLap` | Thiếu chưa nhận; giao dịch cùng nguồn không cộng lại. |
-| `TienMuon_Expired_KhongHoiSinh_KhongNhapKho` | EXPIRED, nguồn LATE_PAYMENT; giải phóng giữ chỗ không tăng tồn. |
-| `ChotHetHan_CanChungCu_DaThuDuKhongChoChot` | Cần sao kê; đã thu đủ không cho EXPIRE. |
-
-Test UI chung: `QuanLy/DungChung/OperationsUiTests.cs`, mở WinForms thật với API/SQL, chụp desktop/compact, kiểm tra wrap nút và chiều cao báo cáo; ADM-06 kiểm tra thêm/bỏ dòng và lưu nháp qua form thật.
-
-```powershell
-dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-09"
-```
-
-Database GUID riêng trong Docker; không chạy reset/seed trên database quán. Test không thay thế kiểm thử máy in thật và sao kê ngân hàng thực tế.
+# UC-ADM-06 — tái sử dụng thư mục UC-ADM-08/09
+- Tìm hóa đơn theo mã đơn/khách và khoảng ngày; hóa đơn gốc/snapshot không đổi khi xem, in hoặc tải PDF.
+- Duyệt hủy tạo khoản đã duyệt; trạng thái Chờ khách nhận, đã trả=0 và còn phải trả đúng phần hủy đã thu tiền.
+- Nhân viên trả tiền thật và replay chỉ có một lần chi; Quản lý thấy đúng người chi/ca/thời gian và số đã trả.
+- API quản lý cũ chặn sửa/duyệt/chi/lập bản trùng khoản quầy; không đổi version hoặc sinh thêm lần chi.
+- Bộ lọc ngày/kết quả hợp lệ; Customer không truy cập danh sách quản lý. Pending/failed/reconciling không tính đã trả.
+- UI hai trang: bộ lọc và bảng gọn; hóa đơn 3 nút, hoàn tiền 1 nút xem; không có ô nhập tiền hay duyệt lại, không JSON kỹ thuật. Polling giữ DataSource, resize/chi tiết không tràn.
+- Giữ hồi quy chứng từ điều chỉnh có nguồn và hồ sơ ngân hàng cũ, không mở lại thao tác hủy/chốt hết hạn đã bỏ.

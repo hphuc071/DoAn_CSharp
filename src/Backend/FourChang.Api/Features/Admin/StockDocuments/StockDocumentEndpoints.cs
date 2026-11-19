@@ -15,6 +15,7 @@ public static class StockDocumentEndpoints
         group.MapPost("", (StockDocumentInput input, HttpContext context, StockDocumentService service) => service.Save(null, input, context));
         group.MapPut("/{id:long}", (long id, StockDocumentInput input, HttpContext context, StockDocumentService service) => service.Save(id, input, context));
         group.MapPost("/{id:long}/post", (long id, StockDocumentAction input, HttpContext context, StockDocumentService service) => service.Post(id, input, context));
+        group.MapPost("/{id:long}/cancel", (long id, StockDocumentAction input, HttpContext context, StockDocumentService service) => service.Cancel(id, input, context));
         group.MapPost("/{id:long}/reverse", (long id, StockDocumentAction input, HttpContext context, StockDocumentService service) => service.Reverse(id, input, context));
         group.MapPost("/{id:long}/delete", (long id, AdminDeleteInput input, HttpContext context, StockDocumentService service) => service.Delete(id, input, context));
         group.MapGet("/operations/{id:guid}", (Guid id, CafeDbContext db, HttpContext context) => AdminOperation.Receipt(db, id, "PhieuKho", context));

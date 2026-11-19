@@ -20,7 +20,7 @@ public partial class OrdersWorkspacePage
         }
         orderActions.AddRange([
             new("FORWARD", "Gửi yêu cầu duyệt", () => Cancellation("FORWARD"), row => staff && row.YeuCauHuy?.TrangThai == "REQUESTED"),
-            new("APPROVE", "Duyệt hủy / hoàn tại quầy", () => Cancellation("APPROVE"), row => !staff && row.YeuCauHuy?.TrangThai == "FORWARDED"),
+            new("APPROVE", "Duyệt yêu cầu hủy", () => Cancellation("APPROVE"), row => !staff && row.YeuCauHuy?.TrangThai == "FORWARDED"),
             new("REJECT", "Từ chối yêu cầu hủy", () => Cancellation("REJECT"), row => !staff && row.YeuCauHuy?.TrangThai == "FORWARDED"),
             new("COUNTER_REFUND", "Hoàn tiền tại quầy", CounterRefund, row => staff && counterOnly && row.TrangThai == "CANCELLED" && row.TaiChinh.PhaiHoan > 0)
         ]);
@@ -35,12 +35,15 @@ public partial class OrdersWorkspacePage
         if (detail.Don.YeuCauHuy is not { } pending) { Message.Text = "Yêu cầu đã thay đổi. Hãy tải lại."; return; }
         var key = selected.MaDonHang + ":" + pending.MaNhomHuy + ":" + action;
         if (!cancellationDrafts.TryGetValue(key, out var draft)) cancellationDrafts[key] = draft = new();
-        var title = action switch { "FORWARD" => "Chuyển yêu cầu cho Quản lý", "APPROVE" => "Duyệt hủy và hoàn tiền tại quầy", _ => "Từ chối yêu cầu hủy" };
-        using var form = new AdminCommandDialog<CancellationCommand>(title, draft);
+        var title = action switch { "FORWARD" => "Chuyển yêu cầu cho Quản lý", "APPROVE" => "Duyệt yêu cầu hủy", _ => "Từ chối yêu cầu hủy" };
+        using var form = new AdminCommandDialog<CancellationCommand>(title + " · " + selected.MaDon, draft);
         var customerReason = form.TextField("Lý do khách yêu cầu", pending.LyDo); customerReason.ReadOnly = true;
+        if (detail.MonYeuCauHuy is { Count: > 0 })
+            form.Info("Món yêu cầu hủy: " + string.Join("; ", detail.MonYeuCauHuy.Select(x => $"{x.TenMon}: {x.SoLy} ly")));
+        if (action == "APPROVE") form.Info("Duyệt hủy chưa phải đã hoàn tiền. Nếu có tiền cần hoàn, khách đến quầy để Nhân viên chi trả.");
         var reason = form.TextField("Ghi chú / lý do xử lý (bắt buộc)");
         var verified = form.CheckField("Đã kiểm tra người nhận; duyệt tiền mặt để khách nhận tại quầy");
-        verified.Visible = action == "APPROVE";
+        verified.Visible = action == "APPROVE" && detail.Don.TaiChinh.DaThu > 0;
         form.Submit(op => new(action, pending.MaNhomHuy, reason.Text, detail.Don.PhienBanDuLieu, op, verified.Checked),
             async input => { await LiveSession.Api.CancellationActionAsync(selected.MaDonHang, input, staff); },
             async op => { await LiveSession.Api.CancellationReceiptAsync(op, staff); });

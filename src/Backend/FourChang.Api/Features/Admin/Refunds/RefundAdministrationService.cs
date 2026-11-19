@@ -11,15 +11,37 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.Refunds;
 
-/// <summary>UC-ADM-09: Admin duy nhất duyệt/chi/đối chiếu sao kê. Không giả tích hợp API chi ngân hàng.</summary>
+/// <summary>UC-ADM-06: theo dõi hoàn tại quầy; giữ dịch vụ hồ sơ ngân hàng cũ để đọc lịch sử tương thích.</summary>
 public sealed class RefundAdministrationService(CafeDbContext db, OrderFinancials financials, IDataProtectionProvider protection)
 {
     /// <summary>Đọc danh sách và từng lần chi; chỉ trả tài khoản đã che, không trả bí mật mã hóa.</summary>
-    public async Task<IReadOnlyList<RefundView>> Read()
+    public async Task<IReadOnlyList<RefundView>> Read(string? search = null, DateTime? from = null, DateTime? to = null, string? status = null)
     {
-        var rows = await db.HoSoHoanTien.AsNoTracking().OrderByDescending(x => x.MaHoanTien).ToListAsync();
-        var attempts = await db.LanChiHoanTien.AsNoTracking().ToListAsync();
-        return rows.Select(x => View(x, attempts.Where(a => a.MaHoanTien == x.MaHoanTien))).ToList();
+        if (from > to || status is not (null or "WAITING" or "PAID" or "PARTIAL" or "CHECK"))
+            throw new AdminRule(400, "Bộ lọc hoàn tiền không hợp lệ.");
+        var query = db.HoSoHoanTien.AsNoTracking().AsQueryable();
+        if (from is { } start) query = query.Where(x => x.ThoiDiemTao >= start);
+        if (to is { } end) query = query.Where(x => x.ThoiDiemTao < end);
+        var rows = await query.OrderByDescending(x => x.MaHoanTien).ToListAsync();
+        var ids = rows.Select(x => x.MaHoanTien).ToArray();
+        var attempts = await db.LanChiHoanTien.AsNoTracking().Where(x => ids.Contains(x.MaHoanTien)).ToListAsync();
+        var orderIds = rows.Select(x => x.MaDonHang).Distinct().ToArray();
+        var channels = await db.DonHang.AsNoTracking().Where(x => orderIds.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang, x => x.KenhDatHang);
+        var shiftIds = attempts.Where(x => x.MaCaLamViec != null).Select(x => x.MaCaLamViec!.Value).Distinct().ToArray();
+        var staff = await (from c in db.CaLamViec.AsNoTracking() join n in db.NhanVien.AsNoTracking() on c.MaNhanVien equals n.MaNhanVien
+            where shiftIds.Contains(c.MaCaLamViec) select new { c.MaCaLamViec, n.HoTen }).ToDictionaryAsync(x => x.MaCaLamViec, x => x.HoTen);
+        var result = rows.Select(x => View(x, attempts.Where(a => a.MaHoanTien == x.MaHoanTien)) with
+        {
+            MaDon = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, channels[x.MaDonHang]),
+            TaoLuc = x.ThoiDiemTao,
+            LanChi = attempts.Where(a => a.MaHoanTien == x.MaHoanTien).OrderBy(a => a.SoThuTuLanChi)
+                .Select(a => new RefundAttemptView(a.MaLanChiHoan, a.SoThuTuLanChi, a.SoTien, a.PhuongThuc, a.TrangThai,
+                    a.MaThamChieuBenNgoai, a.BatDauLuc, a.CoKetQuaLuc, a.ThamChieuChungCu, a.PhienBanDuLieu,
+                    a.MaCaLamViec, a.MaCaLamViec is { } ca ? staff.GetValueOrDefault(ca) : null)).ToList()
+        });
+        if (!string.IsNullOrWhiteSpace(search)) result = result.Where(x => $"{x.MaHoan} {x.MaDon} {x.NguoiNhan}".Contains(search.Trim(), StringComparison.CurrentCultureIgnoreCase));
+        if (status is not null) result = result.Where(x => x.TrangThaiTheoDoi == status);
+        return result.ToList();
     }
 
     /// <summary>Hiển thị riêng thu gốc, đã hoàn và hạn mức để không duyệt theo tổng hóa đơn chưa thu.</summary>

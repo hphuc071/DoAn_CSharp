@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.Orders;
 
-/// <summary>UC-ADM-07 đọc nhiều kênh, truy vết snapshot và đổi địa chỉ có chấp thuận; lệnh vòng đời dùng service chung.</summary>
+/// <summary>UC-ADM-05: đọc đa kênh/snapshot và lịch sử yêu cầu hủy; không cho Admin thực hiện tiến trình của Nhân viên.</summary>
 public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials money, IConfiguration configuration)
 {
     /// <summary>Tìm/lọc và phân trang ở máy chủ; tiền của từng dòng được đọc trong cùng transaction.</summary>
@@ -16,6 +16,7 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
     {
         if (filter.Trang < 1 || filter.KichThuocTrang is < 1 or > 100 || filter.TuLuc > filter.DenLuc) throw new AdminRule(400, "Bộ lọc/khoảng ngày không hợp lệ.");
         if (filter.NhomDon is not (null or "NORMAL" or "CANCELLATION" or "COUNTER_REFUND")) throw new AdminRule(400, "Nhóm đơn không hợp lệ.");
+        if (filter.KetQuaHuy is not (null or "PENDING" or "APPROVED" or "REJECTED")) throw new AdminRule(400, "Kết quả yêu cầu hủy không hợp lệ.");
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var query = db.DonHang.AsNoTracking().AsQueryable();
         if(filter.PhamViCa is not (null or "CURRENT" or "PREVIOUS" or "ALL"))throw new AdminRule(400,"Nhóm ca không hợp lệ.");
@@ -29,7 +30,23 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
         // Lọc nhóm TRƯỚC Count/Skip/Take: tổng số và phân trang không bị sai vì lọc lại một trang ở UI.
         var waitingCancellation = from c in db.HuyMon join line in db.ChiTietDonHang on c.MaChiTietDonHang equals line.MaChiTietDonHang
             where c.TrangThai == "REQUESTED" select line.MaDonHang;
-        if (filter.NhomDon == "CANCELLATION") query = query.Where(x => x.TrangThai == "CANCELLED" || waitingCancellation.Contains(x.MaDonHang));
+        if (filter.NhomDon == "CANCELLATION")
+        {
+            if (currentShift is null)
+            {
+                // Admin xem cả quyết định đã từ chối/duyệt một phần; lọc trước Count/Skip/Take.
+                var allRequests = from c in db.HuyMon join l in db.ChiTietDonHang on c.MaChiTietDonHang equals l.MaChiTietDonHang select new { c, l.MaDonHang };
+                query = query.Where(x => x.TrangThai == "CANCELLED" || allRequests.Any(r => r.MaDonHang == x.MaDonHang));
+                if (filter.KetQuaHuy is { } outcome)
+                {
+                    var latestIds = allRequests.GroupBy(x => x.MaDonHang).Select(g => g.Max(x => x.c.MaHuyMon));
+                    var state = outcome switch { "PENDING" => "REQUESTED", "APPROVED" => "ACCEPTED", _ => "REJECTED" };
+                    var matching = allRequests.Where(x => latestIds.Contains(x.c.MaHuyMon) && x.c.TrangThai == state).Select(x => x.MaDonHang);
+                    query = query.Where(x => matching.Contains(x.MaDonHang));
+                }
+            }
+            else query = query.Where(x => x.TrangThai == "CANCELLED" || waitingCancellation.Contains(x.MaDonHang));
+        }
         if (filter.NhomDon == "COUNTER_REFUND")
         {
             var cashRefundOrders = db.HoSoHoanTien.Where(x => x.PhuongThucHoan == "CASH" && x.MaQuanLyDuyet != null &&
@@ -96,27 +113,20 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
             ? await db.DiaChiKhachHang.AsNoTracking().Where(x => x.MaKhachHang == customerId && x.DangSuDung)
                 .OrderByDescending(x => x.LaDiaChiMacDinh).ThenBy(x => x.MaDiaChi).Select(x => x.DiaChiChiTiet).FirstOrDefaultAsync()
             : null;
-        var result = new AdminOrderDetail(await Row(order), rows, order.DiaChiGiaoDaChot, held, movements,
+        var row = await Row(order);
+        var cancellationGroup = row.YeuCauHuy?.MaNhomHuy ?? row.KetQuaHuy?.MaNhomHuy;
+        List<AdminCancellationLine> requested = cancellationGroup is null ? [] : await (from c in db.HuyMon.AsNoTracking() join l in db.ChiTietDonHang.AsNoTracking()
+            on c.MaChiTietDonHang equals l.MaChiTietDonHang where c.MaNhomHuy == cancellationGroup
+            select new AdminCancellationLine(l.MaChiTietDonHang, l.TenMonDaChot, c.SoLuongHuy)).ToListAsync();
+        var result = new AdminOrderDetail(row, rows, order.DiaChiGiaoDaChot, held, movements,
             history.Select(x => new AdminTraceRow(x.MaNhatKy, x.PhatSinhLuc, x.TenNguoiThucHienDaChot, x.MaCaLamViec, x.MaMayDaChot,
-                x.HanhDong, x.LyDo, x.KetQua, x.DuLieuTruocJson, x.DuLieuSauJson, x.MaLienKetXuLy)).ToList(), ingredientRows, order.TenNguoiNhan, order.DienThoaiNguoiNhan, table, payments, customerAddress);
+                x.HanhDong, x.LyDo, x.KetQua, x.DuLieuTruocJson, x.DuLieuSauJson, x.MaLienKetXuLy)).ToList(), ingredientRows, order.TenNguoiNhan, order.DienThoaiNguoiNhan, table, payments, customerAddress, requested);
         await tx.CommitAsync(); return result;
     }
 
-    /// <summary>Đổi địa chỉ sau nhận cần Admin xác nhận khả năng giao và khách đồng ý; giữ phí đã chốt, không tự phụ thu.</summary>
+    /// <summary>Endpoint cũ vẫn trả lỗi rõ ràng; không cho đổi địa chỉ đã chốt sau đặt trong phạm vi tinh gọn.</summary>
     public Task<IResult> Address(long id, OrderAddressInput input, HttpContext context) =>
-        AdminOperation.Execute(db, input.MaThaoTac, "ORDER_ADDRESS", "DonHang", new { id, input }, context, async () =>
-        {
-            var order = await db.DonHang.SingleOrDefaultAsync(x => x.MaDonHang == id) ?? throw new AdminRule(404, "Không tìm thấy đơn.");
-            AdminOperation.Version(input.PhienBanDuLieu, order.PhienBanDuLieu); AdminOperation.Reason(input.LyDo);
-            if (order.HinhThucNhanMon != "DELIVERY" || order.TrangThai is not ("ACCEPTED" or "PREPARING" or "READY" or "DELIVERING")) throw new AdminRule(409, "Đơn không ở giai đoạn cho phép đổi địa chỉ giao.");
-            if (!input.KhachDongY || !input.QuanLyXacNhanGiaoDuoc || string.IsNullOrWhiteSpace(input.ChungCu) || string.IsNullOrWhiteSpace(input.DiaChiMoi) || input.DiaChiMoi.Length > 1000)
-                throw new AdminRule(400, "Cần địa chỉ, chứng cứ và chấp thuận của khách/Quản lý. Giữ nguyên phí giao đã chốt.");
-            var before = JsonSerializer.Serialize(order);
-            order.DiaChiGiaoDaChot = input.DiaChiMoi.Trim();
-            order.ThoiDiemCapNhat = DateTime.UtcNow;
-            db.SuKienDongBo.Add(new() { MaSuKien = Guid.NewGuid(), MaThaoTac = input.MaThaoTac, LoaiSuKien = "ORDER_CHANGED", NoiDungJson = JsonSerializer.Serialize(new { MaDonHang = id }), PhatSinhLuc = DateTime.UtcNow });
-            await db.SaveChangesAsync(); return (id, (object)new OrderActionReceipt(id, order.TrangThai, order.PhienBanDuLieu), before, input.LyDo);
-        });
+        Task.FromResult<IResult>(Results.Problem(statusCode: 403, detail: "Không hỗ trợ đổi địa chỉ đơn sau đặt. Địa chỉ đã chốt được giữ nguyên."));
 
     /// <summary>Chuẩn hóa một dòng giám sát với ca/người làm và cảnh báo có nội dung rõ ràng.</summary>
     private async Task<AdminOrderRow> Row(FourChang.Domain.Entities.Orders.DonHang order)
@@ -131,6 +141,8 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
         if (pending is not null) warning = pending.TrangThai == "REQUESTED" ? "Khách yêu cầu hủy · chờ Nhân viên chuyển" : "Yêu cầu hủy · chờ Quản lý duyệt";
         return new(order.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), order.KenhDatHang, order.HinhThucNhanMon, order.TrangThai, order.MaKhachHang,
             order.MaCaLamViec, employee?.HoTen, shift?.MaMay, order.ThoiDiemTao, order.HoanTatLuc, Math.Max(0, balance.NghiaVu - order.PhiGiaoHangHienTai),
-            order.PhiGiaoHangHienTai, balance, order.PhienBanDuLieu, warning, pending);
+            order.PhiGiaoHangHienTai, balance, order.PhienBanDuLieu, warning, pending, null,
+            pending is null ? await CancellationWorkflow.LatestDecision(db, order.MaDonHang) : null,
+            string.IsNullOrWhiteSpace(order.TenNguoiNhan) ? "Khách tại quầy" : order.TenNguoiNhan);
     }
 }

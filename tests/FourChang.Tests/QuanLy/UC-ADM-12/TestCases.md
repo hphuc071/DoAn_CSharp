@@ -1,19 +1,7 @@
-# UC-ADM-12 — Test case
-
-Nguồn: docs/use-cases/UC-ADM-12.md. BR: 05,06,08,09,14,19,29,33,36. Test dùng API/SQL thật, database fixture riêng và cùng project xUnit.
-
-| Nhóm | Luồng / BR | File / phương thức | Kết quả cần đạt |
-|---|---|---|---|
-| Xem, gửi đếm, chốt | Chính, A1/A3/A6, E2/E3/E6; BR08,09,19,29,36 | WorkSessionAdministrationTests.GuiDoiChieu_ChotCa_Quyen_VaChongLap | NULL khác0, Admin không đếm thay, nhân viên gửiLOCKED, chốt một lần |
-| Nguồn tiền | Chính4/5, A3, E2/E4; BR19,29,36 | NguonTien_ThayDoi_BuocDoiChieuLai | CASH trừ hoàn thành công, CK riêng; nguồn đổi cùng tổng vẫn409 |
-| Bàn giao | A2, E4/E5; BR09,29,33,36 | BanGiao_DonDo_KhoanChuaRo_GiuLichSu_VaNhanCa | Kiểm đủ đơn/khoản; chủ nguồn giữ nguyên; người nhận ACTIVE, ca mới liên kết ca trước |
-| Mất phiên | A4, E5/E6; bổ sung đã duyệt | MatPhien_MaPhucHoiMotLan_ChiDoiChieu | Mã dùng một lần; audit không chứa mã rõ; không bán hoặc tự chốt |
-| Khóa tạm | A4/A6; BR08,09,36 | KhoaTam_KiemPhien_TruocKhiAdminChoTiepTuc | Cần yêu cầu từ phiên đúng; không mở ca chờ đếm như khóa tạm |
-| Audit thất bại | E8; BR14,29 | ChotCa_AuditHong_Rollback | Không chốt hoặc ghi nhật ký một phần |
-| Race mở/ngừng | E3/E5; BR09,29,33 | WorkSessionConcurrencyTests.MoCa_DuaVoiNgungNhanVien_KhongDeHoSoNgungCoCaMoi | Hai lệnh tuần tự hóa, không mở ca cho hồ sơ đã ngừng |
-| Race hai bàn giao | E5; BR09,29,36 | HaiCa_BanGiaoCungNguoiNhan_ChiMotBenThanhCong | Chỉ một ca giành người/máy nhận, bên còn lại giữ nguyên |
-| Hết hạn/cấp lại | A4, E6; bổ sung đã duyệt | MaPhucHoi_CapLai_VaHetHan_KhongTaiSuDung | Mã và phiên cũ vô hiệu; hết hạn bị từ chối |
-| Thiếu/0 và mã máy | A4/A6, E3 | KhongPhucHoiBangMaMay_ThucDemKhongKhacThieu | Không lấy quyền từ máy/tên; nhập0 hợp lệ, thiếu bị400 |
-| UI end-to-end | Chính, A1/A4/A6 | WorkSessionUiTests.DoiChieu_PhucHoiMotLan_POS_VaTrangThaiChot | Admin cấp mã bằng dialog → POS đổi mã → gửi đếm → Admin chốt; chặn màn hình bán; kiểm footer, viewport và chiều cao thẻ |
-
-Chạy: `dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-12"`. Ảnh WinForms và geometry lưu artifacts/tests; không chụp dialog chứa mã bí mật. Test mạng/receipt kiểm thử replay và kết quả chưa rõ qua API; không khẳng định đã mô phỏng mọi dạng sự cố mạng ngoài thực tế.
+# UC-ADM-08 — tái sử dụng UC-ADM-11/12
+- Hồ sơ: tên trùng vẫn phân biệt ID; tìm/lọc/trang, lưu replay/stale/rollback, sửa địa chỉ không đổi snapshot ca; ngừng/chờ nhận bàn giao bị chặn, kích hoạt không mở lại ca.
+- Ca: chỉ completed đúng ca hoàn tất, tiền/ngày snapshot; tiền thu/hoàn thuộc ca phát sinh, kiểm đếm khớp mới kết/chuyển. Chưa gửi không đổi thành0. Ca kết thúc hợp lệ không cần Admin duyệt lại.
+- Bàn giao: đủ tập đơn/khoản chưa rõ + đúng phiên bản/mốc, replay1biên bản;2ca tranh người nhận chỉ1thành công, không khóa máy quán dùng chung. Người nhận được đổi máy nhưng phải đúng nhân viên.
+- Toàn chuỗi: caA thu, caA bàn giao, caB pha/hoàn tất, caB có doanh thu/đơn, caA giữ tiền; báo cáo/chi tiết ca khớp. CaB tự kết thúc và không lặp Chiều trong ngày, Tối mở được không buộc giờ.
+- Phục hồi: mã một lần/hết hạn/cấp lại, không chứa trong audit/receipt, không cấp quyền bán/Admin, gửi số đếm đúng rồi chốt ngoại lệ ca chưa kết thúc. Khóa tạm/tiếp tục cũ không tồn tại.
+- UI:4nút nhân viên, lọc ngày/tên ca gọn, chi tiết3tab, không ô nhập tiền Admin hoặc mã kỹ thuật không cần thiết. Resize/footer/không chớp và giữ hồ sơ/ca đang chọn.

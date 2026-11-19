@@ -31,6 +31,12 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
     internal static async Task RunRoute(AdminFeatureFixture fixture, string code, string route)
     {
         await fixture.Api.RunApiCommand("--seed-customers");
+        if (route == "dashboard")
+        {
+            // Hai đơn đã thu tiền: chỉ đơn hoàn thành mới được tính trên Tổng quan.
+            await OperationsScenarioSeed.Create(fixture, "COMPLETED");
+            await OperationsScenarioSeed.Create(fixture, "ACCEPTED");
+        }
         await DesktopWorker.Run(fixture.Api, "ADM01-05", new()
         {
             ["FOURCHANG_API_URL"] = fixture.Api.Url,
@@ -50,7 +56,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
         FourChang.Desktop.DesktopLauncher.ConfigureUi();
         var route = Environment.GetEnvironmentVariable("FOURCHANG_TEST_ROUTE")!;
         var code = Environment.GetEnvironmentVariable("FOURCHANG_TEST_UC")!;
-        if (!new[] { "customers", "menu", "ingredients", "recipes", "inventory", "dashboard", "customer-reset", "stock", "manage-orders", "invoices", "refunds", "reports", "employees", "work-sessions", "pos-sale", "staff-orders", "staff-invoices" }.Contains(route)) return 2;
+        if (!new[] { "customers", "menu", "ingredients", "recipes", "inventory", "dashboard", "customer-reset", "stock", "manage-orders", "cancelled-orders", "invoices", "refunds", "reports", "employees", "work-sessions", "pos-sale", "staff-orders", "staff-invoices" }.Contains(route)) return 2;
         var exit = 1;
         using var loop = new Form { ShowInTaskbar = false, StartPosition = FormStartPosition.Manual, Location = new Point(-20000, -20000), Size = new Size(20, 20) };
         loop.Shown += async (_, _) =>
@@ -77,13 +83,32 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                 form.Show(); form.Navigate(route == "customer-reset" ? "customers" : route);
                 File.WriteAllText(Path.Combine(output, "ui-stage.txt"), route + ": wait data");
                 try { await WaitUntil(() => route == "reports"
-                    ? Descendants(form).OfType<TabControl>().Any(t => t.Name == "ReportTables" && t.TabPages.Count == 6)
+                    ? Descendants(form).OfType<TabControl>().Any(t => t.Name == "ReportTables" && t.TabPages.Count == 3)
                     : Descendants(form).OfType<DataGridView>().Any(g => g.Rows.Count > 0)); }
                 catch
                 {
                     Capture(form, Path.Combine(output, code + "-failed.png"));
                     File.WriteAllLines(Path.Combine(output, code + "-layout.txt"), Descendants(form).Select(c => $"{c.GetType().Name} {c.Name} Visible={c.Visible} Handle={c.IsHandleCreated} Bounds={c.Bounds}"));
                     throw;
+                }
+                if (route == "dashboard")
+                {
+                    // Tổng quan phải khớp nguồn Báo cáo, không cộng tiền đã thu của đơn còn dở.
+                    var expected = await LiveSession.Api.GetReportAsync(new ReportFilter(
+                        DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc), DateTime.UtcNow));
+                    var metrics = Descendants(form).Single(x => x.Name == "DashboardMetrics");
+                    Assert.Equal(4, metrics.Controls.Count);
+                    Assert.Contains(metrics.Controls.Cast<Control>(), x => x.AccessibleName!.Contains(MoneyDisplay.Format(expected.ChiSo.DoanhThuThuan)));
+                    Assert.Contains(metrics.Controls.Cast<Control>(), x => x.AccessibleName!.StartsWith("Đơn hoàn thành: " + expected.ChiSo.HoanTat));
+                    var completed = Descendants(form).OfType<DataGridView>().Single(x => x.Name == "DashboardCompletedOrders");
+                    Assert.Equal(Math.Min(6, expected.Bang[0].Dong.Count), completed.Rows.Count);
+                    Assert.DoesNotContain(Descendants(form), x => x.Name is "DashboardAudit" or "DashboardRevenue");
+                    var reload = Descendants(form).OfType<Button>().Single(x => x.Name == "DashboardReload");
+                    reload.PerformClick();
+                    await WaitUntil(() => reload.Enabled);
+                    Assert.Same(completed, Descendants(form).OfType<DataGridView>().Single(x => x.Name == "DashboardCompletedOrders"));
+                    Assert.Contains(Descendants(form), x => x.Name == "DashboardInventoryLink");
+                    Assert.Contains(Descendants(form), x => x.Name == "DashboardReportsLink");
                 }
                 // Resize nhiều lần để phát hiện vùng lọc tự cao dần hoặc cắt hàng đã xuống dòng.
                 foreach (var width in new[] { 1430, 1280, 1500, 1280 })
@@ -100,8 +125,24 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                             Assert.True(bounds.Bottom <= surface.ClientSize.Height && bounds.Top >= 0,
                                 $"Bộ lọc cắt {control.GetType().Name} {control.Name}: {bounds}; vùng chứa {surface.ClientSize}");
                         }
+                        if(surface.Height >= 330) { Capture(form,Path.Combine(output,"layout-overflow.png")); File.WriteAllLines(Path.Combine(output,"layout-overflow.txt"),Descendants(surface).Select(x=>$"{x.GetType().Name} {x.Name}: {x.Bounds}")); }
                         Assert.True(surface.Height < 330, $"Bộ lọc có khoảng trống bất thường: {surface.Height}px");
                     }
+                }
+                if (route is "manage-orders" or "cancelled-orders" or "invoices" or "refunds")
+                {
+                    var commerceGrid=Descendants(form).OfType<DataGridView>().Single(x=>x.Name=="AdminDataGrid");
+                    Assert.Equal(48,commerceGrid.ColumnHeadersHeight); Assert.Equal(64,commerceGrid.RowTemplate.Height);
+                    Assert.All(commerceGrid.Rows.Cast<DataGridViewRow>(),r=>Assert.Equal(64,r.Height));
+                    Assert.Equal(DataGridViewAdvancedCellBorderStyle.None,commerceGrid.AdvancedCellBorderStyle.Left);
+                    Assert.Equal(DataGridViewAdvancedCellBorderStyle.None,commerceGrid.AdvancedCellBorderStyle.Right);
+                    Assert.True(commerceGrid.Columns.GetColumnsWidth(DataGridViewElementStates.Visible)<=commerceGrid.ClientSize.Width,"Bảng không được buộc cuộn ngang tại 1280px.");
+                    var filters=Descendants(form).OfType<FlowLayoutPanel>().Single(x=>x.Name=="WorkspaceFilters");
+                    var dates=Descendants(filters).OfType<DateTimePicker>().ToArray();
+                    Assert.Equal(2,dates.Length);
+                    var dateBounds=dates.Select(x=>filters.RectangleToClient(x.RectangleToScreen(x.ClientRectangle))).ToArray();
+                    Assert.Equal(dateBounds[0].Top,dateBounds[1].Top);
+                    var source=commerceGrid.DataSource; await Task.Delay(5500); Assert.Same(source,commerceGrid.DataSource);
                 }
                 form.ClientSize = new Size(1430, 960); await Task.Delay(100);
                 Capture(form, Path.Combine(output, code + "-desktop.png"));
@@ -110,7 +151,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                 var buttons = Descendants(form).OfType<Button>().Where(b => b.Visible && (b.Name == "DashboardReload" || b.Parent is FlowLayoutPanel)).ToList();
                 Assert.NotEmpty(buttons);
                 foreach (var button in buttons) Assert.True(button.Height >= 32 && button.Width > 0, "Nút có vùng thao tác hợp lệ");
-                if (new[] { "stock", "manage-orders", "invoices", "refunds", "reports", "employees", "work-sessions", "pos-sale", "staff-orders", "staff-invoices" }.Contains(route))
+                if (new[] { "stock", "manage-orders", "cancelled-orders", "invoices", "refunds", "reports", "employees", "work-sessions", "pos-sale", "staff-orders", "staff-invoices" }.Contains(route))
                 {
                     // Ngày lọc không phụ thuộc vùng Windows, tránh tháng/ngày bị hiểu đảo ngược.
                     foreach (var picker in Descendants(form).OfType<DateTimePicker>().Where(x => x.Visible))
@@ -126,7 +167,7 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                     {
                         var report = Descendants(form).Single(x => x.Name == "ReportsManagementPage");
                         Assert.True(report.Height > 600, "Báo cáo phải đủ chiều cao để hiển thị KPI và bảng, không bị giới hạn UserControl 150px.");
-                        Assert.Equal(8, Descendants(report).Count(x => x.GetType().Name == "MetricCard"));
+                        Assert.Equal(3, Descendants(report).Count(x => x.GetType().Name == "MetricCard"));
                     }
                 }
                 if (route == "menu")
@@ -537,7 +578,26 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                     Assert.Equal(toppingIdsBefore, (await LiveSession.Api.GetRecipesAsync()).Where(r => r.MaMonThem is not null).Select(r => r.MaCongThuc).Order().ToArray());
                     Capture(form, Path.Combine(output, "ADM02-dish-recipes-clean.png"));
                 }
-                if (route == "reports") await ReportNavigationUiChecks.Run(form, output);
+                if (route == "inventory") await CheckInventoryHistory(form, output);
+                if (route == "reports")
+                {
+                    Assert.DoesNotContain(Descendants(form).OfType<Button>(),x=>x.Text is "Xuất PDF" or "Tệp đã xuất");
+                    Assert.Equal(new[]{"Đơn hoàn thành","Món bán chạy","Tiền đã hoàn"},Descendants(form).OfType<TabControl>().Single(x=>x.Name=="ReportTables").TabPages.Cast<TabPage>().Select(x=>x.Text));
+                    var auditButton=Descendants(form).OfType<Button>().Single(x=>x.Name=="ReportAudit");
+                    var seen=false; Exception? auditError=null;
+                    using var auditTimer=new System.Windows.Forms.Timer {Interval=100};
+                    auditTimer.Tick+=(_,_)=>
+                    {
+                        var audit=Application.OpenForms.Cast<Form>().FirstOrDefault(x=>x.Text=="Nhật ký hệ thống");
+                        if(audit is null||!Descendants(audit).OfType<DataGridView>().Any(x=>x.Tag is DateTime))return;
+                        auditTimer.Stop();
+                        try {Assert.Contains(Descendants(audit).OfType<ComboBox>().SelectMany(x=>x.Items.Cast<object>()).Select(x=>x.ToString()),x=>x=="SHIFT"); Assert.DoesNotContain(Descendants(audit).OfType<Button>(),x=>x.Text.Contains("Xuất")||x.Text.Contains("Xóa")||x.Text.Contains("Sửa"));Capture(audit,Path.Combine(output,"ADM07-audit.png"));seen=true;}
+                        catch(Exception error){auditError=error;}finally{audit.Close();}
+                    };
+                    auditTimer.Start(); auditButton.PerformClick(); await WaitUntil(()=>seen||auditError is not null);
+                    if(auditError is not null)throw auditError;
+                    await ReportNavigationUiChecks.Run(form, output);
+                }
                 if (route == "stock")
                 {
                     var page = Descendants(form).Single(x => x.GetType().Name == "StockDocumentsPage");
@@ -552,13 +612,16 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                     Assert.False(stockButtons.Single(b => b.Text == "Xác nhận nhập / xuất").Visible);
                     grid.DataSource = new List<StockDocumentView> { original with { TrangThai = "DRAFT", NgayThucHien = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)).AddDays(1) } };
                     Assert.True(stockButtons.Single(b => b.Text == "Sửa nháp").Visible);
-                    Assert.False(stockButtons.Single(b => b.Text == "Xác nhận nhập / xuất").Enabled);
+                    Assert.True(stockButtons.Single(b => b.Text == "Xác nhận nhập / xuất").Enabled);
                     grid.DataSource = actualRows;
                     await StockDocumentEditorChecks.Run(output);
                     await StockDocumentEditorChecks.SavedDraftIsVisible(form, output);
+                    await StockDocumentEditorChecks.ConfirmInsideEditor(form, output);
+                    await StockDocumentEditorChecks.DetailsAreReadOnly(form, output);
                 }
                 if (route == "employees") await WorkforceUiChecks.Employees(form, output);
                 if (route == "work-sessions") await WorkforceUiChecks.WorkSessions(form, output);
+                if (route is "invoices" or "refunds") await CheckFinancePages(form, route, output);
                 if (route == "manage-orders") CheckCompactOrderActions(form);
                 if (route == "menu") CheckSelectedRow(form);
                 if (route == "customer-reset") await ResetPassword(output);
@@ -576,6 +639,98 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
         Application.Run(loop); return exit;
     }
 
+    /// <summary>Hai trang tài chính chỉ có thao tác trong phạm vi, polling không rebind và chi tiết không có bảng kỹ thuật.</summary>
+    private static async Task CheckFinancePages(Form main, string route, string output)
+    {
+        var page = Descendants(main).Single(x => x.GetType().Name == (route == "invoices" ? "InvoicesManagementPage" : "RefundsManagementPage"));
+        var grid = Descendants(page).OfType<DataGridView>().Single(x => x.Name == "AdminDataGrid");
+        Assert.True(grid.ReadOnly);
+        if (route == "invoices")
+            Assert.Equal(new[] {"Số hóa đơn", "Mã đơn", "Khách hàng", "Số tiền", "Ngày phát hành"}, grid.Columns.Cast<DataGridViewColumn>().Select(x => x.HeaderText));
+        var toolbar = Descendants(page).OfType<FlowLayoutPanel>().Single(x => x.Name == "WorkspaceActions");
+        Assert.Equal(route == "invoices" ? new[] {"Xem hóa đơn", "In hóa đơn", "Tải PDF"} : new[] {"Xem chi tiết"}, toolbar.Controls.OfType<Button>().Where(x => x.Visible).Select(x => x.Text));
+        Assert.DoesNotContain(grid.Columns.Cast<DataGridViewColumn>(), x => x.DataPropertyName is "MaDonHang" or "PhienBanDuLieu" or "MaHoaDonGoc" or "TaiKhoanDaChe");
+        var original = grid.DataSource; await Task.Delay(5500); Assert.Same(original, grid.DataSource);
+        if (route == "refunds")
+        {
+            var filter = Descendants(page).OfType<ComboBox>().Single(x => x.Name == "RefundStatusFilter");
+            Assert.Equal(5,filter.Items.Count);
+            Assert.Equal("Chờ khách nhận",grid.Rows[0].Cells.Cast<DataGridViewCell>().Single(x => x.OwningColumn.DataPropertyName == "TrangThaiTheoDoi").FormattedValue);
+        }
+        var seen = false; Exception? failure = null;
+        using var timer = new System.Windows.Forms.Timer {Interval = 100};
+        timer.Tick += (_, _) =>
+        {
+            var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(x => x.Name == (route == "invoices" ? "BasicInvoiceDetails" : "RefundTrackingDetails"));
+            if (dialog is null) return;
+            timer.Stop();
+            try
+            {
+                Assert.DoesNotContain(Descendants(dialog),x => x is TabControl or NumericUpDown);
+                if (route == "invoices") Assert.DoesNotContain(Descendants(dialog).OfType<Label>(), x => x.Text is "Loại" or "Loại hóa đơn");
+                if (route == "refunds")
+                {
+                    Assert.Equal(5,Descendants(dialog).OfType<DataGridView>().Single(x => x.Name == "RefundPayoutHistory").Columns.Count);
+                    dialog.ClientSize = new Size(900, 660); dialog.PerformLayout();
+                    Assert.All(Descendants(dialog).Where(x => x.GetType().Name == "SurfacePanel"), x => Assert.True(x.Width <= dialog.ClientSize.Width));
+                }
+                Capture(dialog,Path.Combine(output,"ADM06-"+route+"-details.png")); seen = true;
+            }
+            catch(Exception error) {failure=error;}
+            finally {dialog.Close();}
+        };
+        timer.Start(); toolbar.Controls.OfType<Button>().First().PerformClick();
+        await WaitUntil(() => seen || failure is not null);
+        if(failure is not null)throw failure;
+    }
+
+    /// <summary>Mở lịch sử qua nút thật, kiểm đúng snapshot/tăng giảm, không có tab kỹ thuật và trạng thái chưa phát sinh.</summary>
+    private static async Task CheckInventoryHistory(Form main, string output)
+    {
+        var inventory = Descendants(main).OfType<FourChang.Desktop.Admin.Inventory.InventoryPage>().Single();
+        var list = Descendants(inventory).OfType<DataGridView>().Single(g => g.Name == "AdminDataGrid");
+        var stock = (StockView)list.CurrentRow!.DataBoundItem;
+        var expected = await LiveSession.Api.GetStockDetailsAsync(stock.MaNguyenLieu);
+        Assert.NotEmpty(expected.BienDong);
+        var checkedDialog = false;
+        using var timer = new System.Windows.Forms.Timer { Interval = 50 };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.Name == "InventoryHistoryForm");
+            if (dialog is null) return;
+            timer.Stop();
+            var controls = Descendants(dialog).ToList();
+            Assert.Empty(controls.OfType<TabControl>());
+            var history = controls.OfType<DataGridView>().Single(g => g.Name == "InventoryHistoryGrid");
+            Assert.True(history.Visible); Assert.True(history.ReadOnly);
+            Assert.Equal(new[] { "Thời gian", "Hoạt động", "Số lượng thay đổi", "Nguồn", "Ghi chú" }, history.Columns.Cast<DataGridViewColumn>().Select(c => c.HeaderText));
+            Assert.Equal(expected.BienDong.Count, history.RowCount);
+            Assert.Equal("Nhập kho", history.Rows[0].Cells["HoatDong"].Value);
+            Assert.StartsWith("+", history.Rows[0].Cells["SoLuong"].FormattedValue.ToString());
+            Assert.Contains(stock.DonVi, history.Rows[0].Cells["SoLuong"].FormattedValue.ToString());
+            Assert.Equal(stock.DonVi, controls.Single(c => c.Name == "InventoryHistoryValue0").Text);
+            Capture(dialog, Path.Combine(output, "ADM04-inventory-history.png"));
+            dialog.Size = dialog.MinimumSize;
+            dialog.PerformLayout();
+            var close = controls.Single(c => c.Name == "InventoryHistoryClose");
+            Assert.True(dialog.RectangleToClient(close.RectangleToScreen(close.ClientRectangle)).Bottom <= dialog.ClientSize.Height);
+            Assert.True(history.Columns.Cast<DataGridViewColumn>().Sum(c => c.Width) <= history.ClientSize.Width);
+            Capture(dialog, Path.Combine(output, "ADM04-inventory-history-compact.png"));
+            checkedDialog = true; dialog.Close();
+        };
+        timer.Start();
+        Descendants(inventory).OfType<Button>().Single(b => b.Text == "Lịch sử kho").PerformClick();
+        await WaitUntil(() => checkedDialog);
+        using var empty = new FourChang.Desktop.Admin.Inventory.InventoryHistoryForm(expected with
+        { BienDong = [], NguyenLieu = stock with { TonThucTe = null, GiuCho = null, KhaDung = null } })
+        { StartPosition = FormStartPosition.Manual, Location = new Point(-12000, -12000) };
+        empty.Show(); await Task.Delay(100);
+        Assert.Equal("Chưa phát sinh nhập, xuất hoặc pha chế.", Descendants(empty).Single(c => c.Name == "InventoryHistoryEmpty" && c.Visible).Text);
+        Assert.Equal("Chưa xác định", Descendants(empty).Single(c => c.Name == "InventoryHistoryValue1").Text);
+        Capture(empty, Path.Combine(output, "ADM04-inventory-history-empty.png"));
+        empty.Close();
+    }
+
     /// <summary>Kiểm thanh đơn chỉ ba nút và menu phụ vẫn có thao tác hợp lệ; mô phỏng trạng thái chỉ ở binding UI.</summary>
     private static void CheckCompactOrderActions(Form form)
     {
@@ -588,17 +743,13 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
         var original=(AdminOrderRow)grid.CurrentRow!.DataBoundItem;
         try
         {
-            foreach(var pair in new[]{("PENDING_CONFIRMATION","Tiếp nhận"),("ACCEPTED","Bắt đầu pha"),("PREPARING","Pha xong"),("READY","Bàn giao / hoàn tất")})
+            foreach(var status in new[]{"PENDING_CONFIRMATION","ACCEPTED","PREPARING","READY","COMPLETED"})
             {
-                grid.DataSource=new List<AdminOrderRow>{original with{TrangThai=pair.Item1}};
-                Assert.True(next.Visible);Assert.Equal(pair.Item2,next.Text);
+                grid.DataSource=new List<AdminOrderRow>{original with{TrangThai=status,YeuCauHuy=null}};
+                Assert.False(next.Visible); Assert.False(more.Visible);
             }
-            grid.DataSource=new List<AdminOrderRow>{original with{TrangThai="ACCEPTED"}};
-            more.PerformClick();Assert.NotNull(more.ContextMenuStrip);Assert.True(more.ContextMenuStrip!.Visible);
-            Assert.Contains(more.ContextMenuStrip.Items.Cast<ToolStripItem>(),x=>x.Text=="Hủy phần chưa pha");
-            more.ContextMenuStrip.Close();
-            grid.DataSource=new List<AdminOrderRow>{original with{TrangThai="COMPLETED"}};
-            Assert.False(next.Visible);Assert.False(more.Enabled);
+            grid.DataSource=new List<AdminOrderRow>{original with{TrangThai="DELIVERING",HinhThuc="DELIVERY",YeuCauHuy=null}};
+            Assert.True(next.Visible); Assert.Equal("Giao thất bại",next.Text); Assert.False(more.Visible);
         }
         finally{grid.DataSource=saved;}
     }

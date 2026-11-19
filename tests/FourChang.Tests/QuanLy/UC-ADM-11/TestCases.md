@@ -1,15 +1,7 @@
-# UC-ADM-11 — Test case
-
-Nguồn: docs/use-cases/UC-ADM-11.md. BR: 05,06,08,09,13,14,28,29,33. Tất cả dùng chung FourChang.Tests.csproj, dữ liệu fixture riêng.
-
-| Nhóm | Luồng / BR | File, phương thức | Kết quả cần đạt |
-|---|---|---|---|
-| Thêm, tìm, phân trang, tên trùng | Chính, A1, E2/E6; BR13,14,29,33 | EmployeeAdministrationTests.Them_Tim_PhanTrang_TenTrung_VaChongLap | Tên trùng có mã riêng; lặp cùng mã chỉ một hồ sơ; trang rỗng hợp lệ |
-| Sửa/trạng thái | A2/A3, E3; BR08,09,28,29,33 | Sua_HoSo_TrangThai_VaVersion | Địa chỉ lưu đúng, stale version409, có lý do, không sinh tài khoản |
-| Ca đang mở/lịch sử | A3/A4/A6, E4; BR09,33 | CoCa_ChanNgung_Xoa_VaGiuSnapshot | Chặn ngừng/xóa, lịch sử giữ tên đã chốt |
-| Xóa/rollback | A6, E7; BR14,29,33 | XoaCoDieuKien_VaRollbackAudit | Chỉ xóa hồ sơ chưa tham chiếu, receipt lặp; audit lỗi rollback |
-| Dữ liệu/quyền | E1/E5; BR05,06,08,33 | DuLieuSai_VaPhanQuyen | Dữ liệu sai400, ẩn danh401, Staff/Customer403 |
-| UI hồ sơ | Chính, A1/A2/A4/A5 | EmployeeUiTests.HoSo_TimKiem_DiaChi_LichSu_ThaoTacBangControl | Nhập bằng control thật, địa chỉ lưu, hủy không ghi, tìm/tải lại, lịch sử đúng nhân viên |
-| Cạnh tranh mở/ngừng và người nhận | E3/E4; BR09,29,33 | UC-ADM-12/WorkSessionConcurrencyTests | Không có nhân viên INACTIVE mở ca mới; chặn người đang chờ bàn giao |
-
-Chạy: `dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-11"`. API/SQL thật; WinForms chạy trên Windows STA. Ảnh/geometry trong artifacts/tests; không chứa mã phục hồi/token.
+# UC-ADM-08 — tái sử dụng UC-ADM-11/12
+- Hồ sơ: tên trùng vẫn phân biệt ID; tìm/lọc/trang, lưu replay/stale/rollback, sửa địa chỉ không đổi snapshot ca; ngừng/chờ nhận bàn giao bị chặn, kích hoạt không mở lại ca.
+- Ca: chỉ completed đúng ca hoàn tất, tiền/ngày snapshot; tiền thu/hoàn thuộc ca phát sinh, kiểm đếm khớp mới kết/chuyển. Chưa gửi không đổi thành0. Ca kết thúc hợp lệ không cần Admin duyệt lại.
+- Bàn giao: đủ tập đơn/khoản chưa rõ + đúng phiên bản/mốc, replay1biên bản;2ca tranh người nhận chỉ1thành công, không khóa máy quán dùng chung. Người nhận được đổi máy nhưng phải đúng nhân viên.
+- Toàn chuỗi: caA thu, caA bàn giao, caB pha/hoàn tất, caB có doanh thu/đơn, caA giữ tiền; báo cáo/chi tiết ca khớp. CaB tự kết thúc và không lặp Chiều trong ngày, Tối mở được không buộc giờ.
+- Phục hồi: mã một lần/hết hạn/cấp lại, không chứa trong audit/receipt, không cấp quyền bán/Admin, gửi số đếm đúng rồi chốt ngoại lệ ca chưa kết thúc. Khóa tạm/tiếp tục cũ không tồn tại.
+- UI:4nút nhân viên, lọc ngày/tên ca gọn, chi tiết3tab, không ô nhập tiền Admin hoặc mã kỹ thuật không cần thiết. Resize/footer/không chớp và giữ hồ sơ/ca đang chọn.

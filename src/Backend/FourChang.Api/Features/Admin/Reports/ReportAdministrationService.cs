@@ -8,83 +8,75 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.Reports;
 
-/// <summary>UC-ADM-10: phân biệt doanh thu hoàn tất, tiền thực thu và hoàn theo thời điểm chi; chụp mốc xuất bất biến.</summary>
+/// <summary>UC-ADM-07: báo cáo tinh gọn theo đơn hoàn thành và tiền đã hoàn; nhật ký chỉ đọc.</summary>
 public sealed class ReportAdministrationService(CafeDbContext db, ReportPermissions permissions, ReportSnapshotStore store)
 {
-    /// <summary>Tổng hợp cùng transaction, không dùng số 0 thay lỗi truy vấn; lưu snapshot để xuất đúng mốc đã xem.</summary>
+    /// <summary>UC-ADM-07: chỉ tổng hợp đơn hoàn thành và tiền hoàn thực trả trong kỳ; chụp cùng transaction để xuất đúng dữ liệu đã xem.</summary>
     public async Task<ReportSnapshot> Read(ReportFilter filter, HttpContext context)
     {
         permissions.Demand("ReportsRead");
-        if (filter.TuLuc.Kind == DateTimeKind.Unspecified || filter.DenLuc.Kind == DateTimeKind.Unspecified || filter.TuLuc >= filter.DenLuc)
-            throw new AdminRule(400, "Chọn kỳ có múi giờ; cận cuối phải sau cận đầu.");
+        if (filter.TuLuc.Kind == DateTimeKind.Unspecified || filter.DenLuc.Kind == DateTimeKind.Unspecified || filter.TuLuc >= filter.DenLuc ||
+            filter.Kenh is not (null or "WEB" or "POS") || filter.HinhThuc is not (null or "DINE_IN" or "TAKEAWAY" or "DELIVERY") || filter.MaCa is <= 0)
+            throw new AdminRule(400, "Chọn khoảng ngày, nguồn đơn, hình thức nhận và ca hợp lệ.");
         var start = filter.TuLuc.ToUniversalTime(); var end = filter.DenLuc.ToUniversalTime();
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var q = db.DonHang.AsNoTracking().AsQueryable();
-        if (filter.Kenh is { Length: > 0 }) q = q.Where(x => x.KenhDatHang == filter.Kenh);
-        if (filter.HinhThuc is { Length: > 0 }) q = q.Where(x => x.HinhThucNhanMon == filter.HinhThuc);
-        if (filter.MaCa is { } shift) q = q.Where(x => x.MaCaLamViec == shift);
-        // Không lọc đơn theo ngày tạo trước khi tính dòng tiền: thu/hoàn có thể thuộc đơn của kỳ trước.
-        var orders = await q.ToListAsync(); var ids = orders.Select(x => x.MaDonHang).ToArray();
-        var created = orders.Where(x => x.ThoiDiemTao >= start && x.ThoiDiemTao < end).ToList();
-        var completed = orders.Where(x => x.TrangThai == "COMPLETED" && x.HoanTatLuc >= start && x.HoanTatLuc < end).ToList();
-        var doneIds = completed.Select(x => x.MaDonHang).ToArray();
+        var orders = db.DonHang.AsNoTracking().AsQueryable();
+        if (filter.Kenh is { } channel) orders = orders.Where(x => x.KenhDatHang == channel);
+        if (filter.HinhThuc is { } fulfillment) orders = orders.Where(x => x.HinhThucNhanMon == fulfillment);
+        var refundOrders = orders; // Hoàn tiền thuộc ca chi thực tế, không chuyển giao dịch từ ca trước.
+        if (filter.MaCa is { } shift) orders = FourChang.Api.Shared.WorkSessions.HandoverLink.CompletedByShift(db, orders, shift);
+        // Ngày hoàn thành độc lập ngày tạo/thanh toán: đã thu nhưng chưa giao xong chưa tính doanh thu.
+        var completed = await orders.Where(x => x.TrangThai == "COMPLETED" && x.HoanTatLuc >= start && x.HoanTatLuc < end)
+            .OrderByDescending(x => x.HoanTatLuc).ThenByDescending(x => x.MaDonHang).ToListAsync();
+        var ids = completed.Select(x => x.MaDonHang).ToArray();
         var lines = await db.ChiTietDonHang.AsNoTracking().Where(x => ids.Contains(x.MaDonHang)).ToListAsync();
         var lineIds = lines.Select(x => x.MaChiTietDonHang).ToArray();
         var toppings = await db.MonThemChiTietDonHang.AsNoTracking().Where(x => lineIds.Contains(x.MaChiTietDonHang)).ToListAsync();
-        var payments = await db.ThanhToan.AsNoTracking().Where(x => ids.Contains(x.MaDonHang) && x.XacMinhLuc >= start && x.XacMinhLuc < end && x.SoTienDaXacMinh > 0).ToListAsync();
-        var bankTransfers = await (from b in db.GiaoDichNganHang.AsNoTracking() join p in db.ThanhToan.AsNoTracking() on b.MaThanhToan equals (long?)p.MaThanhToan
-                                   where ids.Contains(p.MaDonHang) && b.ChieuGiaoDich == "IN" && b.TrangThaiXacMinh == "VERIFIED" && b.ThoiDiemNganHang >= start && b.ThoiDiemNganHang < end
-                                   select new { b.MaGiaoDichNganHang, p.MaThanhToan, p.MaDonHang, b.SoTien, b.ThoiDiemNganHang }).ToListAsync();
-        var bankLinked = await (from b in db.GiaoDichNganHang.AsNoTracking() join p in db.ThanhToan.AsNoTracking() on b.MaThanhToan equals (long?)p.MaThanhToan
-                                where ids.Contains(p.MaDonHang) && b.ChieuGiaoDich == "IN" && b.TrangThaiXacMinh == "VERIFIED" select p.MaThanhToan).Distinct().ToListAsync();
-        var refunds = await db.HoSoHoanTien.AsNoTracking().Where(x => ids.Contains(x.MaDonHang)).ToListAsync();
-        var refundIds = refunds.Select(x => x.MaHoanTien).ToArray();
-        var attempts = await db.LanChiHoanTien.AsNoTracking().Where(x => refundIds.Contains(x.MaHoanTien) && x.TrangThai == "SUCCEEDED" && x.CoKetQuaLuc >= start && x.CoKetQuaLuc < end).ToListAsync();
-        var cancelled = await db.HuyMon.AsNoTracking().Where(x => lineIds.Contains(x.MaChiTietDonHang) && x.TrangThai == "ACCEPTED" && x.XuLyLuc >= start && x.XuLyLuc < end).ToListAsync();
-        var servedLines = lines.Where(x => doneIds.Contains(x.MaDonHang)).ToList();
-        decimal Unit(FourChang.Domain.Entities.Orders.ChiTietDonHang l) => l.GiaMonDaChot + toppings.Where(x => x.MaChiTietDonHang == l.MaChiTietDonHang).Sum(x => x.GiaMoiPhanDaChot * x.SoPhanMoiLy);
-        var goods = servedLines.Sum(x => Unit(x) * (x.SoLuongDat - x.SoLuongDaHuy)); var ship = completed.Sum(x => x.PhiGiaoHangHienTai);
-        var issuedComplaints = await db.HoaDon.AsNoTracking().Where(x => doneIds.Contains(x.MaDonHang) && x.LoaiHoaDon == "ADJUSTMENT" && x.TrangThai == "ISSUED" && x.MaHoanTien != null)
-            .Select(x => new { x.MaHoanTien, x.SoTien }).ToListAsync();
-        var complaints = -issuedComplaints.Sum(x => x.SoTien) + refunds.Where(x => doneIds.Contains(x.MaDonHang) && !issuedComplaints.Any(i => i.MaHoanTien == x.MaHoanTien) && x.LoaiNguon == "COMPLAINT" && x.TrangThai is "APPROVED" or "PROCESSING" or "PARTIALLY_REFUNDED" or "RECONCILING" or "REFUNDED").Sum(x => x.SoTienDuocDuyet ?? 0);
-        var cash = payments.Where(x => x.PhuongThuc == "CASH").Sum(x => x.SoTienDaXacMinh);
-        // Thu nhiều đợt khác kỳ phải theo từng giao dịch ngân hàng, không gom hết vào giờ xác minh cuối.
-        var legacyBank = payments.Where(x => x.PhuongThuc == "BANK_TRANSFER" && !bankLinked.Contains(x.MaThanhToan)).ToList();
-        var bank = bankTransfers.Sum(x => x.SoTien) + legacyBank.Sum(x => x.SoTienDaXacMinh);
-        var cashRefund = attempts.Where(x => x.PhuongThuc == "CASH").Sum(x => x.SoTien);
-        var bankRefund = attempts.Where(x => x.PhuongThuc == "BANK_TRANSFER").Sum(x => x.SoTien);
-        var activeCancellations = cancelled.Where(x => orders.Single(o => o.MaDonHang == lines.Single(l => l.MaChiTietDonHang == x.MaChiTietDonHang).MaDonHang).TrangThai != "EXPIRED").ToList();
-        var partialOrders = activeCancellations.Select(x => lines.Single(l => l.MaChiTietDonHang == x.MaChiTietDonHang).MaDonHang).Distinct().Count(id => orders.Single(o => o.MaDonHang == id).TrangThai != "CANCELLED");
-        var kpi = new ReportKpis(goods, ship, complaints, goods + ship - complaints, cash, bank, cashRefund, bankRefund,
-            cash + bank - cashRefund - bankRefund, created.Count, completed.Count, created.Count(x => x.TrangThai == "CANCELLED"), created.Count(x => x.TrangThai == "EXPIRED"),
-            partialOrders, activeCancellations.Sum(x => x.SoLuongHuy), created.Count == 0 ? null : (decimal)created.Count(x => x.TrangThai == "COMPLETED") / created.Count);
-        var variants = await db.CauHinhMon.AsNoTracking().ToDictionaryAsync(x => x.MaCauHinhMon, x => x.MaMon);
-        var top = servedLines.GroupBy(x => variants[x.MaCauHinhMon]).Select(g => (IReadOnlyList<string?>)new string?[]
-        { g.Key.ToString(), g.Last().TenMonDaChot, N(g.Sum(x => x.SoLuongDat - x.SoLuongDaHuy)), N(g.Sum(x => Unit(x) * (x.SoLuongDat - x.SoLuongDaHuy))),
-            N(g.Sum(x => toppings.Where(t => t.MaChiTietDonHang == x.MaChiTietDonHang).Sum(t => t.GiaMoiPhanDaChot * t.SoPhanMoiLy) * (x.SoLuongDat - x.SoLuongDaHuy))) }).OrderByDescending(x => decimal.Parse(x[2]!, CultureInfo.InvariantCulture)).ToList();
-        var stock = await (from n in db.NguyenLieu.AsNoTracking() join t in db.TonKho.AsNoTracking() on n.MaNguyenLieu equals t.MaNguyenLieu
-                           where t.TonThucTe - t.TongGiuCho <= n.NguongCanhBao
-                           select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, t.TonThucTe, t.TongGiuCho, n.TonAnToan, n.NguongCanhBao }).ToListAsync();
+        decimal Unit(FourChang.Domain.Entities.Orders.ChiTietDonHang line) => line.GiaMonDaChot +
+            toppings.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).Sum(x => x.GiaMoiPhanDaChot * x.SoPhanMoiLy);
+
+        // Giữ giảm trừ khiếu nại có chứng từ cũ; không trừ hai lần khi hồ sơ và chứng từ cùng một nguồn.
+        var adjustments = await db.HoaDon.AsNoTracking().Where(x => ids.Contains(x.MaDonHang) && x.LoaiHoaDon == "ADJUSTMENT" && x.TrangThai == "ISSUED" && x.MaHoanTien != null).ToListAsync();
+        var complaints = await db.HoSoHoanTien.AsNoTracking().Where(x => ids.Contains(x.MaDonHang) && x.LoaiNguon == "COMPLAINT" &&
+            (x.TrangThai == "APPROVED" || x.TrangThai == "PROCESSING" || x.TrangThai == "PARTIALLY_REFUNDED" || x.TrangThai == "RECONCILING" || x.TrangThai == "REFUNDED")).ToListAsync();
+        decimal Reduction(long order) => -adjustments.Where(x => x.MaDonHang == order).Sum(x => x.SoTien) +
+            complaints.Where(x => x.MaDonHang == order && !adjustments.Any(a => a.MaHoanTien == x.MaHoanTien)).Sum(x => x.SoTienDuocDuyet ?? 0);
+        decimal Total(long order, decimal shipping) => lines.Where(x => x.MaDonHang == order).Sum(x => Unit(x) * (x.SoLuongDat - x.SoLuongDaHuy)) + shipping - Reduction(order);
+        var goods = lines.Sum(x => Unit(x) * (x.SoLuongDat - x.SoLuongDaHuy));
+        var shippingTotal = completed.Sum(x => x.PhiGiaoHangHienTai);
+        var reduction = completed.Sum(x => Reduction(x.MaDonHang));
+
+        // Hoàn tiền theo ngày chi thành công, gồm cả đơn đã hủy hoặc đơn hoàn thành ở kỳ trước.
+        var paidRefunds = await (from a in db.LanChiHoanTien.AsNoTracking()
+            join r in db.HoSoHoanTien.AsNoTracking() on a.MaHoanTien equals r.MaHoanTien
+            join o in refundOrders on r.MaDonHang equals o.MaDonHang
+            where a.TrangThai == "SUCCEEDED" && a.CoKetQuaLuc >= start && a.CoKetQuaLuc < end && (filter.MaCa == null || a.MaCaLamViec == filter.MaCa)
+            orderby a.CoKetQuaLuc descending, a.MaLanChiHoan descending
+            select new { o.MaDonHang, o.KenhDatHang, r.TenNguoiNhan, a.SoTien, a.PhuongThuc, a.CoKetQuaLuc }).ToListAsync();
+        var cashRefund = paidRefunds.Where(x => x.PhuongThuc == "CASH").Sum(x => x.SoTien);
+        var bankRefund = paidRefunds.Where(x => x.PhuongThuc == "BANK_TRANSFER").Sum(x => x.SoTien);
+        var variantIds = lines.Select(x => x.MaCauHinhMon).Distinct().ToArray();
+        var products = await db.CauHinhMon.AsNoTracking().Where(x => variantIds.Contains(x.MaCauHinhMon)).ToDictionaryAsync(x => x.MaCauHinhMon, x => x.MaMon);
+        var bestsellers = lines.GroupBy(x => products[x.MaCauHinhMon])
+            .Select(g => new { Id = g.Key, Name = g.Last().TenMonDaChot, Quantity = g.Sum(x => x.SoLuongDat - x.SoLuongDaHuy), Amount = g.Sum(x => Unit(x) * (x.SoLuongDat - x.SoLuongDaHuy)) })
+            .Where(x => x.Quantity > 0).OrderByDescending(x => x.Quantity).ThenBy(x => x.Id).ToList();
         var tables = new List<ReportTable>
         {
-            new("Món đã phục vụ", [new("Mã món"), new("Tên món"), new("Số ly", "number"), new("Tiền hàng gồm topping", "number"), new("Trong đó topping", "number")], top),
-            new("Tỷ lệ đơn theo ngày tạo", [new("Trạng thái"), new("Số đơn", "number"), new("Tỷ lệ", "number")], created.GroupBy(x => x.TrangThai).Select(g => (IReadOnlyList<string?>)new string?[] { g.Key, N(g.Count()), N((decimal)g.Count() / created.Count) }).ToList()),
-            new("Nguyên liệu cảnh báo", [new("Mã"), new("Nguyên liệu"), new("Đơn vị"), new("Thực tế", "number"), new("Giữ", "number"), new("An toàn", "number"), new("Ngưỡng", "number")],
-                stock.Select(x => (IReadOnlyList<string?>)new string?[] { x.MaNguyenLieu.ToString(), x.TenNguyenLieu, x.DonViCoSo, N(x.TonThucTe), N(x.TongGiuCho), N(x.TonAnToan), N(x.NguongCanhBao) }).ToList()),
-            new("Nguồn thu trong kỳ", [new("Mã thu"), new("Mã đơn"), new("Phương thức"), new("Thực thu", "number"), new("Thời điểm UTC")],
-                payments.Where(x => x.PhuongThuc == "CASH").Concat(legacyBank).Select(x => (IReadOnlyList<string?>)new string?[] { x.MaThanhToan.ToString(), x.MaDonHang.ToString(), x.PhuongThuc + (x.PhuongThuc == "BANK_TRANSFER" ? " (số thu cũ chưa tách giao dịch)" : ""), N(x.SoTienDaXacMinh), x.XacMinhLuc?.ToString("O") })
-                    .Concat(bankTransfers.Select(x => (IReadOnlyList<string?>)new string?[] { "GD-" + x.MaGiaoDichNganHang + "/TT-" + x.MaThanhToan, x.MaDonHang.ToString(), "BANK_TRANSFER", N(x.SoTien), x.ThoiDiemNganHang.ToString("O") })).ToList()),
-            new("Hoàn thành công trong kỳ", [new("Mã lần chi"), new("Mã hồ sơ"), new("Phương thức"), new("Thực hoàn", "number"), new("Thời điểm UTC")],
-                attempts.Select(x => (IReadOnlyList<string?>)new string?[] { x.MaLanChiHoan.ToString(), x.MaHoanTien.ToString(), x.PhuongThuc, N(x.SoTien), x.CoKetQuaLuc?.ToString("O") }).ToList()),
-            new("Hủy món trong kỳ", [new("Mã hủy"), new("Mã đơn"), new("Mã dòng"), new("Số ly", "number"), new("Lý do")], activeCancellations.Select(x => (IReadOnlyList<string?>)new string?[] {
-                x.MaHuyMon.ToString(), lines.Single(l => l.MaChiTietDonHang == x.MaChiTietDonHang).MaDonHang.ToString(), x.MaChiTietDonHang.ToString(), N(x.SoLuongHuy), x.LyDoHuy }).ToList())
+            new("Đơn hoàn thành", [new("Mã đơn"), new("Khách hàng"), new("Tổng tiền", "number"), new("Hoàn thành lúc", "datetime")],
+                completed.Select(x => (IReadOnlyList<string?>)new string?[] { FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TenNguoiNhan ?? "Khách tại quầy", N(Total(x.MaDonHang, x.PhiGiaoHangHienTai)), x.HoanTatLuc?.ToString("O") }).ToList()),
+            new("Món bán chạy", [new("Tên món"), new("Số ly", "number"), new("Tiền món", "number")],
+                bestsellers.Select(x => (IReadOnlyList<string?>)new string?[] { x.Name, N(x.Quantity), N(x.Amount) }).ToList()),
+            new("Tiền đã hoàn", [new("Mã đơn"), new("Người nhận"), new("Phương thức"), new("Số tiền", "number"), new("Trả tiền lúc", "datetime")],
+                paidRefunds.Select(x => (IReadOnlyList<string?>)new string?[] { FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TenNguoiNhan, x.PhuongThuc == "CASH" ? "Tiền mặt" : "Chuyển khoản", N(x.SoTien), x.CoKetQuaLuc?.ToString("O") }).ToList())
         };
+        // Các trường KPI cũ còn trong hợp đồng để đọc snapshot lịch sử; báo cáo mới không sử dụng các phân tích đã bỏ.
+        var kpis = new ReportKpis(goods, shippingTotal, reduction, goods + shippingTotal - reduction, 0, 0, cashRefund, bankRefund, 0, 0, completed.Count, 0, 0, 0, 0, null);
         var snapshot = new ReportSnapshot(Guid.NewGuid(), DateTime.UtcNow, filter, "Asia/Ho_Chi_Minh (UTC+07)",
-            "Doanh thu: đơn COMPLETED theo giờ hoàn tất, bỏ ly hủy; tách ship và điều chỉnh khiếu nại đã duyệt tại mốc. Thu: tiền mặt theo giờ xác minh, chuyển khoản theo từng giao dịch ngân hàng; số thu cũ chưa tách giao dịch được ghi rõ riêng; hoàn: SUCCEEDED theo giờ chi. Tỷ lệ: trạng thái hiện tại của đơn tạo trong kỳ; mẫu số là tổng đơn tạo trong kỳ. Món nhóm theo ID, topping tách giá trị; hoàn chung xem bảng hoàn, không phân bổ giả theo món.", kpi, tables);
+            "Tổng tiền chỉ tính đơn đã hoàn thành trong kỳ, gồm phí giao và giảm trừ hợp lệ. Tiền hoàn tính riêng theo ngày trả thành công, không trừ lần hai khỏi tổng đơn. Món bán chạy bỏ số ly đã hủy.", kpis, tables, "REPORT_SIMPLE");
         await tx.CommitAsync();
-        await store.Save(snapshot, long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!)); return snapshot;
+        await store.Save(snapshot, long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!));
+        return snapshot;
     }
-
     /// <summary>Tra audit độc lập quyền báo cáo, phân trang và che dữ liệu bí mật; không có sửa/xóa.</summary>
     public async Task<AdminPage<AdminTraceRow>> Audit(AuditFilter filter, HttpContext? context = null)
     {

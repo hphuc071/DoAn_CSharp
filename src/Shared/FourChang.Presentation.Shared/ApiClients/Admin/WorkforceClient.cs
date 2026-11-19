@@ -18,9 +18,10 @@ public sealed partial class CafeApiClient
     /// <summary>Tra cứu receipt để phân biệt timeout với chưa lưu.</summary>
     public Task<Employee> EmployeeReceiptAsync(Guid id) => SendAsync<Employee>(HttpMethod.Get, $"/api/admin/employees/operations/{id}");
     /// <summary>Gửi các bộ lọc ca; ngày được đổi UTC trước khi gửi.</summary>
-    public Task<WorkSessionPage> GetWorkSessionsAsync(long? employee, DateTime? from, DateTime? to, string name, string status, string machine, int page)
+    public Task<WorkSessionPage> GetWorkSessionsAsync(long? employee, DateTime? from, DateTime? to, string name, string status, string machine, int page, string? search = null)
     {
         var args = new List<string> { $"page={page}", "pageSize=20", $"name={Uri.EscapeDataString(name)}", $"status={status}", $"machine={Uri.EscapeDataString(machine)}" };
+        if (!string.IsNullOrWhiteSpace(search)) args.Add("search=" + Uri.EscapeDataString(search));
         if (employee is not null) args.Add($"employee={employee}");
         if (from is not null) args.Add("from=" + Uri.EscapeDataString(from.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)));
         if (to is not null) args.Add("to=" + Uri.EscapeDataString(to.Value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture)));

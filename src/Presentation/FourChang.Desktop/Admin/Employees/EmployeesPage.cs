@@ -9,7 +9,7 @@ using FourChang.Presentation.Shared.Contracts.Staff;
 
 namespace FourChang.Desktop.Admin.Employees;
 
-/// <summary>ADM-11: danh sách phân trang, hồ sơ, trạng thái/xóa có điều kiện và nối lịch sử ca ADM-12.</summary>
+/// <summary>UC-ADM-08: hồ sơ/trạng thái nhân viên và lịch sử ca; không xóa lịch sử từ giao diện.</summary>
 public sealed class EmployeesPage : UserControl
 {
     private readonly TextBox search = Ui.Input("Tên hoặc số điện thoại", "", 340);
@@ -19,12 +19,14 @@ public sealed class EmployeesPage : UserControl
     private readonly Label counter = Ui.Label("", 9, false, CafeTheme.Muted);
     private readonly List<Button> buttons = [];
     private readonly AdminListLayout layout;
+    private readonly Button statusButton;
+    private string? boundSnapshot;
     private int page = 1;
     private int total;
     private bool busy;
     private DateTime? loaded;
     private readonly Dictionary<long, EmployeeStatusInput> pendingStatuses = [];
-    private readonly Dictionary<long, DeleteEmployeeInput> pendingDeletions = [];
+
 
     /// <summary>Dựng khung đồng bộ các trang quản lý đã tinh chỉnh, giữ mã nội bộ làm khóa chọn dòng.</summary>
     public EmployeesPage()
@@ -33,7 +35,7 @@ public sealed class EmployeesPage : UserControl
         Name = "EmployeesPage"; AutoSize = true; AutoSizeMode = AutoSizeMode.GrowAndShrink; Dock = DockStyle.Top; Padding = new Padding(16); BackColor = CafeTheme.Cream;
         search.Name = "EmployeeSearch"; status.Name = "EmployeeStatusFilter"; grid.Name = "EmployeesGrid";
         foreach (var (property, caption, weight) in new[] { ("MaNhanVien", "Mã", 45f), ("HoTen", "Họ tên", 150f), ("SoDienThoai", "Điện thoại", 100f),
-            ("DiaChiLienHe", "Địa chỉ liên hệ", 180f), ("NgayVaoLam", "Ngày vào làm", 100f), ("TrangThai", "Trạng thái", 100f) })
+            ("NgayVaoLam", "Ngày vào làm", 100f), ("TrangThai", "Trạng thái", 100f) })
             grid.Columns.Add(new DataGridViewTextBoxColumn { Name = property, DataPropertyName = property, HeaderText = caption, FillWeight = weight, SortMode = DataGridViewColumnSortMode.NotSortable });
         grid.AutoGenerateColumns = false;
         grid.Columns["NgayVaoLam"].DefaultCellStyle.Format = "dd/MM/yyyy";
@@ -41,13 +43,21 @@ public sealed class EmployeesPage : UserControl
         var filters = Ui.Row(Ui.Field("Tìm kiếm", search), Ui.Field("Trạng thái", status));
         var filterActions = Ui.Row(Action("Tìm kiếm", Find, true), Action("Tải lại", Reset));
         filterActions.Dock = DockStyle.None; filterActions.Margin = new Padding(0, 30, 0, 8); filters.Controls.Add(filterActions);
-        var actions = Ui.Row(Action("Thêm nhân viên", () => Edit(null), true), Action("Xem hồ sơ", View), Action("Sửa hồ sơ", EditSelected),
-            Action("Ngừng / kích hoạt lại", ChangeStatus), Action("Xóa có điều kiện", Delete), Action("Lịch sử ca", History));
+        statusButton = Action("Ngừng làm", ChangeStatus);
+        var actions = Ui.Row(Action("Thêm nhân viên", () => Edit(null), true), Action("Sửa hồ sơ", EditSelected), statusButton, Action("Lịch sử ca", History));
         var footer = Ui.Row(Action("Trang trước", Previous), Action("Trang sau", Next), counter);
-        layout = new AdminListLayout("Danh sách nhân viên", "Hồ sơ làm việc · Trạng thái · Lịch sử ca; không tạo tài khoản nhân viên", filters, actions, message, grid, footer, "NHÂN SỰ / NHÂN VIÊN");
+        layout = new AdminListLayout("Danh sách nhân viên", "Thông tin liên hệ • Trạng thái làm việc • Lịch sử ca", filters, actions, message, grid, footer, "NHÂN SỰ / NHÂN VIÊN", fitTableToRows: false);
         Controls.Add(layout);
+        CommerceWorkspaceVisuals.AdminStyle(filters, actions, grid);
+        grid.CurrentCellChanged += (_, _) => UpdateSelection();
+        grid.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0 && !busy) await View(); };
+        grid.CellPainting += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || grid.Columns[e.ColumnIndex].Name != "TrangThai" || grid.Rows[e.RowIndex].DataBoundItem is not Employee row) return;
+            CommerceWorkspaceVisuals.StatusBadge(grid, e, row.TrangThai == "ACTIVE" ? "Đang làm" : "Ngừng làm", row.TrangThai == "ACTIVE");
+        };
         HandleCreated += async (_, _) => { SetBusy(true); try { await LoadPage(); } finally { SetBusy(false); } };
-        search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; if (!busy) await Find(); } };
+        search.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; if (!busy) { SetBusy(true); try { await Find(); } finally { SetBusy(false); } } } };
     }
 
     /// <summary>Giữ điểm gọi router cũ để tích hợp không phải đổi nơi tạo trang.</summary>
@@ -76,7 +86,7 @@ public sealed class EmployeesPage : UserControl
         if (IsDisposed) return;
         foreach (var button in buttons) button.Enabled = !value;
         search.Enabled = status.Enabled = !value;
-        layout.Busy = value;
+        layout.Busy = value; UpdateSelection();
     }
 
     /// <summary>Tải trang từ server; mất mạng giữ bảng cũ kèm thời điểm, không thay bằng số liệu giả.</summary>
@@ -88,7 +98,15 @@ public sealed class EmployeesPage : UserControl
             if (IsDisposed) return;
             total = data.Total;
             if (data.Items.Count == 0 && total > 0 && page > 1) { page = Math.Max(1, (total + 19) / 20); await LoadPage(); return; }
-            grid.DataSource = data.Items.ToList();
+            var snapshot = System.Text.Json.JsonSerializer.Serialize(data.Items);
+            if (snapshot != boundSnapshot)
+            {
+                var chosen = (grid.CurrentRow?.DataBoundItem as Employee)?.MaNhanVien;
+                grid.DataSource = data.Items.ToList(); boundSnapshot = snapshot;
+                var index = data.Items.Select((x, i) => (x, i)).FirstOrDefault(x => x.x.MaNhanVien == chosen).i;
+                if (grid.RowCount > 0) grid.CurrentCell = grid.Rows[index].Cells[0];
+            }
+            UpdateSelection();
             loaded = DateTime.Now;
             counter.Text = $"Trang {page}/{Math.Max(1, (total + 19) / 20)} · {total} nhân viên";
             message.Text = "";
@@ -96,6 +114,13 @@ public sealed class EmployeesPage : UserControl
         catch (CafeApiException ex) { message.Text = ex.Message + (loaded is null ? " Chưa tải được hồ sơ." : " · Đang hiển thị dữ liệu đã tải trước đó."); }
     }
 
+    /// <summary>Chỉ bật thao tác hồ sơ khi có dòng; tên nút thể hiện đúng trạng thái hiện tại.</summary>
+    private void UpdateSelection()
+    {
+        var selected = grid.CurrentRow?.DataBoundItem as Employee;
+        statusButton.Text = selected?.TrangThai == "INACTIVE" ? "Kích hoạt lại" : "Ngừng làm";
+        foreach (var button in buttons.Where(x => x == statusButton || x.Text is "Sửa hồ sơ" or "Lịch sử ca")) button.Enabled = !busy && selected is not null;
+    }
     /// <summary>Bộ lọc mới luôn bắt đầu trang đầu.</summary>
     private async Task Find() { page = 1; await LoadPage(); }
     /// <summary>Bỏ từ khóa/trạng thái trước tải lại, trả tổng ban đầu.</summary>
@@ -155,24 +180,4 @@ public sealed class EmployeesPage : UserControl
         await LoadPage();
     }
 
-    /// <summary>Máy chủ kiểm tra tham chiếu/version sau hộp xác nhận; không xóa người đã có lịch sử ca.</summary>
-    private async Task Delete()
-    {
-        if (grid.CurrentRow?.DataBoundItem is not Employee selected) return;
-        var id = selected.MaNhanVien;
-        if (!pendingDeletions.TryGetValue(id, out var input))
-        {
-            var item = await LiveSession.Api.GetEmployeeAsync(id);
-            if (MessageBox.Show(FindForm(), $"Xóa hồ sơ #{id} · {item.HoTen}? Chỉ xóa được khi chưa có ca hoặc tham chiếu.", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-            input = new(item.PhienBanDuLieu!, Guid.NewGuid());
-            pendingDeletions[id] = input;
-        }
-        try
-        {
-            await AdminUi.Recover(() => LiveSession.Api.DeleteEmployeeAsync(id, input), () => LiveSession.Api.EmployeeOperationReceiptAsync(input.MaThaoTac));
-            pendingDeletions.Remove(id);
-        }
-        catch (CafeApiException ex) { if (ex.StatusCode is not null && (int)ex.StatusCode < 500) pendingDeletions.Remove(id); throw; }
-        await LoadPage();
-    }
 }

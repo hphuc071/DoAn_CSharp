@@ -6,7 +6,7 @@ using FourChang.Presentation.Shared.Contracts.Admin;
 namespace FourChang.Tests.Admin;
 
 /// <summary>UC-ADM-08: snapshot bất biến, điều chỉnh duy nhất và PDF đọc được tiếng Việt.</summary>
-[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-08"), Trait("Actor", "QuanLy")]
+[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-06"), Trait("Actor", "QuanLy")]
 public sealed class InvoiceAdministrationTests(AdminFeatureFixture fixture)
 {
     /// <summary>Giá menu đổi không đổi hóa đơn; xem PDF không phát hành thêm hoặc tăng thu.</summary>
@@ -28,7 +28,7 @@ public sealed class InvoiceAdministrationTests(AdminFeatureFixture fixture)
         var scenario = await OperationsScenarioSeed.Create(fixture, "ACCEPTED", invoice: true); var id = scenario.Invoice!.Value;
         var original = await Detail(id);
         var order = (await fixture.Send("GET", $"/api/admin/orders/{scenario.Order}")).Deserialize<AdminOrderDetail>(new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
-        await fixture.Send("POST", $"/api/admin/orders/{scenario.Order}/actions", new OrderActionInput("CANCEL", "Khách đổi ý một ly", order.Don.PhienBanDuLieu, Guid.NewGuid(), scenario.Line, 1));
+        await OperationsScenarioSeed.RequestAndApprove(fixture, scenario);
         var source = long.Parse(await fixture.Api.Sql($"SELECT TOP(1) MaHuyMon FROM dbo.HuyMon WHERE MaChiTietDonHang={scenario.Line}"));
         var input = new InvoiceAdjustmentInput(source, "Điều chỉnh dòng đã hủy", original.HoaDon.PhienBanDuLieu, Guid.NewGuid());
         var receipt = await fixture.Send("POST", $"/api/admin/invoices/{id}/adjustments", input);

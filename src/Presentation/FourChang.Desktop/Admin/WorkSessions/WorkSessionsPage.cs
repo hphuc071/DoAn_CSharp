@@ -7,20 +7,21 @@ using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Desktop.Admin.WorkSessions;
 
-/// <summary>ADM-12: lọc/phân trang ca, giữ mã nhân viên khi mở lịch sử và không có quản trị thiết bị.</summary>
+/// <summary>UC-ADM-08: lọc/phân trang ca, giữ mã nhân viên khi mở lịch sử và không có quản trị thiết bị.</summary>
 public sealed class WorkSessionsPage : UserControl
 {
-    private readonly TextBox employee = Ui.Input("Mã nhân viên, để trống: tất cả", "", 235);
-    private readonly TextBox machine = Ui.Input("Mã máy lịch sử", "", 180);
-    private readonly ComboBox name = Ui.Select("Tất cả ca", "Sáng", "Chiều", "Tối");
-    private readonly ComboBox state = Ui.Select("Tất cả trạng thái", "Đang mở", "Đang khóa", "Đã chốt", "Đã bàn giao");
-    private readonly DateTimePicker from = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 160, Value = DateTime.Today.AddMonths(-1) };
+    private readonly TextBox employee = Ui.Input("Tên hoặc mã nhân viên", "", 235);
+
+    private readonly ComboBox name = Ui.Select("Tất cả", "Sáng", "Chiều", "Tối");
+    private readonly ComboBox state = Ui.Select("Tất cả", "Đang làm", "Chờ đối chiếu", "Đã kết thúc", "Đã bàn giao");
+    private readonly DateTimePicker from = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 160, Value = DateTime.Today.AddDays(-30) };
     private readonly DateTimePicker to = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 160, Value = DateTime.Today };
     private readonly DataGridView grid = Ui.Grid(new([], []), 400);
     private readonly Label message = Ui.Label("", 9, false, CafeTheme.Muted);
     private readonly Label counter = Ui.Label("", 9, false, CafeTheme.Muted);
     private readonly List<Button> buttons = [];
     private readonly AdminListLayout layout;
+    private string? boundSnapshot;
     private int page = 1;
     private int total;
     private bool busy;
@@ -34,29 +35,42 @@ public sealed class WorkSessionsPage : UserControl
         employee.Text = employeeId?.ToString() ?? "";
         if (employeeId is not null) from.Value = DateTime.Today.AddYears(-1);
         state.Width = 210;
-        employee.Name = "WorkSessionEmployeeFilter"; machine.Name = "WorkSessionMachineFilter"; name.Name = "WorkSessionNameFilter";
+        employee.Name = "WorkSessionEmployeeFilter"; name.Name = "WorkSessionNameFilter";
         state.Name = "WorkSessionStateFilter"; from.Name = "WorkSessionFrom"; to.Name = "WorkSessionTo"; grid.Name = "WorkSessionsGrid";
-        foreach (var (property, caption, weight) in new[] { ("MaCaLamViec", "Mã ca", 55f), ("MaNhanVien", "Mã NV", 55f), ("HoTen", "Nhân viên", 160f),
-            ("TenCa", "Ca", 65f), ("MaMay", "Máy (lịch sử)", 110f), ("BatDauLuc", "Bắt đầu", 120f), ("KetThucLuc", "Kết thúc", 120f), ("TrangThai", "Trạng thái", 105f) })
-            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = property, DataPropertyName = property, HeaderText = caption, FillWeight = weight, SortMode = DataGridViewColumnSortMode.NotSortable });
-        grid.AutoGenerateColumns = false;
+        foreach (var (property, caption, weight) in new[] { ("MaCaLamViec", "Mã ca", 75f), ("HoTen", "Nhân viên", 160f), ("TenCa", "Ca", 75f),
+            ("BatDauLuc", "Bắt đầu", 130f), ("KetThucLuc", "Kết thúc", 130f), ("TienMatThucDem", "Tiền kiểm đếm", 120f), ("TrangThai", "Trạng thái", 145f) })
+            grid.Columns.Add(new DataGridViewTextBoxColumn { Name = property, DataPropertyName = property, HeaderText = caption, FillWeight = weight, SortMode = DataGridViewColumnSortMode.NotSortable });        grid.AutoGenerateColumns = false;
         grid.CellFormatting += (_, e) =>
         {
             if (e.ColumnIndex < 0) return;
-            if (e.Value is DateTime utc) e.Value = utc.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
-            if (grid.Columns[e.ColumnIndex].Name == "TrangThai" && e.Value is string status) e.Value = status switch { "OPEN" => "Đang mở", "LOCKED" => "Đang khóa", "CLOSED" => "Đã chốt", "HANDED_OVER" => "Đã bàn giao", _ => status };
+            if (e.Value is DateTime utc) { e.Value = utc.ToLocalTime().ToString("dd/MM/yyyy\nHH:mm"); e.FormattingApplied = true; }
+            if (grid.Columns[e.ColumnIndex].Name == "TienMatThucDem") { e.Value = e.Value is decimal amount ? amount.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + "đ" : "Chưa gửi"; e.FormattingApplied = true; }
+            if (grid.Columns[e.ColumnIndex].Name == "TrangThai" && e.Value is string status) e.Value = status switch { "OPEN" => "Đang mở", "LOCKED" => "Chờ đối chiếu", "CLOSED" => "Đã chốt", "HANDED_OVER" => "Đã bàn giao", _ => status };
         };
         var filterActions = Ui.Row(Action("Tìm kiếm", Find, true), Action("Tải lại", Reload));
         filterActions.Dock = DockStyle.None; filterActions.Margin = new Padding(0, 30, 0, 8);
-        var machineField = Ui.Field("Máy", machine);
-        var filters = Ui.Row(Ui.Field("Nhân viên", employee), Ui.Field("Tên ca", name), Ui.Field("Trạng thái", state), machineField,
-            Ui.Field("Từ ngày", from), Ui.Field("Đến hết ngày", to), filterActions);
-        // Một FlowLayoutPanel đo theo chiều rộng thật, không lồng các hàng AutoSize gây feedback chiều cao.
-        filters.SetFlowBreak(machineField, true);
-        var actions = Ui.Row(Action("Xem đối chiếu", Details, true));
+        var filters = Ui.Row();
+        CommerceWorkspaceVisuals.AdminFilters(filters, employee, from, to, ("Tên ca", name), ("Trạng thái", state));
+        filters.Controls.Add(filterActions);
+        var actions = Ui.Row(Action("Xem chi tiết ca", Details, true));
         var footer = Ui.Row(Action("Trang trước", Previous), Action("Trang sau", Next), counter);
-        layout = new AdminListLayout("Giám sát ca làm việc", "Tra cứu nguồn tiền · Đối chiếu thực đếm · Chốt / bàn giao có lịch sử", filters, actions, message, grid, footer, "NHÂN SỰ / CA LÀM VIỆC");
-        Controls.Add(layout);
+        layout = new AdminListLayout("Lịch sử ca làm việc", "Đơn hoàn thành • Kết quả kiểm đếm • Bàn giao đơn còn dở", filters, actions, message, grid, footer, "NHÂN SỰ / CA LÀM VIỆC", fitTableToRows: false);        Controls.Add(layout);
+        CommerceWorkspaceVisuals.AdminStyle(filters, actions, grid);
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        foreach (DataGridViewColumn column in grid.Columns)
+        {
+            column.MinimumWidth = column.DataPropertyName switch { "MaCaLamViec" => 70, "HoTen" => 150, "TenCa" => 75, "TrangThai" => 140, _ => 120 };
+            if (column.DataPropertyName is "BatDauLuc" or "KetThucLuc" or "HoTen") column.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            if (column.DataPropertyName == "TienMatThucDem") column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        grid.CellPainting += (_, e) =>
+        {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || grid.Columns[e.ColumnIndex].Name != "TrangThai" || grid.Rows[e.RowIndex].DataBoundItem is not WorkSessionInfo row) return;
+            CommerceWorkspaceVisuals.StatusBadge(grid, e, row.TrangThai switch { "OPEN" => "Đang làm", "CLOSED" => "Đã kết thúc", "HANDED_OVER" => "Đã bàn giao", _ => "Chờ đối chiếu" }, row.TrangThai is "CLOSED" or "HANDED_OVER");
+        };
+        employee.KeyDown += async (_, e) => { if (e.KeyCode == Keys.Enter && !busy) { e.SuppressKeyPress = true; SetBusy(true); try { await Find(); } finally { SetBusy(false); } } };
+        grid.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0 && !busy) await Details(); };
         HandleCreated += async (_, _) => { SetBusy(true); try { await LoadPage(); } finally { SetBusy(false); } };
     }
 
@@ -72,25 +86,32 @@ public sealed class WorkSessionsPage : UserControl
     {
         busy = value; if (IsDisposed) return;
         foreach (var button in buttons) button.Enabled = !value;
-        employee.Enabled = machine.Enabled = name.Enabled = state.Enabled = from.Enabled = to.Enabled = !value;
+        employee.Enabled = name.Enabled = state.Enabled = from.Enabled = to.Enabled = !value;
         layout.Busy = value;
     }
     /// <summary>Kiểm tra ngày/mã trước khi gửi; giữ bảng cũ nếu mạng lỗi, không tạo ca mẫu.</summary>
     private async Task LoadPage()
     {
-        long? id = null;
+        long? id = null; string? term = null;
         if (employee.Text.Trim().Length > 0)
         {
-            if (!long.TryParse(employee.Text.Trim(), out var parsed) || parsed <= 0) { message.Text = "Mã nhân viên phải là số nguyên dương; để trống nếu xem tất cả."; return; }
-            id = parsed;
+            if (long.TryParse(employee.Text.Trim(), out var parsed) && parsed > 0) id = parsed; else term = employee.Text.Trim();
         }
         if (from.Value.Date > to.Value.Date) { message.Text = "Từ ngày không được sau đến ngày."; return; }
         try
         {
             var data = await LiveSession.Api.GetWorkSessionsAsync(id, from.Value.Date, to.Value.Date.AddDays(1), name.SelectedIndex == 0 ? "" : name.Text,
-                state.SelectedIndex switch { 1 => "OPEN", 2 => "LOCKED", 3 => "CLOSED", 4 => "HANDED_OVER", _ => "" }, machine.Text.Trim(), page);
+                state.SelectedIndex switch { 1 => "OPEN", 2 => "LOCKED", 3 => "CLOSED", 4 => "HANDED_OVER", _ => "" }, "", page, term);
             if (IsDisposed) return;
-            grid.DataSource = data.Items.ToList(); total = data.Total; loaded = DateTime.Now;
+            var snapshot = System.Text.Json.JsonSerializer.Serialize(data.Items);
+            if (snapshot != boundSnapshot)
+            {
+                var selected = (grid.CurrentRow?.DataBoundItem as WorkSessionInfo)?.MaCaLamViec;
+                grid.DataSource = data.Items.ToList(); boundSnapshot = snapshot;
+                var index = data.Items.Select((x, i) => (x, i)).FirstOrDefault(x => x.x.MaCaLamViec == selected).i;
+                if (grid.RowCount > 0) grid.CurrentCell = grid.Rows[index].Cells[0];
+            }
+            total = data.Total; loaded = DateTime.Now;
             counter.Text = $"Trang {page}/{Math.Max(1, (total + 19) / 20)} · {total} ca";
             message.Text = "";
         }

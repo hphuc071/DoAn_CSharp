@@ -4,7 +4,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Admin;
 
 /// <summary>ADM-11: kiểm thử HTTP/SQL thật trong fixture riêng, gồm idempotency, quyền, lịch sử và rollback audit.</summary>
-[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-11"), Trait("Actor", "QuanLy")]
+[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-08"), Trait("Actor", "QuanLy")]
 public sealed class EmployeeAdministrationTests(AdminFeatureFixture fixture)
 {
     /// <summary>Tên trùng hợp lệ; mã thao tác lặp không sinh hồ sơ thứ hai, tìm tiếng Việt và địa chỉ đúng.</summary>

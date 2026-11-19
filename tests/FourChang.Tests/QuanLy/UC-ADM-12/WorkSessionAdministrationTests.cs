@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using FourChang.Tests.Shared;
 using static FourChang.Tests.Shared.TestData;
@@ -5,7 +6,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Admin;
 
 /// <summary>ADM-12 và tích hợp POS-01: SQL/API thật, không dùng thiết bị để mở phiên ca mới.</summary>
-[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-12"), Trait("Actor", "QuanLy")]
+[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-08"), Trait("Actor", "QuanLy")]
 public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
 {
     /// <summary>NULL khác 0, Staff không phê duyệt; gửi đối chiếu khóa bán và chốt Admin chống lặp.</summary>
@@ -168,5 +169,50 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         Assert.Equal("LOCKED", detail["ca"]!.Text("trangThai"));
         Assert.Null(detail["ca"]!["ketThucLuc"]);
         await fixture.Send("POST", $"/api/admin/work-sessions/{id}/close", action);
+    }
+    /// <summary>Bàn giao thật trên máy dùng chung: ca nhận hoàn thành đơn; tiền cũ và số đếm vẫn thuộc ca nguồn.</summary>
+    [Fact]
+    public async Task BanGiaoMayDungChung_HoanThanhOCaNhan_BaoCaoKhongCongSangCaCu()
+    {
+        var source=await WorkforceScenarios.Open(fixture); var sourceId=source.Session.Number("shiftId");
+        var sourceDetail=await WorkforceScenarios.Detail(fixture,sourceId); var machine=sourceDetail["ca"]!.Text("maMay");
+        var order=await OperationsScenarioSeed.Create(fixture,"ACCEPTED");
+        await fixture.Api.Sql($"UPDATE dbo.DonHang SET MaCaLamViec={sourceId} WHERE MaDonHang={order.Order}; UPDATE dbo.ThanhToan SET MaCaLamViec={sourceId} WHERE MaThanhToan={order.Payment}");
+        var other=await fixture.Send("POST","/api/admin/employees",WorkforceScenarios.EmployeeInput());
+        (await fixture.Api.Send("POST","/api/pos/shifts",Body(("MaNhanVien",other.Number("maNhanVien")),("HoTen",other.Text("hoTen")),("TenCa","Sáng"),("MaMay",machine),("TienMatDauCa",0),("MaThaoTac",NewId())))).Expect(200,"Nhân viên khác dùng chung máy");
+        var receiver=await fixture.Send("POST","/api/admin/employees",WorkforceScenarios.EmployeeInput());
+        var sent=await WorkforceScenarios.Submit(fixture,sourceId,source.Headers,500000+order.Total);
+        var command=WorkforceScenarios.CloseInput(sent);
+        command["MaNhanVienNhan"]=receiver.Number("maNhanVien"); command["MaMayNhan"]=machine; command["LyDo"]="Bàn giao ca cho nhân viên tiếp theo";
+        command["MaDonBanGiao"]=new JsonArray(order.Order); command["KhoanChuaRo"]=sent["khoanChuaRo"]!.DeepClone();
+        await fixture.Send("POST",$"/api/admin/work-sessions/{sourceId}/handover",command);
+        await fixture.Send("POST",$"/api/admin/employees/{receiver.Number("maNhanVien")}/status",Body(("TrangThai","INACTIVE"),("LyDo","Thử ngừng khi chờ nhận"),("PhienBanDuLieu",receiver.Text("phienBanDuLieu")),("MaThaoTac",NewId())),409);
+        // Đúng nhân viên được nhận kể cả đổi máy; không dùng mã máy để xác thực người nhận.
+        var incoming=(await fixture.Api.Send("POST","/api/pos/shifts",Body(("MaNhanVien",receiver.Number("maNhanVien")),("HoTen",receiver.Text("hoTen")),("TenCa","Chiều"),("MaMay","RECEIVER-"+Guid.NewGuid().ToString("N")[..8]),("TienMatDauCa",0),("MaThaoTac",NewId())))).Expect(200,"Nhận bàn giao").Json;
+        var targetId=incoming.Number("shiftId"); var staff=TestApi.Bearer(incoming);
+        foreach(var action in new[]{"START","FINISH","COMPLETE"})
+        {
+            var detail=(await fixture.Send("GET",$"/api/admin/orders/{order.Order}")).Deserialize<FourChang.Presentation.Shared.Contracts.Admin.AdminOrderDetail>(new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+            var input=new FourChang.Presentation.Shared.Contracts.Admin.OrderActionInput(action,"",detail.Don.PhienBanDuLieu,Guid.NewGuid(),action=="COMPLETE"?null:order.Line,2);
+            (await fixture.Api.Send("POST",$"/api/pos/orders/{order.Order}/actions",System.Text.Json.JsonSerializer.SerializeToNode(input),staff)).Expect(200,"Hoàn thành đơn bàn giao");
+        }
+        var target=await WorkforceScenarios.Detail(fixture,targetId); var old=await WorkforceScenarios.Detail(fixture,sourceId);
+        Assert.Equal(1,target.Number("soDonHoanThanh")); Assert.Equal(order.Total,target["tongTienDonHoanThanh"]!.GetValue<decimal>());
+        Assert.Equal($"POS-{order.Order}",Assert.Single(target["donHoanThanh"]!.AsArray())!.Text("maDon"));
+        Assert.Equal(0,target.Number("thuTienMat")); Assert.Equal(0,target.Number("tienMatDuKienHienTai")); Assert.Equal(0,old.Number("soDonHoanThanh"));
+        Assert.Equal(order.Total,old["thuTienMat"]!.GetValue<decimal>());
+        Assert.Equal(sourceId.ToString(),await fixture.Api.Sql($"SELECT MaCaLamViec FROM dbo.ThanhToan WHERE MaThanhToan={order.Payment}"));
+        var report=await fixture.Send("POST","/api/admin/reports/snapshot",new FourChang.Presentation.Shared.Contracts.Admin.ReportFilter(DateTime.UtcNow.AddDays(-1),DateTime.UtcNow.AddDays(1),MaCa:targetId));
+        Assert.Equal(1,report["chiSo"]!.Number("hoanTat")); Assert.Equal(order.Total,report["chiSo"]!["doanhThuThuan"]!.GetValue<decimal>());
+        var close=Body(("TienMatThucDem",0),("MaThaoTac",NewId()));
+        (await fixture.Api.Send("POST","/api/pos/shifts/current/close",close,staff)).Expect(200,"Nhân viên kết ca, không chờ duyệt lại");
+        (await fixture.Api.Send("POST","/api/pos/shifts/current/close",close,staff)).Expect(200,"Gửi lại không kết ca hai lần");
+        var closed=await WorkforceScenarios.Detail(fixture,targetId); Assert.Equal("CLOSED",closed["ca"]!.Text("trangThai"));
+        await fixture.Send("POST",$"/api/admin/work-sessions/{targetId}/close",WorkforceScenarios.CloseInput(closed),409);
+        var reopen=Body(("MaNhanVien",receiver.Number("maNhanVien")),("HoTen",receiver.Text("hoTen")),("TenCa","Chiều"),("MaMay",machine),("TienMatDauCa",0),("MaThaoTac",NewId()));
+        (await fixture.Api.Send("POST","/api/pos/shifts",reopen)).Expect(409,"Không lặp ca Chiều trong ngày");
+        reopen["TenCa"]="Tối"; reopen["MaThaoTac"]=NewId(); (await fixture.Api.Send("POST","/api/pos/shifts",reopen)).Expect(200,"Được làm ca khác không phụ thuộc giờ");
+        var search=await fixture.Send("GET","/api/admin/work-sessions?search="+Uri.EscapeDataString(receiver.Text("hoTen")));
+        Assert.Equal(2,search.Number("total"));
     }
 }

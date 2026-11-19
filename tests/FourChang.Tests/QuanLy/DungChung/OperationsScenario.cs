@@ -1,4 +1,4 @@
-﻿using FourChang.Tests.Shared;
+using FourChang.Tests.Shared;
 
 namespace FourChang.Tests.Admin;
 
@@ -7,6 +7,24 @@ internal sealed record OperationsScenario(long Order, long Line, long Payment, l
 /// <summary>Dữ liệu chuẩn bị riêng cho test các UC sau đặt đơn; không chứng minh luồng bán hàng POS đã tích hợp SQL.</summary>
 internal static class OperationsScenarioSeed
 {
+    /// <summary>Chuẩn bị yêu cầu bằng Staff thật rồi Admin duyệt; không dùng lệnh hủy trực tiếp đã bỏ.</summary>
+    internal static async Task<Dictionary<string,string>> RequestAndApprove(AdminFeatureFixture fixture, OperationsScenario data, bool approve = true)
+    {
+        var api = fixture.Api;
+        var employee = await api.Employee(fixture.Admin, "Nhân viên giao diện");
+        var opened = (await api.Send("POST", "/api/pos/shifts", FourChang.Tests.Shared.TestData.Body(
+            ("MaNhanVien", employee.Number("maNhanVien")), ("HoTen", employee.Text("hoTen")), ("TenCa", "Sáng"),
+            ("MaMay", Guid.NewGuid().ToString("N")), ("TienMatDauCa", 500000), ("MaThaoTac", Guid.NewGuid().ToString())))).Expect(200,"Mở ca fixture").Json;
+        async Task<FourChang.Presentation.Shared.Contracts.Admin.AdminOrderDetail> Detail() =>
+            System.Text.Json.JsonSerializer.Deserialize<FourChang.Presentation.Shared.Contracts.Admin.AdminOrderDetail>((await fixture.Send("GET",$"/api/admin/orders/{data.Order}")).ToJsonString(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        var order = await Detail(); var group = Guid.NewGuid();
+        var command = new FourChang.Presentation.Shared.Contracts.Admin.OrderActionInput("CANCEL", "Khách đề nghị hủy", order.Don.PhienBanDuLieu, group, data.Line, 1);
+        (await api.Send("POST", $"/api/pos/orders/{data.Order}/actions", System.Text.Json.JsonSerializer.SerializeToNode(command), TestApi.Bearer(opened))).Expect(200,"Staff gửi hủy");
+        order = await Detail();
+        await fixture.Send("POST",$"/api/admin/orders/{data.Order}/cancellation", new FourChang.Presentation.Shared.Contracts.Orders.CancellationCommand(approve?"APPROVE":"REJECT", group, "Đã kiểm tra yêu cầu", order.Don.PhienBanDuLieu, Guid.NewGuid(), true));
+        return TestApi.Bearer(opened);
+    }
+
     /// <summary>Tạo ca/đơn/snapshot/giữ chỗ/thu có kiểm soát trong database fixture GUID để test hành vi quản trị.</summary>
     internal static Task<OperationsScenario> Create(AdminFeatureFixture fixture, string state = "PENDING_CONFIRMATION", bool paid = true, bool invoice = false) => Create(fixture.Api, state, paid, invoice);
 

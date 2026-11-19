@@ -8,29 +8,28 @@ namespace FourChang.Tests.Admin;
 [Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-04"), Trait("Actor", "QuanLy")]
 public sealed class StockDocumentAdministrationTests(AdminFeatureFixture fixture)
 {
-    /// <summary>Nháp không đổi tồn; ghi sổ lặp không cộng hai lần; đảo tạo phiếu mới và giữ gốc bất biến.</summary>
-    [Fact]
-    public async Task NhapKho_NhapKhongDoiTon_GhiSoMotLan_DaoCoLienKet()
+    /// <summary>Thành công khóa sửa/xóa/hủy ở cả endpoint hủy cũ và hủy lịch; không sinh phiếu ngược hoặc đổi tồn.</summary>
+    [Theory]
+    [InlineData("RECEIPT")]
+    [InlineData("ISSUE")]
+    public async Task DaThanhCong_KhongDuocHuySuaXoa(string type)
     {
-        var stock = (await Stock()).First(x => x.TonThucTe > 100);
+        var stock = (await Stock()).First(x => x.KhaDung > 100);
         var before = stock.TonThucTe;
-        var created = await fixture.Send("POST", "/api/admin/stock-documents", Input("RECEIPT", [new(stock.MaNguyenLieu, 12.5m)]));
-        var id = created.Number("ma");
-        Assert.Equal(before, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
+        var id = (await fixture.Send("POST", "/api/admin/stock-documents", Input(type, [new(stock.MaNguyenLieu, 12.5m)]))).Number("ma");
         var draft = (await Documents()).Single(x => x.MaPhieuKho == id);
-        var post = new StockDocumentAction("Nhập theo phiếu giao", draft.PhienBanDuLieu, Guid.NewGuid());
+        var post = new StockDocumentAction("Xác nhận phiếu", draft.PhienBanDuLieu, Guid.NewGuid());
         await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", post);
         await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", post);
-        Assert.Equal(before + 12.5m, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
         var posted = (await Documents()).Single(x => x.MaPhieuKho == id);
-        await fixture.Send("PUT", $"/api/admin/stock-documents/{id}", Input("RECEIPT", [new(stock.MaNguyenLieu, 99)]) with { PhienBanDuLieu = posted.PhienBanDuLieu }, 409);
-        var reverse = new StockDocumentAction("Sai số lượng cần đảo", posted.PhienBanDuLieu, Guid.NewGuid());
-        var receipt = await fixture.Send("POST", $"/api/admin/stock-documents/{id}/reverse", reverse);
-        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/reverse", reverse);
-        Assert.Equal(before, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
-        Assert.Equal(id, (await Documents()).Single(x => x.MaPhieuKho == receipt.Number("ma")).MaPhieuBiDao);
-        Assert.Equal("POSTED", (await Documents()).Single(x => x.MaPhieuKho == id).TrangThai);
-        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/reverse", reverse with { MaThaoTac = Guid.NewGuid() }, 409);
+        await fixture.Send("PUT", $"/api/admin/stock-documents/{id}", Input(type, [new(stock.MaNguyenLieu, 99)]) with { PhienBanDuLieu = posted.PhienBanDuLieu }, 409);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/delete", new AdminDeleteInput(posted.PhienBanDuLieu, Guid.NewGuid()), 409);
+        foreach (var action in new[] { "reverse", "cancel" })
+            await fixture.Send("POST", $"/api/admin/stock-documents/{id}/{action}", new StockDocumentAction("Không được hủy phiếu thành công", posted.PhienBanDuLieu, Guid.NewGuid()), 409);
+        Assert.Equal(before + (type == "RECEIPT" ? 12.5m : -12.5m), (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
+        var unchanged = (await Documents()).Single(x => x.MaPhieuKho == id);
+        Assert.Equal("POSTED", unchanged.TrangThai); Assert.Equal(posted.PhienBanDuLieu, unchanged.PhienBanDuLieu);
+        Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.PhieuKho WHERE MaPhieuBiDao={id}"));
     }
 
     /// <summary>Một dòng vượt tồn làm toàn phiếu thất bại, không trừ dòng hợp lệ trước nó.</summary>
@@ -112,32 +111,111 @@ public sealed class StockDocumentAdministrationTests(AdminFeatureFixture fixture
         Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.BienDongKho b JOIN dbo.ChiTietPhieuKho l ON b.MaDongPhieuKho=l.MaDongPhieuKho WHERE l.MaPhieuKho={id}"));
     }
 
-    /// <summary>Ngày dự kiến không tự cộng kho; trước ngày không được xác nhận, sửa nháp đến hôm nay mới ghi sổ.</summary>
+    /// <summary>Xác nhận ngày tương lai khóa phiếu, chưa đổi tồn; worker đến hạn ghi đúng một lần cho cả nhập và xuất.</summary>
     [Theory]
     [InlineData("RECEIPT")]
     [InlineData("ISSUE")]
-    public async Task NgayTuongLai_ChoXacNhan_KhongTuGhiSo(string type)
+    public async Task HenNgay_XacNhanTruoc_DenHanTuGhiSo(string type)
     {
-        var stock = (await Stock()).First(x => x.TonThucTe > 100);
+        var stock = (await Stock()).First(x => x.KhaDung > 100);
         var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7));
         var input = Input(type, [new(stock.MaNguyenLieu, 2)]) with { NgayThucHien = today.AddDays(1) };
-        var saved = await fixture.Send("POST", "/api/admin/stock-documents", input);
-        var id = saved.Number("ma"); var draft = (await Documents()).Single(x => x.MaPhieuKho == id);
-        Assert.Equal(today.AddDays(1), draft.NgayThucHien);
-        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", new StockDocumentAction("", draft.PhienBanDuLieu, Guid.NewGuid()), 409);
+        var id = (await fixture.Send("POST", "/api/admin/stock-documents", input)).Number("ma");
+        var draft = (await Documents()).Single(x => x.MaPhieuKho == id);
+        var approval = new StockDocumentAction("Duyệt phiếu ngày mai", draft.PhienBanDuLieu, Guid.NewGuid());
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", approval);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", approval);
+        var scheduled = (await Documents()).Single(x => x.MaPhieuKho == id);
+        Assert.Equal("SCHEDULED", scheduled.TrangThai); Assert.Null(scheduled.GhiSoLuc);
+        Assert.NotNull(scheduled.NguoiGhiSo);
         Assert.Equal(stock.TonThucTe, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
-        await fixture.Send("PUT", $"/api/admin/stock-documents/{id}", input with { NgayThucHien = today.AddDays(-1), PhienBanDuLieu = draft.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() });
-        draft = (await Documents()).Single(x => x.MaPhieuKho == id);
-        // Đã đến ngày vẫn chỉ là nháp. Chỉ lệnh xác nhận bên dưới mới làm thay đổi tồn.
-        Assert.Equal("DRAFT", draft.TrangThai);
-        Assert.Equal(stock.TonThucTe, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
-        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", new StockDocumentAction("", draft.PhienBanDuLieu, Guid.NewGuid()));
-        var posted = (await Documents()).Single(x => x.MaPhieuKho == id);
-        Assert.Equal(today.AddDays(-1), posted.NgayThucHien);
+        await fixture.Send("PUT", $"/api/admin/stock-documents/{id}", input with { PhienBanDuLieu = scheduled.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() }, 409);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/delete", new AdminDeleteInput(scheduled.PhienBanDuLieu, Guid.NewGuid()), 409);
+        // Chỉ database GUID fixture: đưa ngày về hôm nay để mô phỏng lịch đã đến hạn, không sửa đồng hồ máy.
+        await fixture.Api.Sql($"UPDATE dbo.PhieuKho SET NgayThucHien=CONVERT(date,DATEADD(hour,7,SYSUTCDATETIME())) WHERE MaPhieuKho={id}");
+        var posted = await WaitForState(id, "POSTED");
         Assert.NotNull(posted.GhiSoLuc);
         Assert.Equal(stock.TonThucTe + (type == "RECEIPT" ? 2 : -2), (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
-        await fixture.Send("PUT", $"/api/admin/stock-documents/{id}", input with { PhienBanDuLieu = posted.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() }, 409);
-        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/delete", new AdminDeleteInput(posted.PhienBanDuLieu, Guid.NewGuid()), 409);
+        await Task.Delay(5500); // Qua thêm một vòng worker để kiểm không ghi sổ lặp.
+        Assert.Equal("1", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.BienDongKho b JOIN dbo.ChiTietPhieuKho l ON l.MaDongPhieuKho=b.MaDongPhieuKho WHERE l.MaPhieuKho={id}"));
+        Assert.Equal("1", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.NhatKyHeThong WHERE LoaiTacNhan='SYSTEM' AND HanhDong='STOCK_SCHEDULE_POSTED' AND MaDoiTuong='{id}'"));
+    }
+
+    /// <summary>Thiếu một nguyên liệu không trừ dòng nào; FAILED không tự thử lại khi nhập thêm hàng, sửa và xác nhận lại cùng ID.</summary>
+    [Fact]
+    public async Task HenXuatThieuTon_CanKiemTra_KhongTruMotPhan()
+    {
+        var stocks = (await Stock()).Where(x => x.KhaDung > 100).Take(2).ToArray();
+        var input = Input("ISSUE", [new(stocks[0].MaNguyenLieu, 1), new(stocks[1].MaNguyenLieu, stocks[1].TonThucTe!.Value + 1)])
+            with { NgayThucHien = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)).AddDays(1) };
+        var id = (await fixture.Send("POST", "/api/admin/stock-documents", input)).Number("ma");
+        var draft = (await Documents()).Single(x => x.MaPhieuKho == id);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", new StockDocumentAction("Xuất theo lịch", draft.PhienBanDuLieu, Guid.NewGuid()));
+        await fixture.Api.Sql($"UPDATE dbo.PhieuKho SET NgayThucHien=CONVERT(date,DATEADD(hour,7,SYSUTCDATETIME())) WHERE MaPhieuKho={id}");
+        var failed = await WaitForState(id, "FAILED");
+        Assert.NotEmpty(failed.LoiXuLy!); Assert.Null(failed.GhiSoLuc);
+        foreach (var stock in stocks) Assert.Equal(stock.TonThucTe, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
+        Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.BienDongKho b JOIN dbo.ChiTietPhieuKho l ON l.MaDongPhieuKho=b.MaDongPhieuKho WHERE l.MaPhieuKho={id}"));
+        await fixture.Api.Sql($"UPDATE dbo.TonKho SET TonThucTe=TonThucTe+1000 WHERE MaNguyenLieu={stocks[1].MaNguyenLieu}");
+        await Task.Delay(5500);
+        Assert.Equal("FAILED", (await Documents()).Single(x => x.MaPhieuKho == id).TrangThai);
+        await fixture.Send("PUT", $"/api/admin/stock-documents/{id}", input with { NgayThucHien = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)), ThanhPhan = [new(stocks[0].MaNguyenLieu, 1), new(stocks[1].MaNguyenLieu, 1)], PhienBanDuLieu = failed.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() });
+        draft = (await Documents()).Single(x => x.MaPhieuKho == id);
+        Assert.Equal("DRAFT", draft.TrangThai); Assert.Null(draft.LoiXuLy);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", new StockDocumentAction("Xác nhận lại", draft.PhienBanDuLieu, Guid.NewGuid()));
+        Assert.Equal("POSTED", (await Documents()).Single(x => x.MaPhieuKho == id).TrangThai);
+    }
+
+    /// <summary>Hủy lịch giữ lịch sử và không cập nhật kho dù sau đó đến hạn; replay hủy không tạo hành động mới.</summary>
+    [Fact]
+    public async Task HuyLich_KhongGhiSoKhiDenNgay()
+    {
+        var stock = (await Stock()).First(x => x.KhaDung > 100);
+        var id = (await fixture.Send("POST", "/api/admin/stock-documents", Input("RECEIPT", [new(stock.MaNguyenLieu, 5)]) with { NgayThucHien = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)).AddDays(1) })).Number("ma");
+        var row = (await Documents()).Single(x => x.MaPhieuKho == id);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", new StockDocumentAction("Hẹn nhập", row.PhienBanDuLieu, Guid.NewGuid()));
+        row = (await Documents()).Single(x => x.MaPhieuKho == id);
+        var cancel = new StockDocumentAction("Không còn nhận lô này", row.PhienBanDuLieu, Guid.NewGuid());
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/cancel", cancel);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/cancel", cancel);
+        await fixture.Api.Sql($"UPDATE dbo.PhieuKho SET NgayThucHien=CONVERT(date,DATEADD(hour,7,SYSUTCDATETIME())) WHERE MaPhieuKho={id}");
+        await Task.Delay(5500);
+        Assert.Equal("CANCELLED", (await Documents()).Single(x => x.MaPhieuKho == id).TrangThai);
+        Assert.Equal(stock.TonThucTe, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
+    }
+
+    /// <summary>Worker lỗi ghi audit rollback cả kho và trạng thái; khôi phục quyền rồi chỉ ghi sổ đúng một lần.</summary>
+    [Fact]
+    public async Task HenNgay_LoiAudit_RollbackVaPhucHoi()
+    {
+        var stock = (await Stock()).First(x => x.KhaDung > 100);
+        var id = (await fixture.Send("POST", "/api/admin/stock-documents", Input("RECEIPT", [new(stock.MaNguyenLieu, 3)]) with { NgayThucHien = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)).AddDays(1) })).Number("ma");
+        var draft = (await Documents()).Single(x => x.MaPhieuKho == id);
+        await fixture.Send("POST", $"/api/admin/stock-documents/{id}/post", new StockDocumentAction("Hẹn nhập", draft.PhienBanDuLieu, Guid.NewGuid()));
+        await fixture.Api.Sql("DENY INSERT ON OBJECT::dbo.NhatKyHeThong TO fourchang_app");
+        try
+        {
+            await fixture.Api.Sql($"UPDATE dbo.PhieuKho SET NgayThucHien=CONVERT(date,DATEADD(hour,7,SYSUTCDATETIME())) WHERE MaPhieuKho={id}");
+            await Task.Delay(6500);
+            Assert.Equal("SCHEDULED", (await Documents()).Single(x => x.MaPhieuKho == id).TrangThai);
+            Assert.Equal(stock.TonThucTe, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
+            Assert.Equal("0", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.BienDongKho b JOIN dbo.ChiTietPhieuKho l ON l.MaDongPhieuKho=b.MaDongPhieuKho WHERE l.MaPhieuKho={id}"));
+        }
+        finally { await fixture.Api.Sql("REVOKE INSERT ON OBJECT::dbo.NhatKyHeThong FROM fourchang_app"); }
+        await WaitForState(id, "POSTED");
+        Assert.Equal(stock.TonThucTe + 3, (await Stock()).Single(x => x.MaNguyenLieu == stock.MaNguyenLieu).TonThucTe);
+    }
+
+    private async Task<StockDocumentView> WaitForState(long id, string state)
+    {
+        var until = DateTime.UtcNow.AddSeconds(25);
+        while (DateTime.UtcNow < until)
+        {
+            var row = (await Documents()).Single(x => x.MaPhieuKho == id);
+            if (row.TrangThai == state) return row;
+            await Task.Delay(150);
+        }
+        throw new TimeoutException($"Phiếu {id} chưa chuyển sang {state}.");
     }
 
     /// <summary>Nguyên liệu mới chưa có số dư vẫn nhập được; lưu nháp không tự tạo tồn, xác nhận mới tạo số dư.</summary>

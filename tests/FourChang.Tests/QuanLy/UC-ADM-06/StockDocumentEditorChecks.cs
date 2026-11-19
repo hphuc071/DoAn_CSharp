@@ -166,8 +166,17 @@ internal static class StockDocumentEditorChecks
         Assert.True(until.Value.Date >= savedDate);
         Assert.True(Descendants(page).OfType<Button>().Single(b => b.Text == "Sửa nháp").Visible);
         Capture(main, Path.Combine(output, "ADM04-saved-draft-selected.png"));
-        await LiveSession.Api.ActStockDocumentAsync(draft.MaPhieuKho, "post", new("Nhập hàng kiểm thử", draft.PhienBanDuLieu, Guid.NewGuid()));
-        await ((StockDocumentsPage)page).Reload();
+        using var approve = new System.Windows.Forms.Timer { Interval = 50 };
+        approve.Tick += (_, _) =>
+        {
+            var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.Name == "StockDocumentPostDialog");
+            if (dialog is null) return;
+            approve.Stop();
+            Descendants(dialog).OfType<Button>().Single(b => b.Name == "StockDocumentPostConfirm").PerformClick();
+        };
+        approve.Start();
+        Descendants(page).OfType<Button>().Single(b => b.Text == "Xác nhận nhập / xuất").PerformClick();
+        await AdminFeaturesUiTests.WaitUntil(() => grid.CurrentRow?.DataBoundItem is StockDocumentView current && current.MaPhieuKho == draft.MaPhieuKho && current.TrangThai == "POSTED");
         Assert.False(Descendants(page).OfType<Button>().Single(b => b.Text == "Sửa nháp").Visible);
         Assert.False(Descendants(page).OfType<Button>().Single(b => b.Text == "Xóa nháp").Visible);
         Assert.Equal("Thành công", grid.CurrentRow!.Cells[3].FormattedValue);
@@ -175,6 +184,133 @@ internal static class StockDocumentEditorChecks
         from.Value = today; until.Value = today;
         Assert.DoesNotContain(grid.Rows.Cast<DataGridViewRow>(), r => r.DataBoundItem is StockDocumentView d && d.MaPhieuKho == draft.MaPhieuKho);
     }
+
+    /// <summary>Xác nhận ngay trong editor, tự lấy dòng đang nhập; lỗi xuất giữ cùng nháp và sửa rồi thử lại không tạo phiếu trùng.</summary>
+    internal static async Task ConfirmInsideEditor(Form main, string output)
+    {
+        var before = await LiveSession.Api.GetInventoryAsync();
+        var material = before.NguyenLieu.First(x => x.TonThucTe > 100 && x.KhaDung > 10);
+        using (var editor = OpenEditor(before))
+        {
+            var controls = Named(editor);
+            ((ComboBox)controls["StockDocumentIngredient"]).SelectedValue = material.MaNguyenLieu;
+            ((NumericUpDown)controls["StockDocumentQuantity"]).Value = 2.5m;
+            ((NumericUpDown)controls["StockDocumentPrice"]).Value = 20000;
+            Capture(editor, Path.Combine(output, "ADM04-confirm-in-editor.png"));
+            ((Button)controls["StockDocumentConfirm"]).PerformClick();
+            await AdminFeaturesUiTests.WaitUntil(() => editor.DialogResult == DialogResult.OK && !editor.Visible);
+            var posted = (await LiveSession.Api.GetStockDocumentsAsync()).Single(d => d.MaPhieuKho == editor.SavedDocumentId);
+            Assert.Equal("POSTED", posted.TrangThai);
+            Assert.Equal(2.5m, Assert.Single(posted.ThanhPhan).SoLuong);
+            Assert.Equal(material.TonThucTe + 2.5m, (await LiveSession.Api.GetInventoryAsync()).NguyenLieu.Single(x => x.MaNguyenLieu == material.MaNguyenLieu).TonThucTe);
+        }
+        var documentCount = (await LiveSession.Api.GetStockDocumentsAsync()).Count;
+        using (var issue = OpenEditor(await LiveSession.Api.GetInventoryAsync()))
+        {
+            var controls = Named(issue);
+            ((ComboBox)controls["StockDocumentType"]).SelectedIndex = 1;
+            ((ComboBox)controls["StockDocumentIngredient"]).SelectedValue = material.MaNguyenLieu;
+            ((TextBox)controls["StockDocumentReason"]).Text = "Xuất hàng hỏng kiểm thử";
+            ((NumericUpDown)controls["StockDocumentQuantity"]).Value = material.TonThucTe!.Value + 100;
+            ((Button)controls["StockDocumentConfirm"]).PerformClick();
+            await AdminFeaturesUiTests.WaitUntil(() => issue.SavedDocumentId is not null && controls["StockDocumentFeedback"].Text.Contains("Đã lưu nháp"));
+            var savedId = issue.SavedDocumentId;
+            Assert.True(issue.Visible);
+            var grid = (DataGridView)controls["StockDocumentLines"];
+            grid.CurrentCell = grid.Rows[0].Cells["NguyenLieu"];
+            ((NumericUpDown)controls["StockDocumentQuantity"]).Value = 1;
+            ((Button)controls["StockDocumentConfirm"]).PerformClick();
+            await AdminFeaturesUiTests.WaitUntil(() => issue.DialogResult == DialogResult.OK && !issue.Visible);
+            Assert.Equal(savedId, issue.SavedDocumentId);
+            var documents = await LiveSession.Api.GetStockDocumentsAsync();
+            Assert.Equal(documentCount + 1, documents.Count);
+            Assert.Equal("POSTED", documents.Single(d => d.MaPhieuKho == savedId).TrangThai);
+        }
+        using (var future = OpenEditor(await LiveSession.Api.GetInventoryAsync()))
+        {
+            var controls = Named(future);
+            ((DateTimePicker)controls["StockDocumentDate"]).Value = DateTime.UtcNow.AddHours(7).Date.AddDays(1);
+            ((NumericUpDown)controls["StockDocumentQuantity"]).Value = 1;
+            ((Button)controls["StockDocumentConfirm"]).PerformClick();
+            await AdminFeaturesUiTests.WaitUntil(() => future.DialogResult == DialogResult.OK && !future.Visible);
+            var scheduled = (await LiveSession.Api.GetStockDocumentsAsync()).Single(d => d.MaPhieuKho == future.SavedDocumentId);
+            Assert.Equal("SCHEDULED", scheduled.TrangThai);
+            Assert.Null(scheduled.GhiSoLuc);
+            var page = Descendants(main).OfType<StockDocumentsPage>().Single();
+            var until = Descendants(page).OfType<DateTimePicker>().Single(p => p.Name == "StockDocumentUntil");
+            until.Value = DateTime.UtcNow.AddHours(7).Date.AddDays(1);
+            await page.Reload();
+            var grid = Descendants(page).OfType<DataGridView>().Single(g => g.Name == "AdminDataGrid");
+            var row = grid.Rows.Cast<DataGridViewRow>().Single(r => ((StockDocumentView)r.DataBoundItem).MaPhieuKho == scheduled.MaPhieuKho);
+            grid.CurrentCell = row.Cells[0];
+            Assert.Equal("Đang xử lý", row.Cells[3].FormattedValue);
+            Assert.False(Descendants(page).OfType<Button>().Single(b => b.Name == "StockDocumentEditButton").Visible);
+            var cancel = Descendants(page).OfType<Button>().Single(b => b.Name == "StockDocumentCancelButton");
+            Assert.True(cancel.Visible);
+            Capture(main, Path.Combine(output, "ADM04-scheduled-locked.png"));
+            var actualRows = grid.DataSource;
+            grid.DataSource = new List<StockDocumentView> { scheduled with { TrangThai = "FAILED", LoiXuLy = "Không đủ tồn kho để xuất." } };
+            Assert.Equal("Cần kiểm tra", grid.Rows[0].Cells[3].FormattedValue);
+            Assert.True(Descendants(page).OfType<Button>().Single(b => b.Name == "StockDocumentEditButton").Visible);
+            grid.DataSource = actualRows;
+            grid.CurrentCell = grid.Rows.Cast<DataGridViewRow>().Single(r => ((StockDocumentView)r.DataBoundItem).MaPhieuKho == scheduled.MaPhieuKho).Cells[0];
+            using var approve = new System.Windows.Forms.Timer { Interval = 50 };
+            approve.Tick += (_, _) =>
+            {
+                var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.Text == "Hủy phiếu đang chờ xử lý");
+                if (dialog is null) return;
+                approve.Stop();
+                Descendants(dialog).OfType<TextBox>().Single().Text = "Hủy lịch kiểm thử";
+                Descendants(dialog).OfType<Button>().Single(b => b.Text == "Xác nhận hủy phiếu").PerformClick();
+            };
+            approve.Start(); cancel.PerformClick();
+            await AdminFeaturesUiTests.WaitUntil(() => grid.Rows.Cast<DataGridViewRow>().Any(r => r.DataBoundItem is StockDocumentView d && d.MaPhieuKho == scheduled.MaPhieuKho && d.TrangThai == "CANCELLED"));
+        }
+    }
+
+    /// <summary>Chi tiết nhập/xuất chỉ xem, không có nút hủy phiếu đã thành công; kiểm bố cục và trường theo loại.</summary>
+    internal static async Task DetailsAreReadOnly(Form main, string output)
+    {
+        var page = Descendants(main).OfType<StockDocumentsPage>().Single();
+        var list = Descendants(page).OfType<DataGridView>().Single(g => g.Name == "AdminDataGrid");
+        foreach (var type in new[] { "RECEIPT", "ISSUE" })
+        {
+            var row = list.Rows.Cast<DataGridViewRow>().First(r => r.DataBoundItem is StockDocumentView d && d.TrangThai == "POSTED" && d.LoaiPhieu == type);
+            list.CurrentCell = row.Cells[0];
+            Assert.DoesNotContain(Descendants(page).OfType<Button>(), b => b.Visible && b.Text.StartsWith("Hủy phiếu"));
+            var seen = false;
+            using var timer = new System.Windows.Forms.Timer { Interval = 50 };
+            timer.Tick += (_, _) =>
+            {
+                var dialog = Application.OpenForms.Cast<Form>().FirstOrDefault(f => f.Name == "StockDocumentDetailsForm");
+                if (dialog is null) return;
+                timer.Stop();
+                var controls = Descendants(dialog).ToList();
+                var grid = controls.OfType<DataGridView>().Single(g => g.Name == "StockDocumentDetailsLines");
+                Assert.True(grid.ReadOnly);
+                Assert.Equal(type == "RECEIPT" ? 5 : 3, grid.Columns.Cast<DataGridViewColumn>().Count(c => c.Visible));
+                Assert.Equal(type == "RECEIPT", controls.Single(c => c.Name == "StockDocumentDetailsTotal").Visible);
+                if (type == "ISSUE") Assert.DoesNotContain(controls, c => c.Name == "StockDocumentDetailsSource");
+                Assert.Equal("Thành công", controls.Single(c => c.Name == "StockDocumentDetailsStatus").Text);
+                Assert.Single(controls.OfType<Button>());
+                Capture(dialog, Path.Combine(output, "ADM04-details-" + type + ".png"));
+                dialog.Size = dialog.MinimumSize; dialog.PerformLayout();
+                var close = controls.Single(c => c.Name == "StockDocumentDetailsClose");
+                Assert.True(dialog.RectangleToClient(close.RectangleToScreen(close.ClientRectangle)).Bottom <= dialog.ClientSize.Height);
+                Assert.True(grid.Columns.Cast<DataGridViewColumn>().Where(c => c.Visible).Sum(c => c.Width) <= grid.ClientSize.Width);
+                seen = true; dialog.Close();
+            };
+            timer.Start(); Descendants(page).OfType<Button>().Single(b => b.Text == "Chi tiết").PerformClick();
+            await AdminFeaturesUiTests.WaitUntil(() => seen);
+        }
+    }
+
+    private static StockDocumentEditorForm OpenEditor(StockSnapshot snapshot)
+    {
+        var editor = new StockDocumentEditorForm(snapshot) { StartPosition = FormStartPosition.Manual, Location = new Point(-12000, -12000) };
+        editor.Show(); return editor;
+    }
+    private static Dictionary<string, Control> Named(Control parent) => Descendants(parent).Where(c => c.Name.Length > 0).ToDictionary(c => c.Name);
 
     /// <summary>Duyệt cây control để tìm control theo Name ổn định, không phụ thuộc chữ nút hoặc vị trí.</summary>
     private static IEnumerable<Control> Descendants(Control parent)

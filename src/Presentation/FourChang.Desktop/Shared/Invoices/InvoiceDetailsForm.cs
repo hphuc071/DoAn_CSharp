@@ -67,8 +67,7 @@ public sealed class InvoiceDetailsForm : Form
         var information = OrderDetailsForm.Section("Thông tin hóa đơn",
             OrderDetailsForm.Value("Số hóa đơn", invoice.SoHoaDon, 220), OrderDetailsForm.Value("Mã đơn", order.Don.MaDon),
             OrderDetailsForm.Value("Phát hành", invoice.PhatHanhLuc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm")),
-            OrderDetailsForm.Value("Trạng thái", OperationsPresentation.Label(invoice.TrangThai), 160),
-            OrderDetailsForm.Value("Loại", OperationsPresentation.Label(invoice.Loai), 150));
+            OrderDetailsForm.Value("Trạng thái", OperationsPresentation.Label(invoice.TrangThai), 160));
         information.Name = "InvoiceInformation";
         var name = string.IsNullOrWhiteSpace(invoice.NguoiMua) ? order.TenNguoiNhan : invoice.NguoiMua;
         var customerFields = new List<Control> { OrderDetailsForm.Value("Tên khách hàng", string.IsNullOrWhiteSpace(name) ? "Khách lẻ" : name, 260), OrderDetailsForm.Value("Số điện thoại", order.DienThoai) };

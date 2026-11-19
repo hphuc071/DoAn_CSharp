@@ -11,4 +11,4 @@ public sealed record StockDocumentLineView(long MaDong, long MaNguyenLieu, strin
 public sealed record StockDocumentView(long MaPhieuKho, string SoPhieuKho, string LoaiPhieu, string TrangThai,
     string? Nguon, string? MaMucDich, string? LyDo, DateTime? MocKiemKe, long? MaPhieuBiDao,
     long NguoiLap, long? NguoiGhiSo, DateTime TaoLuc, DateTime? GhiSoLuc, byte[] PhienBanDuLieu,
-    IReadOnlyList<StockDocumentLineView> ThanhPhan, DateOnly? NgayThucHien = null);
+    IReadOnlyList<StockDocumentLineView> ThanhPhan, DateOnly? NgayThucHien = null, string? LoiXuLy = null);

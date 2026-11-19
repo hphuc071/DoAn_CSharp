@@ -1,5 +1,5 @@
 using System.Drawing.Printing;
-using System.Text.Json;
+using System.Globalization;
 using FourChang.Desktop.Admin.Orders;
 using FourChang.Desktop.Shared.Invoices;
 using FourChang.Desktop.Shared.Controls;
@@ -10,34 +10,66 @@ using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Desktop.Admin.Invoices;
 
-/// <summary>UC-ADM-08: tra snapshot, điều chỉnh có nguồn và in/xuất riêng, không sửa hoặc xóa hóa đơn gốc.</summary>
+/// <summary>UC-ADM-06: tra cứu hóa đơn, xem/in/tải bản đã phát hành, không sửa chứng từ gốc.</summary>
 public sealed class InvoicesManagementPage : AdminWorkspacePage<AdminInvoiceView>
 {
     private readonly DateTimePicker from = new() { Value = DateTime.Today.AddMonths(-1), Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 135 };
     private readonly DateTimePicker to = new() { Value = DateTime.Today, Format = DateTimePickerFormat.Custom, CustomFormat = "dd/MM/yyyy", Width = 135 };
     private readonly NumericUpDown shift = new() { Maximum = 999999999, Width = 120 };
-    private readonly Dictionary<long, CommandDraft<InvoiceAdjustmentInput>> drafts = [];
+    private string? boundSnapshot;
+    private readonly System.Windows.Forms.Timer refresh = new() { Interval = 5000 };
+    private bool quiet;
+    private (string Search, DateTime From, DateTime To, long? Shift, int Page)? applied;
     private int page = 1;
     private readonly Label pagination = Ui.Label("", 9);
 
-    /// <summary>Bộ lọc ngày không có ô tích; nút điều chỉnh tách khỏi xem/in/xuất để tránh phát hành nhầm.</summary>
-    public InvoicesManagementPage() : base("Hóa đơn và điều chỉnh", "Bản gốc bất biến • Đối chiếu thu/hoàn • In lại có dấu bản sao", true, "TÀI CHÍNH / HÓA ĐƠN")
+    /// <summary>Bộ lọc ngày không có ô tích; chỉ xem/in/tải hóa đơn, không nhập mã nguồn điều chỉnh.</summary>
+    public InvoicesManagementPage() : base("Hóa đơn bán hàng", "Tra cứu hóa đơn • Xem chi tiết • In hoặc tải PDF", true, "TÀI CHÍNH / HÓA ĐƠN", fitTableToRows: false)
     {
-        Filters.Controls.Clear(); Filters.Controls.AddRange([Ui.Field("Tìm kiếm", SearchBox), Ui.Field("Từ ngày", from), Ui.Field("Đến ngày", to), Ui.Field("Mã ca (0: tất cả)", shift)]);
+        Name = "InvoicesManagementPage"; SearchBox.PlaceholderText = "Số hóa đơn, mã đơn hoặc tên khách";
+        from.Name = "InvoiceFrom"; to.Name = "InvoiceTo";
+        CommerceWorkspaceVisuals.AdminFilters(Filters, SearchBox, from, to, ("Ca (0: tất cả)", shift));
         AddAction(Filters, "Tìm kiếm", async () => { page = 1; await Reload(); }); AddAction(Filters, "Tải lại", async () => { page = 1; SearchBox.Clear(); await Reload(); });
-        Column("SoHoaDon", "Số hóa đơn", 140); Column("MaDonHang", "Mã đơn", 65); Column("Loai", "Loại", 80); Column("NguoiMua", "Người mua", 140);
-        Column("SoTien", "Giá trị", 90); Column("TrangThai", "Trạng thái", 75); Column("PhatHanhLuc", "Phát hành", 130); Column("MaHoaDonGoc", "Hóa đơn gốc", 85);
-        AddAction(Actions, "Chi tiết / đối chiếu", Details, true); AddAction(Actions, "Phát hành điều chỉnh", Adjust);
-        AddAction(Actions, "Xem trước", Preview); AddAction(Actions, "In / in lại", Print); AddAction(Actions, "Xuất PDF", Export);
+        Column("SoHoaDon", "Số hóa đơn", 190); Column("MaDon", "Mã đơn", 100); Column("NguoiMua", "Khách hàng", 185);
+        Column("SoTien", "Số tiền", 115); Column("PhatHanhLuc", "Ngày phát hành", 165);
+        AddAction(Actions, "Xem hóa đơn", Details, true); AddAction(Actions, "In hóa đơn", Print); AddAction(Actions, "Tải PDF", Export);
         AddAction(Actions, "Trang trước", async () => { if (page > 1) { page--; await Reload(); } });
         AddAction(Actions, "Trang sau", async () => { page++; await Reload(); }); Actions.Controls.Add(pagination);
         OperationsPresentation.FitRows(Filters); OperationsPresentation.FitRows(Actions); OperationsPresentation.Grid(Grid);
         CommerceWorkspaceVisuals.Apply(Actions, Counter, pagination, Grid);
+        Grid.RowTemplate.Height = 56; Grid.ColumnHeadersHeight = 48;
+        Grid.DefaultCellStyle.Padding = new Padding(12, 10, 12, 10);
+        foreach (DataGridViewColumn column in Grid.Columns)
+        {
+            if (column.DataPropertyName is "SoHoaDon" or "MaDon" or "SoTien") column.DefaultCellStyle.Font = CafeTheme.Strong(10);
+            if (column.DataPropertyName == "SoTien") column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight;
+        }
+        Grid.CellDoubleClick += async (_, e) => { if (e.RowIndex >= 0 && !Busy) await Details(); };
+        SearchBox.KeyDown += async (_, e) =>
+        {
+            if (e.KeyCode != Keys.Enter || Busy) return;
+            e.SuppressKeyPress = true; page = 1; await Reload();
+        };
+        Grid.CellFormatting += (_, e) =>
+        {
+            if (e.ColumnIndex < 0) return;
+            if (Grid.Columns[e.ColumnIndex].DataPropertyName == "SoTien" && e.Value is decimal money) { e.Value = money.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) + "đ"; e.FormattingApplied = true; }
+            if (Grid.Columns[e.ColumnIndex].DataPropertyName == "PhatHanhLuc" && e.Value is DateTime at) { e.Value = at.ToLocalTime().ToString("dd/MM/yyyy HH:mm"); e.FormattingApplied = true; }
+        };
+        refresh.Tick += async (_, _) =>
+        {
+            if (Busy || !Visible || FindForm()?.OwnedForms.Length != 0) return;
+            quiet = true; try { await RefreshQuietly(); } finally { quiet = false; }
+        };
+        CommerceWorkspaceVisuals.AdminStyle(Filters, Actions, Grid);
+        refresh.Start();
     }
     /// <summary>Tra tìm theo số/đơn/người mua và thời điểm phát hành ở server.</summary>
     protected override async Task<IReadOnlyList<AdminInvoiceView>> Fetch()
     {
-        var result = await LiveSession.Api.GetAdminInvoicesAsync(SearchBox.Text, from.Value.Date.ToUniversalTime(), to.Value.Date.AddDays(1).ToUniversalTime(), shift.Value == 0 ? null : (long)shift.Value, page);
+        var filter = quiet && applied is { } saved ? saved : (SearchBox.Text.Trim(), from.Value.Date.ToUniversalTime(), to.Value.Date.AddDays(1).ToUniversalTime(), shift.Value == 0 ? (long?)null : (long)shift.Value, page);
+        applied = filter;
+        var result = await LiveSession.Api.GetAdminInvoicesAsync(filter.Item1, filter.Item2, filter.Item3, filter.Item4, filter.Item5);
         pagination.Text = $"Trang {page} · {result.TongSo} chứng từ"; return result.DuLieu;
     }
     /// <summary>Không lọc lại tại UI làm sai phân trang đã trả từ máy chủ.</summary>
@@ -50,27 +82,6 @@ public sealed class InvoicesManagementPage : AdminWorkspacePage<AdminInvoiceView
         var order = await LiveSession.Api.GetAdminOrderAsync(selected.MaDonHang);
         using var form = new InvoiceDetailsForm(data.HoaDon, data.SnapshotJson, order);
         form.ShowDialog(FindForm());
-    }
-    /// <summary>Chọn nguồn hủy hoặc hoàn khiếu nại đã duyệt; hoàn thừa/muộn không được giảm hóa đơn.</summary>
-    private async Task Adjust()
-    {
-        var selected = Selected(); if (selected is null) return;
-        if (!drafts.TryGetValue(selected.MaHoaDon, out var draft)) drafts[selected.MaHoaDon] = draft = new();
-        using var form = new AdminCommandDialog<InvoiceAdjustmentInput>("Phát hành điều chỉnh " + selected.SoHoaDon, draft);
-        var kind = form.ChoiceField("Nguồn điều chỉnh", "Hủy món hợp lệ", "Hồ sơ hoàn khiếu nại đã duyệt");
-        var source = form.NumberField("Mã nguồn"); var reason = form.TextField("Lý do phát hành");
-        form.Submit(op => new(kind.SelectedIndex == 0 ? (long)source.Value : null, reason.Text, selected.PhienBanDuLieu, op, kind.SelectedIndex == 1 ? (long)source.Value : null),
-            async input => { await LiveSession.Api.AdjustInvoiceAsync(selected.MaHoaDon, input); }, async op => { await LiveSession.Api.InvoiceReceiptAsync(op); });
-        if (form.ShowDialog(FindForm()) == DialogResult.OK) await Reload();
-    }
-    /// <summary>Xem trước chỉ dựng trang in, không hiện nút in tự do bỏ qua log nghiệp vụ.</summary>
-    private async Task Preview()
-    {
-        var selected = Selected(); if (selected is null) return;
-        var data = await LiveSession.Api.GetAdminInvoiceAsync(selected.MaHoaDon);
-        await LiveSession.Api.LogInvoiceDocumentAsync(selected.MaHoaDon, new("PREVIEW", null, null, Guid.NewGuid()));
-        using var document = PrintDocument(data, false); using var form = AdminUi.Dialog("Xem trước " + selected.SoHoaDon, 1000, 800);
-        form.Controls.Add(new PrintPreviewControl { Dock = DockStyle.Fill, Document = document, Zoom = .9 }); form.ShowDialog(FindForm());
     }
     /// <summary>Gửi job tới máy in đã chọn; in lại có BẢN SAO, không phát hành số mới khi in lỗi.</summary>
     private async Task Print()
@@ -102,10 +113,19 @@ public sealed class InvoicesManagementPage : AdminWorkspacePage<AdminInvoiceView
     /// <summary>Nội dung lấy duy nhất từ snapshot, giữ dấu Unicode; không tra giá/menu.</summary>
     private static string SnapshotText(AdminInvoiceDetail data)
     {
-        using var json = JsonDocument.Parse(data.SnapshotJson);
-        return $"4CHANG LINH NGU LAM\n{data.HoaDon.SoHoaDon}\nGiá trị: {data.HoaDon.SoTien:N0}đ\nPhát hành: {data.HoaDon.PhatHanhLuc:dd/MM/yyyy HH:mm}\n\n" + JsonSerializer.Serialize(json.RootElement, new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+        var culture = CultureInfo.GetCultureInfo("vi-VN");
+        var lines = InvoiceSnapshotReader.Read(data.SnapshotJson);
+        var text = new System.Text.StringBuilder($"4CHANG LINH NGU LAM\n{data.HoaDon.SoHoaDon}\nKhách hàng: {data.HoaDon.NguoiMua ?? "Khách lẻ"}\nPhát hành: {data.HoaDon.PhatHanhLuc?.ToLocalTime():dd/MM/yyyy HH:mm}\n\n");
+        if (lines.Count == 0) text.AppendLine("Hóa đơn cũ chưa lưu đầy đủ danh sách món.");
+        foreach (var line in lines)
+        {
+            text.AppendLine($"{line.Mon} · {line.Size} · {line.SoLuong} ly × {line.DonGia.ToString("N0", culture)}đ = {line.ThanhTien.ToString("N0", culture)}đ");
+            if (!string.IsNullOrWhiteSpace(line.Topping)) text.AppendLine("  " + line.Topping);
+        }
+        text.AppendLine($"\nTổng giá trị hóa đơn: {data.HoaDon.SoTien.ToString("N0", culture)}đ");
+        return text.ToString();
     }
-    /// <summary>Phân trang theo vùng in thực; nhãn bản sao áp dụng cả xem/print nhiều trang.</summary>
+    /// <summary>Phân trang theo vùng in thực; nhãn bản sao áp dụng mọi trang in lại.</summary>
     private static PrintDocument PrintDocument(AdminInvoiceDetail data, bool copy)
     {
         var document = new PrintDocument { DocumentName = data.HoaDon.SoHoaDon }; var remaining = "";
@@ -120,4 +140,19 @@ public sealed class InvoicesManagementPage : AdminWorkspacePage<AdminInvoiceView
         };
         return document;
     }
+    /// <summary>Snapshot không đổi thì không bind lại; giữ dòng/chỗ cuộn khi có hóa đơn mới.</summary>
+    protected override void BindRows(IReadOnlyList<AdminInvoiceView> rows)
+    {
+        var snapshot = System.Text.Json.JsonSerializer.Serialize(rows); if (snapshot == boundSnapshot) return;
+        var selected = Selected()?.MaHoaDon; var top = Grid.FirstDisplayedScrollingRowIndex;
+        Grid.DataSource = rows.ToList(); boundSnapshot = snapshot;
+        if (Grid.Rows.Count > 0)
+        {
+            var index = rows.Select((row, i) => (row, i)).FirstOrDefault(x => x.row.MaHoaDon == selected).i;
+            Grid.CurrentCell = Grid.Rows[index].Cells[0];
+            if (top >= 0) Grid.FirstDisplayedScrollingRowIndex = Math.Min(top, Grid.RowCount - 1);
+        }
+    }
+    protected override void Dispose(bool disposing) { if (disposing) { refresh.Stop(); refresh.Dispose(); } base.Dispose(disposing); }
+
 }

@@ -10,19 +10,15 @@ internal static class ReportNavigationUiChecks
     {
         var targets = new[]
         {
-            (Tab: "Món đã phục vụ", Caption: "Đến Thực đơn", Page: "MenuManagementPage"),
-            (Tab: "Tỷ lệ đơn theo ngày tạo", Caption: "Đến Đơn hàng", Page: "OrdersManagementPage"),
-            (Tab: "Nguyên liệu cảnh báo", Caption: "Đến Tồn kho", Page: "InventoryPage"),
-            (Tab: "Nguồn thu trong kỳ", Caption: "Đến Đơn hàng", Page: "OrdersManagementPage"),
-            (Tab: "Hoàn thành công trong kỳ", Caption: "Đến Hoàn tiền", Page: "RefundsManagementPage"),
-            (Tab: "Hủy món trong kỳ", Caption: "Đến Đơn hàng", Page: "OrdersManagementPage")
-        };
-        for (var i = 0; i < targets.Length; i++)
+            (Tab: "Đơn hoàn thành", Caption: "Đến Đơn hàng", Page: "OrdersManagementPage"),
+            (Tab: "Món bán chạy", Caption: "Đến Thực đơn", Page: "MenuManagementPage"),
+            (Tab: "Tiền đã hoàn", Caption: "Đến Hoàn tiền", Page: "RefundsManagementPage")
+        };        for (var i = 0; i < targets.Length; i++)
         {
             var target = targets[i];
             if (i > 0) shell.Navigate("reports");
             await AdminFeaturesUiTests.WaitUntil(() => AdminFeaturesUiTests.Descendants(shell).OfType<TabControl>()
-                .Any(t => t.Name == "ReportTables" && t.TabPages.Count == 6));
+                .Any(t => t.Name == "ReportTables" && t.TabPages.Count == 3));
             var tabs = AdminFeaturesUiTests.Descendants(shell).OfType<TabControl>().Single(t => t.Name == "ReportTables");
             tabs.SelectedTab = tabs.TabPages.Cast<TabPage>().Single(t => t.Text == target.Tab);
             // Không chọn dòng: chứng minh nút vẫn dùng được ở bảng báo cáo trống hoặc không có selection.
@@ -39,7 +35,7 @@ internal static class ReportNavigationUiChecks
             await AdminFeaturesUiTests.WaitUntil(() => AdminFeaturesUiTests.Descendants(shell).Any(c => c.GetType().Name == target.Page));
             Assert.DoesNotContain(AdminFeaturesUiTests.Descendants(shell), c => c.GetType().Name == "ReportsManagementPage");
             Assert.Single(Application.OpenForms.Cast<Form>().OfType<MainForm>());
-            if (i == 0) AdminFeaturesUiTests.Capture(shell, Path.Combine(output, "ReportNavigation-menu.png"));
+            if (i == 0) AdminFeaturesUiTests.Capture(shell, Path.Combine(output, "ReportNavigation-orders.png"));
         }
     }
 }

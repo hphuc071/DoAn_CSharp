@@ -43,22 +43,17 @@ public sealed class IncomingReconciliationTests(AdminFeatureFixture fixture)
         Assert.Equal("1", await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.HoSoHoanTien WHERE MaDonHang={s.Order}"));
     }
 
-    /// <summary>Admin phải đối chiếu sao kê trước chốt hết hạn; đã thu đủ không được chuyển EXPIRED.</summary>
+    /// <summary>UC tinh gọn bỏ chốt hết hạn thủ công; chứng cứ không cấp lại quyền đã bỏ.</summary>
     [Fact]
-    public async Task ChotHetHan_CanChungCu_DaThuDuKhongChoChot()
+    public async Task ChotHetHanThuCong_DaBoQuyen_KhongDoiDon()
     {
         var s = await Prepare(true);
         var order = (await fixture.Send("GET", $"/api/admin/orders/{s.Order}")).Deserialize<AdminOrderDetail>(Options)!;
-        var input = new OrderActionInput("EXPIRE", "Đã đến hạn chờ tiền", order.Don.PhienBanDuLieu, Guid.NewGuid());
-        await fixture.Send("POST", $"/api/admin/orders/{s.Order}/actions", input, 409);
-        await fixture.Send("POST", $"/api/admin/orders/{s.Order}/actions", input with { ChungCu = "Sao kê kiểm thử không có tiền vào", DaDoiChieuSaoKe = true, MaThaoTac = Guid.NewGuid() });
-        Assert.Equal("EXPIRED", await State(s));
-        var paid = await Prepare(true);
-        await fixture.Api.Sql($"UPDATE dbo.ThanhToan SET SoTienDaXacMinh=SoTienYeuCau,TrangThai='VERIFIED',XacMinhLuc=SYSUTCDATETIME() WHERE MaThanhToan={paid.Payment}");
-        order = (await fixture.Send("GET", $"/api/admin/orders/{paid.Order}")).Deserialize<AdminOrderDetail>(Options)!;
-        await fixture.Send("POST", $"/api/admin/orders/{paid.Order}/actions", input with { PhienBanDuLieu=order.Don.PhienBanDuLieu, ChungCu="Đã thu đủ", DaDoiChieuSaoKe=true, MaThaoTac=Guid.NewGuid() }, 409);
+        var input = new OrderActionInput("EXPIRE", "Đã đến hạn", order.Don.PhienBanDuLieu, Guid.NewGuid());
+        await fixture.Send("POST", $"/api/admin/orders/{s.Order}/actions", input, 403);
+        await fixture.Send("POST", $"/api/admin/orders/{s.Order}/actions", input with { ChungCu="Sao kê kiểm thử", DaDoiChieuSaoKe=true, MaThaoTac=Guid.NewGuid() }, 403);
+        Assert.Equal(order.Don.TrangThai, await State(s));
     }
-
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
 
     /// <summary>Chỉ đổi dữ liệu fixture thành Web chưa trả tiền, không tạo dữ liệu giả trong database quán.</summary>

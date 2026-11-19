@@ -8,7 +8,7 @@ public sealed partial class CafeApiClient
     public Task<AdminPage<AdminOrderRow>> GetAdminOrdersAsync(AdminOrderFilter f) => SendAsync<AdminPage<AdminOrderRow>>(HttpMethod.Get,
         "/api/admin/orders?" + EncodeQuery(new() { ["Kenh"] = f.Kenh, ["HinhThuc"] = f.HinhThuc, ["TrangThai"] = f.TrangThai,
             ["TuLuc"] = f.TuLuc?.ToString("O"), ["DenLuc"] = f.DenLuc?.ToString("O"), ["MaCa"] = f.MaCa?.ToString(),
-            ["NhomDon"] = f.NhomDon, ["TimKiem"] = f.TimKiem, ["Trang"] = f.Trang.ToString(), ["KichThuocTrang"] = f.KichThuocTrang.ToString() }));
+            ["NhomDon"] = f.NhomDon, ["KetQuaHuy"] = f.KetQuaHuy, ["TimKiem"] = f.TimKiem, ["Trang"] = f.Trang.ToString(), ["KichThuocTrang"] = f.KichThuocTrang.ToString() }));
     /// <summary>Đọc cấu hình đã chốt, tiền, giữ chỗ và lịch sử một đơn.</summary>
     public Task<AdminOrderDetail> GetAdminOrderAsync(long id) => SendAsync<AdminOrderDetail>(HttpMethod.Get, $"/api/admin/orders/{id}");
     /// <summary>Gửi cùng lệnh tiến trình mà POS dùng; không cập nhật tiền/trạng thái cục bộ.</summary>
@@ -29,7 +29,9 @@ public sealed partial class CafeApiClient
     /// <summary>Ghi lịch sử xem trước/in/in lại/xuất, không tạo hóa đơn.</summary>
     public Task<DocumentLogReceipt> LogInvoiceDocumentAsync(long id, DocumentLogInput input) => SendAsync<DocumentLogReceipt>(HttpMethod.Post, $"/api/admin/invoices/{id}/documents/log", input);
     /// <summary>Đọc các hồ sơ hoàn đã che tài khoản ngân hàng.</summary>
-    public Task<IReadOnlyList<RefundView>> GetAdminRefundsAsync() => SendAsync<IReadOnlyList<RefundView>>(HttpMethod.Get, "/api/admin/refunds");
+    public Task<IReadOnlyList<RefundView>> GetAdminRefundsAsync(string? search = null, DateTime? from = null, DateTime? to = null, string? status = null) =>
+        SendAsync<IReadOnlyList<RefundView>>(HttpMethod.Get, "/api/admin/refunds?" + EncodeQuery(new()
+        { ["search"] = search, ["from"] = from?.ToString("O"), ["to"] = to?.ToString("O"), ["status"] = status }));
     /// <summary>Đọc tiền gốc, hạn mức còn lại và lịch sử duyệt/chi.</summary>
     public Task<RefundDetail> GetAdminRefundAsync(long id) => SendAsync<RefundDetail>(HttpMethod.Get, $"/api/admin/refunds/{id}");
     /// <summary>Lập hoặc bổ sung hồ sơ; số tài khoản chỉ gửi qua kênh được cấu hình và không ghi log phía UI.</summary>

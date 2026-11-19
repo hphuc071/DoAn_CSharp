@@ -38,7 +38,7 @@ public sealed class CancellationDesktopTests
             try
             {
                 LiveSession.Preview = false;
-                foreach (var step in new[] { ("Staff", "Gửi yêu cầu duyệt"), ("Admin", "Duyệt hủy / hoàn tại quầy"), ("Staff", "Hoàn tiền tại quầy") })
+                foreach (var step in new[] { ("Staff", "Gửi yêu cầu duyệt"), ("Admin", "Duyệt yêu cầu hủy"), ("Staff", "Hoàn tiền tại quầy") })
                 {
                     var token = Environment.GetEnvironmentVariable(step.Item1 == "Staff" ? "TEST_CANCEL_STAFF_TOKEN" : "TEST_CANCEL_ADMIN_TOKEN")!;
                     LiveSession.Api.Token = token; LiveSession.Current = new SessionResult(token, step.Item1 == "Staff" ? "STAFF" : "ADMIN", "Kiểm thử", 1, long.Parse(Environment.GetEnvironmentVariable("TEST_CANCEL_SHIFT")!)); LiveSession.ShiftLocked = false;

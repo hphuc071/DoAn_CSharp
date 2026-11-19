@@ -102,6 +102,15 @@ public static class ReportDocumentWriter
     /// <summary>Đưa cả chỉ tiêu tổng hợp vào file; tài liệu hóa đơn/nhật ký không thêm KPI không liên quan.</summary>
     private static ReportTable[] Tables(ReportSnapshot snapshot)
     {
+        if (snapshot.Loai == "REPORT_SIMPLE")
+        {
+            var values = snapshot.ChiSo;
+            var summary = new ReportTable("Tổng hợp", [new("Chỉ tiêu"), new("Giá trị", "number"), new("Đơn vị")],
+            [new string?[] { "Tổng tiền đơn hoàn thành", values.DoanhThuThuan.ToString(CultureInfo.InvariantCulture), "đ" },
+             new string?[] { "Số đơn hoàn thành", values.HoanTat.ToString(CultureInfo.InvariantCulture), "đơn" },
+             new string?[] { "Tiền đã hoàn", (values.HoanTienMat + values.HoanChuyenKhoan).ToString(CultureInfo.InvariantCulture), "đ" }]);
+            return new[] { Metadata(snapshot), summary }.Concat(snapshot.Bang).ToArray();
+        }
         if (snapshot.Loai != "REPORT") return new[] { Metadata(snapshot) }.Concat(snapshot.Bang).ToArray();
         var x = snapshot.ChiSo;
         var pairs = new (string Name, decimal? Value, string Unit)[] { ("Tiền hàng", x.TienHang, "đ"), ("Phí giao", x.PhiGiaoHang, "đ"),

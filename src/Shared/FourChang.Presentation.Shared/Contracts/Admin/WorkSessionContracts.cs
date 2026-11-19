@@ -6,7 +6,7 @@ public sealed record WorkSessionInfo(long MaCaLamViec, string MaCaHienThi, long 
     decimal TienMatDauCa, decimal? TienMatDuKienCuoiCa, decimal? TienMatThucDem, string? LyDoChenhLech,
     long? MaCaBanGiaoTruoc, long? MaQuanLyDuyet, byte[] PhienBanDuLieu);
 public sealed record WorkSessionPage(IReadOnlyList<WorkSessionInfo> Items, int Page, int PageSize, int Total);
-public sealed record ShiftTransaction(string Loai, long Ma, long? MaDonHang, string ThamChieu, string PhuongThuc, decimal SoTien, string TrangThai);
+public sealed record ShiftTransaction(string Loai, long Ma, long? MaDonHang, string ThamChieu, string PhuongThuc, decimal SoTien, string TrangThai, string? MaDon = null);
 public sealed record ShiftOrder(long MaDonHang, string MaDonHienThi, string TrangThai, long? MaCaNguon);
 public sealed record ShiftAudit(DateTime ThoiDiem, string NguoiThucHien, string HanhDong, string? LyDo);
 public sealed record HandoverInfo(long MaCaNguon, long MaNhanVienNhan, string MaMayNhan, string LyDo,
@@ -14,13 +14,15 @@ public sealed record HandoverInfo(long MaCaNguon, long MaNhanVienNhan, string Ma
 public sealed record WorkSessionDetails(WorkSessionInfo Ca, decimal ThuTienMat, decimal HoanTienMat,
     decimal TienMatDuKienHienTai, decimal? ChenhLech, IReadOnlyList<ShiftTransaction> GiaoDich,
     IReadOnlyList<ShiftOrder> DonDangXuLy, IReadOnlyList<string> KhoanChuaRo, IReadOnlyList<ShiftAudit> NhatKy,
-    HandoverInfo? BanGiao, DateTime DuLieuTaiLuc, string MaDoiChieu, bool DangChoDoiChieu, bool CoYeuCauKhoiPhuc, string? SuKienTrangThai = null, int SoDonHoanThanh = 0, decimal TongTienDonHoanThanh = 0)
+    HandoverInfo? BanGiao, DateTime DuLieuTaiLuc, string MaDoiChieu, bool DangChoDoiChieu, bool CoYeuCauKhoiPhuc, string? SuKienTrangThai = null, int SoDonHoanThanh = 0, decimal TongTienDonHoanThanh = 0, IReadOnlyList<ShiftCompletedOrder>? DonHoanThanh = null)
 {
     /// <summary>Tiền mặt thuần từ giao dịch của chính ca; không tính lại khoản thu của ca bàn giao.</summary>
     public decimal TienThuDuoc => ThuTienMat - HoanTienMat;
     /// <summary>Chuyển khoản ghi nhận ở ca, hiển thị riêng và không cộng vào tiền mặt kiểm đếm.</summary>
     public decimal ThuChuyenKhoan => GiaoDich.Where(x => x.Loai == "Thu" && x.PhuongThuc == "BANK_TRANSFER" && x.TrangThai == "VERIFIED").Sum(x => x.SoTien);
 }
+/// <summary>Đơn hoàn thành bởi ca đang xem; ca nguồn có thể khác khi nhận bàn giao, giá trị do server chốt.</summary>
+public sealed record ShiftCompletedOrder(long MaDonHang, string MaDon, DateTime? HoanTatLuc, decimal SoTien, long? MaCaNguon);
 public sealed record CloseWorkSessionInput(byte[] PhienBanDuLieu, Guid MaThaoTac, string MaDoiChieu);
 public sealed record HandoverWorkSessionInput(long MaNhanVienNhan, string MaMayNhan, string LyDo,
     long[] MaDonBanGiao, string[] KhoanChuaRo, byte[] PhienBanDuLieu, Guid MaThaoTac, string MaDoiChieu);
