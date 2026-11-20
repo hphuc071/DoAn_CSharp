@@ -8,6 +8,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Staff;
 
 /// <summary>Toàn chuỗi dùng HTTP thật và SQL fixture riêng: khách đề nghị, Staff chuyển, Admin quyết định và Staff chi tại quầy.</summary>
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-04")]
 public sealed class CancellationApprovalTests
 {
     /// <summary>Không hủy sớm, không nhảy vai trò, duyệt mới giải phóng kho; tiền mặt ghi đúng ca và chỉ một lần.</summary>

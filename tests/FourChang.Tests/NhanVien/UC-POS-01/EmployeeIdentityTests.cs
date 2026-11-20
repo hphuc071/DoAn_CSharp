@@ -8,7 +8,7 @@ public sealed class EmployeeIdentityTests
 {
 
     /// <summary>
-    /// Kiểm tra nhận diện bằng mã và tên, trường hợp trùng tên, nhân viên ngừng làm và mở hoặc tiếp tục đúng ca.
+    /// Kiểm tra nhận diện, trùng tên, ngừng làm và gửi lại lệnh mở ca cùng mã thao tác.
     /// </summary>
     [Fact, Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-01"), Trait("Layer", "API")]
     public async Task NhapMaVaTen_TrungTen_NgungLam_VaMoCa()
@@ -55,11 +55,13 @@ public sealed class EmployeeIdentityTests
         change["MaThaoTac"] = NewId();
         change["PhienBanDuLieu"] = inactive.Text("phienBanDuLieu");
         first = (await api.Send("PUT", $"/api/admin/employees/{first.Number("maNhanVien")}", change, admin)).Expect(200, "Kích hoạt lại fixture").Json;
+        open["MaThaoTac"] = NewId();
         var shift = (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(200, "Mở ca đúng danh tính").Json;
         var staff = TestApi.Bearer(shift);
         Assert.Equal(first.Number("maNhanVien"), shift.Number("id"));
         Assert.Equal(name, shift.Text("name"));
-        (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(200, "Tiếp tục cùng ca");
+        var replay = (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(200, "Gửi lại cùng mã mở ca").Json;
+        Assert.Equal(shift.Number("shiftId"), replay.Number("shiftId"));
         Assert.Equal("1", await api.Sql($"SELECT COUNT(*) FROM dbo.CaLamViec WHERE MaMay='{device.Input.Text("MaMay")}' AND TrangThai='OPEN'"));
         (await api.Send("GET", "/api/admin/customers", headers: staff)).Expect(403, "Staff không có quyền Admin");
         (await api.Send("POST", "/api/pos/shifts/current/close", Body(("TienMatThucDem", 500000), ("LyDoChenhLech", null)), staff)).Expect(200, "Kết thúc ca đúng tiền");

@@ -4,6 +4,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Staff;
 
 /// <summary>Kết thúc ca lưu báo cáo kiểm đếm và đóng ca cùng giao dịch, không chờ nút chốt của Admin.</summary>
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-01")]
 public sealed class FinishShiftTests
 {
     /// <summary>Không bắt nhập lý do; cuối ca trừ đầu ca được lưu đến Admin, gửi lặp không ghi lại, mở tiếp ca khác.</summary>

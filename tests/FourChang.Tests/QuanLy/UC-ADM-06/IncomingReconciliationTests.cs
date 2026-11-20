@@ -5,7 +5,7 @@ using FourChang.Tests.Shared;
 namespace FourChang.Tests.Admin;
 
 /// <summary>Đối soát tiền vào và hết hạn chạy API/SQL thật trong database kiểm thử riêng.</summary>
-[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-09"), Trait("Actor", "QuanLy")]
+[Collection("AdminFeatures"), Trait("UseCase", "UC-ADM-06"), Trait("Actor", "QuanLy")]
 public sealed class IncomingReconciliationTests(AdminFeatureFixture fixture)
 {
     /// <summary>Thiếu tiền không nhận đơn, giao dịch lặp không cộng lại, đủ tiền đúng hạn mới chờ xác nhận.</summary>

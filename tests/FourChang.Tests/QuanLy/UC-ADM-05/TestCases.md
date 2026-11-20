@@ -1,21 +1,26 @@
-# UC-ADM-05 — Theo dõi tồn kho và cảnh báo — Test cases
+# UC-ADM-05 Đơn hàng và yêu cầu hủy
 
-Nguồn: `D:\8.tailieu\dac-25-Uc.docx`; giữ số UC mới. Quy tắc liên quan: **BR-02, BR-03, BR-05, BR-08, BR-14, BR-23, BR-24, BR-26, BR-29, BR-35**. Tất cả test C# nằm trong project xUnit dùng chung, không tạo `.csproj` riêng theo UC.
+Các lớp kiểm thử trong thư mục này dùng project xUnit chung. Danh mục nguồn và bộ lọc nằm trong tests/test-manifest.json.
 
-| Mã TC | Tình huống | Kết quả cần đạt | Lớp xUnit |
-|---|---|---|---|
-| TC-ADM-05-01 | Đọc số dư/khả dụng/cảnh báo | Khả dụng = thực tế − giữ chỗ − an toàn; thiếu số dư báo Chưa xác định. | `InventoryAdministrationTests` |
-| TC-ADM-05-02 | Truy vết và chỉ đọc | Chi tiết đúng nguyên liệu và nguồn; GET không tạo biến động kho. | `InventoryAdministrationTests` |
-| TC-ADM-05-03 | Ẩn danh và Customer | 401/403 trên API Admin; không chỉ dựa vào ẩn nút UI. | `InventoryAdministrationTests` |
-| TC-ADM-05-04 | Tồn thay đổi trên Web đang mở | Trạng thái đặt món thay đổi theo nguồn chung; không tự chuyển thành ẩn. | `MenuSynchronizationBrowserTests` |
+## Mã kiểm thử
 
-Kiểm tra WinForms: `AdminFeaturesUiTests` mở route thật với API, chụp desktop/compact và form nguyên liệu/BOM. Ảnh nằm trong `artifacts/tests/xunit/ADM01-05/<database-fixture>/`. `Theory` giao diện dùng `Layer=WinForms`, tham số UC được lưu trong tên ảnh thay vì gắn Trait động.
+- [OrderAdministrationTests.cs](OrderAdministrationTests.cs)
 
-```powershell
+## Chạy kiểm thử
+
+~~~powershell
 dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-05"
-dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "FullyQualifiedName~AdminFeaturesUiTests"
-```
+~~~
 
-Điều kiện chạy: Windows/.NET 8, SQL Server Docker đã hoạt động, `.env` local đã cấu hình và Playwright Chromium đã có cho test Browser. Fixture dùng database GUID riêng, không chạy lệnh xóa/reset trên database đồ án.
+Test API và giao diện sử dụng database thử riêng khi cần SQL. Kết quả đạt cần căn cứ lượt chạy và tệp TRX tương ứng.
 
-Kiểm tra thủ công bổ sung: ngắt API lúc form có nháp; xác nhận không báo lưu thành công, dữ liệu cũ có cảnh báo; nối lại và tra receipt/version trước gửi lại. Trước xóa/ngừng phải có xác nhận/lý do theo từng thao tác. Chạy SQL test không thay thế kiểm tra trực quan các dialog.
+## Kịch bản kiểm thử 07
+
+### UC-ADM-05 — tái sử dụng thư mục UC-ADM-05
+- Admin không được gọi ACCEPT/START/FINISH/DELIVER/COMPLETE/CANCEL/RETRY_DELIVERY/EXPIRE; đơn/kho/version không đổi.
+- Nhân viên gửi yêu cầu đúng món/số ly; chưa duyệt chưa hủy.
+- Duyệt hoặc từ chối có phiên bản/mã chống trùng; không chi tiền sớm, không tạo hồ sơ hoàn cho đơn chưa thu tiền.
+- Giữ kết quả đã từ chối/đã duyệt, lọc tại máy chủ trước phân trang; đọc địa chỉ snapshot.
+- Giao thất bại chỉ cần lý do, không hồi kho, replay không lặp.
+- WinForms: Admin chỉ xem/ngoại lệ được phép; nút duyệt/từ chối và trạng thái rõ, resize không cắt bộ lọc.
+- Hồi quy chuỗi Khách → Nhân viên → Quản lý → Nhân viên hoàn tại quầy và tiến trình pha chế POS.

@@ -3,6 +3,7 @@ using FourChang.Desktop.Shared.Invoices;
 namespace FourChang.Tests.Staff;
 
 /// <summary>Kiểm tra bảng hóa đơn từ snapshot đã chốt, không dùng giá menu hoặc số ly sau hủy.</summary>
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-05")]
 public sealed class InvoiceSnapshotTests
 {
     /// <summary>Topping tính theo số phần mỗi ly; số ly đặt ban đầu được giữ dù đơn đã hủy một phần.</summary>

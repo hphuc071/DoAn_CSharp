@@ -4,7 +4,7 @@ using FourChang.Tests.Shared;
 namespace FourChang.Tests.Admin;
 
 /// <summary>ADM-05: số dư/giữ chỗ/an toàn, cảnh báo, drill-down và ranh giới quyền.</summary>
-[Collection("AdminFeatures"), Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-05")]
+[Collection("AdminFeatures"), Trait("Actor", "QuanLy"), Trait("UseCase", "UC-ADM-03")]
 public sealed class InventoryAdministrationTests(AdminFeatureFixture fixture)
 {
     /// <summary>Tất cả API mới chặn ẩn danh và Customer; không dùng việc ẩn nút làm phân quyền.</summary>

@@ -7,6 +7,7 @@ namespace FourChang.Tests.Staff;
 
 /// <summary>Tra hóa đơn qua HTTP/SQL thật: lọc trước phân trang, không giới hạn vào 100 dòng đã tải.</summary>
 [Collection("AdminFeatures"),Trait("Feature","StaffInvoiceSearch")]
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-05")]
 public sealed class StaffInvoiceQueryTests(AdminFeatureFixture fixture)
 {
     /// <summary>Tìm mã đơn/tên, kiểm cận ngày loại trừ và ba trang; endpoint chỉ dành cho Staff đang có ca.</summary>

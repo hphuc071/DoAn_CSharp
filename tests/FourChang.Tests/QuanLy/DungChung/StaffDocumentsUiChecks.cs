@@ -3,6 +3,8 @@ using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shell;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using FourChang.Desktop.Shared.Invoices;
+using FourChang.Desktop.Shared.Orders;
+using System.Reflection;
 using FourChang.Presentation.Shared.Contracts.Admin;
 using System.Data;
 namespace FourChang.Tests.Admin;
@@ -20,25 +22,27 @@ internal static class StaffDocumentsUiChecks
             LiveSession.Current=session;LiveSession.Api.Token=session.Token;LiveSession.ShiftLocked=false;
             var product=(await LiveSession.Api.GetMenuAsync()).First(x=>x.Available);
             var variant=(await LiveSession.Api.GetMenuVariantsAsync(product.MaMon)).First(x=>x.Available);var pair=variant.TuyChonPhaChe[0];
-            var receipt=await LiveSession.Api.CheckoutPosAsync(new(Guid.NewGuid(),"TAKEAWAY",null,"CASH",1000000,variant.GiaBan,[new(variant.MaCauHinhMon,1,pair.PhanTramDuong,pair.PhanTramDa,null,[])]));
+            var receipt=await LiveSession.Api.CheckoutPosAsync(new(Guid.NewGuid(),"TAKEAWAY",null,"CASH",variant.GiaBan,variant.GiaBan,[new(variant.MaCauHinhMon,1,pair.PhanTramDuong,pair.PhanTramDa,null,[])]));
             using var shell=new MainForm("Staff",employee.HoTen){ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-14000,-14000)};
             shell.Show();shell.Navigate(invoice?"payment":"orders");
-            await AdminFeaturesUiTests.WaitUntil(()=>Controls(shell).OfType<DataGridView>().Any(x=>x.Name=="StaffDocumentsGrid"&&x.Rows.Count>0));
-            var grid=Controls(shell).OfType<DataGridView>().Single(x=>x.Name=="StaffDocumentsGrid");
-            var search=Controls(shell).OfType<TextBox>().Single(x=>x.Name=="StaffDocumentSearch");
+            var gridName = invoice ? "StaffDocumentsGrid" : "AdminDataGrid";
+            await AdminFeaturesUiTests.WaitUntil(()=>Controls(shell).OfType<DataGridView>().Any(x=>x.Name==gridName&&x.Rows.Count>0));
+            var grid=Controls(shell).OfType<DataGridView>().Single(x=>x.Name==gridName);
+            var search=Controls(shell).OfType<TextBox>().Single(x=>invoice
+                ? x.Name=="StaffDocumentSearch" : x.PlaceholderText=="Mã đơn hoặc tên khách hàng");
             search.Text=invoice?"HD-"+receipt.MaDonHang.ToString("D12"):receipt.MaDon;
-            if(invoice)await ApplyFilters(shell,grid);
+            await ApplyFilters(shell,grid,invoice);
             await AdminFeaturesUiTests.WaitUntil(()=>grid.Rows.Count==1);
             if(invoice)
             {
                 var end=Controls(shell).OfType<DateTimePicker>().Single(x=>x.Name=="StaffInvoiceTo");
-                end.Value=DateTime.Today.AddDays(-1);await ApplyFilters(shell,grid);Assert.Equal(0,grid.Rows.Count);
-                end.Value=DateTime.Today;await ApplyFilters(shell,grid);Assert.Equal(1,grid.Rows.Count);
+                end.Value=DateTime.Today.AddDays(-1);await ApplyFilters(shell,grid,invoice);Assert.Equal(0,grid.Rows.Count);
+                end.Value=DateTime.Today;await ApplyFilters(shell,grid,invoice);Assert.Equal(1,grid.Rows.Count);
             }
             foreach(var width in new[]{1440,1280})
             {
                 shell.ClientSize=new Size(width,850);await Task.Delay(100);
-                var button=Controls(shell).OfType<Button>().Single(x=>x.Text==(invoice?"Xem hóa đơn":"Xem đơn hàng"));
+                var button=Controls(shell).OfType<Button>().Single(x=>x.Text==(invoice?"Xem hóa đơn":"Chi tiết"));
                 var bounds=shell.RectangleToClient(button.RectangleToScreen(button.ClientRectangle));
                 Assert.True(bounds.Top>=0&&bounds.Bottom<=shell.ClientSize.Height);
             }
@@ -47,7 +51,8 @@ internal static class StaffDocumentsUiChecks
             using var timer=new System.Windows.Forms.Timer{Interval=75};
             timer.Tick+=(_,_)=>
             {
-                var dialog=Application.OpenForms.Cast<Form>().FirstOrDefault(x=>x!=shell&&x.Text.StartsWith(invoice?"Hóa đơn HD-":"Đơn hàng POS-",StringComparison.Ordinal));
+                var dialog=Application.OpenForms.Cast<Form>().FirstOrDefault(x=>x!=shell&&
+                    (invoice ? x.Text.StartsWith("Hóa đơn HD-",StringComparison.Ordinal) : x.Name=="BasicOrderDetails"));
                 if(dialog is null)return;
                 try
                 {
@@ -66,7 +71,13 @@ internal static class StaffDocumentsUiChecks
                 catch(Exception ex){failure=ex;}
                 finally{timer.Stop();finished=true;dialog.Close();}
             };
-            timer.Start();Controls(shell).OfType<Button>().Single(x=>x.Text==(invoice?"Xem hóa đơn":"Xem đơn hàng")).PerformClick();
+            if (!invoice)
+            {
+                var workspace = Controls(shell).OfType<OrdersWorkspacePage>().Single();
+                var busy = typeof(AdminWorkspacePage<AdminOrderRow>).GetField("Busy", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                await AdminFeaturesUiTests.WaitUntil(() => !(bool)busy.GetValue(workspace)!);
+            }
+            timer.Start();Controls(shell).OfType<Button>().Single(x=>x.Text==(invoice?"Xem hóa đơn":"Chi tiết")).PerformClick();
             await AdminFeaturesUiTests.WaitUntil(()=>finished);Assert.Null(failure);
             if(invoice)
             {
@@ -80,15 +91,15 @@ internal static class StaffDocumentsUiChecks
                 foreach(var text in new[]{"Nguyễn Minh Anh","0901234567","123 Nguyễn Trãi, TP. Hồ Chí Minh","Địa chỉ giao hàng"})Assert.Contains(Controls(deliveryForm).OfType<Label>(),x=>x.Text==text);
                 AdminFeaturesUiTests.Capture(deliveryForm,Path.Combine(output,"staff-invoice-customer-address.png"));deliveryForm.Close();
             }
-            search.Text="NO-SUCH-DOCUMENT";if(invoice)await ApplyFilters(shell,grid);Assert.Equal(0,grid.Rows.Count);
-            search.Clear();if(invoice)await ApplyFilters(shell,grid);Assert.True(grid.Rows.Count>0);shell.Close();
+            search.Text="NO-SUCH-DOCUMENT";await ApplyFilters(shell,grid,invoice);Assert.Equal(0,grid.Rows.Count);
+            search.Clear();await ApplyFilters(shell,grid,invoice);Assert.True(grid.Rows.Count>0);shell.Close();
         }
         finally{LiveSession.Current=saved;LiveSession.Api.Token=token;LiveSession.ShiftLocked=false;}
     }
     /// <summary>Áp dụng từ khóa/ngày bằng nút thật và chờ fetch hoàn tất, không chỉ quan sát dữ liệu cũ.</summary>
-    private static async Task ApplyFilters(Form shell,DataGridView grid)
+    private static async Task ApplyFilters(Form shell,DataGridView grid,bool invoice)
     {
-        var before=grid.Tag;Controls(shell).OfType<Button>().Single(x=>x.Name=="StaffInvoiceSearch").PerformClick();
+        var before=grid.Tag;Controls(shell).OfType<Button>().Single(x=>invoice ? x.Name=="StaffInvoiceSearch" : x.Text=="Tìm kiếm").PerformClick();
         await AdminFeaturesUiTests.WaitUntil(()=>!Equals(before,grid.Tag));
     }
     /// <summary>Tìm control bằng tên ổn định, không phụ thuộc tọa độ hoặc thứ tự dòng.</summary>

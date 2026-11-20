@@ -16,7 +16,7 @@ Các file chính:
 - src/Presentation/FourChang.Desktop/Shared/Orders/OrderDetailsForm.cs (chia sẻ helper bố cục)
 - src/Presentation/FourChang.Desktop/Staff/Shared/StaffDocumentsPage.cs
 - src/Presentation/FourChang.Desktop/Admin/Invoices/InvoicesManagementPage.cs
-- tests/FourChang.Tests/NhanVien/InvoiceSnapshotTests.cs
+- tests/FourChang.Tests/NhanVien/UC-POS-05/InvoiceSnapshotTests.cs
 - tests/FourChang.Tests/QuanLy/DungChung/StaffDocumentsUiChecks.cs
 
 Kiểm tra: build, 8 test snapshot/API/WinForms trong basic-invoice-details.trx; kiểm tra thêm bố cục tên/điện thoại/địa chỉ ở basic-invoice-customer-ui.trx. Ảnh trong artifacts/tests/xunit/ADM01-05/<database>/staff-invoice-*.png. Biến thể giao hàng trong test UI chỉ kiểm hiển thị, không thay đổi đơn thật.

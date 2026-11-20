@@ -37,6 +37,6 @@ public sealed class ChooseNextProductBrowserTests
         Assert.Equal(2,await page.EvaluateAsync<int>("FourChangCart.parse(FourChangCart.raw()).length"));
         await page.Locator("[data-product-id='1']").ClickAsync();
         await Assertions.Expect(page.Locator("#product-editor textarea")).ToHaveValueAsync("");
-        await Assertions.Expect(page.Locator("#product-editor input[type=number]").First).ToHaveValueAsync("1");
+        await Assertions.Expect(page.Locator("#product-editor input[type=number][min='1'][max='99']")).ToHaveValueAsync("1");
     }
 }

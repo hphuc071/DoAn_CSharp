@@ -1,25 +1,39 @@
-# UC-ADM-04 — Tồn kho và chứng từ (tái sử dụng thư mục UC-ADM-06 cũ)
+# UC-ADM-06 Hóa đơn và hoàn tiền
 
-| Ca kiểm thử | Kết quả mong đợi |
-|---|---|
-| Lưu/sửa/xóa nháp nhập | Không đổi tồn, được sửa/xóa với đúng phiên bản |
-| Xác nhận nhập, gửi lại cùng mã | Cộng đúng một lần, có sổ kho/audit/outbox |
-| Sửa/xóa sau xác nhận | API409; trigger SQL chặn sửa dòng đã ghi sổ |
-| Ngày tương lai (nhập và xuất) | Xác nhận SCHEDULED, khóa sửa/xóa, chưa đổi tồn; đến hạn worker POSTED đúng một lần |
-| Đến hạn thiếu hàng | FAILED, lỗi rõ, không trừ một phần; không tự thử lại khi bổ sung hàng; sửa/xác nhận lại cùng ID |
-| Nguyên liệu mới chưa có số dư | Lưu nháp không tạo số dư; xác nhận mới tạo và cộng tồn |
-| Xuất vượt tồn ở một dòng | Rollback toàn phiếu, giữ nháp để sửa/xóa |
-| Hủy phiếu đã ghi sổ | Tạo phiếu ngược, giữ gốc, chặn hủy hai lần |
-| Kiểm kê/điều chỉnh cũ | Đọc lịch sử được; không sửa/xóa/xác nhận |
-| Lập kiểm kê/điều chỉnh qua API cũ | Bị từ chối400; chỉ nhận Nhập/Xuất |
-| Lỗi audit | Rollback trạng thái, tồn, sổ kho và outbox |
-| Khách/ẩn danh | Không truy cập chức năng Admin |
-| UI thật STA | 2 loại phiếu, chọn ngày, trường theo loại, thành tiền/tổng, lưu nháp không đổi tồn, thêm nhiều nguyên liệu, tự xóa ô nhập, chọn dòng sửa, chặn trùng không ghi đè, bỏ dòng và footer không bị cắt |
-| Nâng cấp schema30 cũ | Giữ dữ liệu/rowversion phiếu nháp và đã chốt; thêm ngày nullable; chạy lại an toàn |
+Các lớp kiểm thử trong thư mục này dùng project xUnit chung. Danh mục nguồn và bộ lọc nằm trong tests/test-manifest.json.
 
-Các test chỉ chạy trên database GUID riêng. Không reset database quán.
+## Mã kiểm thử
 
-| Hủy lịch | CANCELLED có audit, không tự ghi sổ khi đến hạn |
-| Worker lỗi audit | Rollback tồn/sổ/trạng thái; phục hồi quyền thì ghi sổ đúng một lần |
-| Nâng cấp lịch | Thêm lỗi nullable/check trạng thái, giữ phiếu/rowversion cũ, chạy lại an toàn |
-| UI lịch | Xác nhận trong editor/danh sách; Đang xử lý khóa sửa, FAILED cho sửa, hủy lịch; polling giữ chọn/cuộn |
+- [IncomingReconciliationTests.cs](IncomingReconciliationTests.cs)
+- [InvoiceAdministrationTests.cs](InvoiceAdministrationTests.cs)
+- [RefundAdministrationTests.cs](RefundAdministrationTests.cs)
+
+## Chạy kiểm thử
+
+~~~powershell
+dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-06"
+~~~
+
+Test API và giao diện sử dụng database thử riêng khi cần SQL. Kết quả đạt cần căn cứ lượt chạy và tệp TRX tương ứng.
+
+## Kịch bản kiểm thử 08
+
+### UC-ADM-06 — tái sử dụng thư mục UC-ADM-06/09
+- Tìm hóa đơn theo mã đơn/khách và khoảng ngày; hóa đơn gốc/snapshot không đổi khi xem, in hoặc tải PDF.
+- Duyệt hủy tạo khoản đã duyệt; trạng thái Chờ khách nhận, đã trả=0 và còn phải trả đúng phần hủy đã thu tiền.
+- Nhân viên trả tiền thật và replay chỉ có một lần chi; Quản lý thấy đúng người chi/ca/thời gian và số đã trả.
+- API quản lý cũ chặn sửa/duyệt/chi/lập bản trùng khoản quầy; không đổi version hoặc sinh thêm lần chi.
+- Bộ lọc ngày/kết quả hợp lệ; Customer không truy cập danh sách quản lý. Pending/failed/reconciling không tính đã trả.
+- UI hai trang: bộ lọc và bảng gọn; hóa đơn 3 nút, hoàn tiền 1 nút xem; không có ô nhập tiền hay duyệt lại, không JSON kỹ thuật. Polling giữ DataSource, resize/chi tiết không tràn.
+- Giữ hồi quy chứng từ điều chỉnh có nguồn và hồ sơ ngân hàng cũ, không mở lại thao tác hủy/chốt hết hạn đã bỏ.
+
+## Kịch bản kiểm thử 09
+
+### UC-ADM-06 — tái sử dụng thư mục UC-ADM-08/09
+- Tìm hóa đơn theo mã đơn/khách và khoảng ngày; hóa đơn gốc/snapshot không đổi khi xem, in hoặc tải PDF.
+- Duyệt hủy tạo khoản đã duyệt; trạng thái Chờ khách nhận, đã trả=0 và còn phải trả đúng phần hủy đã thu tiền.
+- Nhân viên trả tiền thật và replay chỉ có một lần chi; Quản lý thấy đúng người chi/ca/thời gian và số đã trả.
+- API quản lý cũ chặn sửa/duyệt/chi/lập bản trùng khoản quầy; không đổi version hoặc sinh thêm lần chi.
+- Bộ lọc ngày/kết quả hợp lệ; Customer không truy cập danh sách quản lý. Pending/failed/reconciling không tính đã trả.
+- UI hai trang: bộ lọc và bảng gọn; hóa đơn 3 nút, hoàn tiền 1 nút xem; không có ô nhập tiền hay duyệt lại, không JSON kỹ thuật. Polling giữ DataSource, resize/chi tiết không tràn.
+- Giữ hồi quy chứng từ điều chỉnh có nguồn và hồ sơ ngân hàng cũ, không mở lại thao tác hủy/chốt hết hạn đã bỏ.

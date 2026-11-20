@@ -1,4 +1,4 @@
-﻿# UC-ADM-02 — Quản lý thực đơn và công thức
+# UC-ADM-02 — Quản lý thực đơn và công thức
 
 Nguồn: `Dac-ta-8-UC-Quan-ly-Quy-tac-lien-quan.docx`, bản tinh gọn đã chốt ngày 15/11/2026. Thay nội dung ADM02 theo số cũ. Chỉ áp dụng **BR-03, BR-08, BR-11, BR-12, BR-13, BR-23, BR-24, BR-28, BR-29, BR-38**.
 
@@ -27,7 +27,7 @@ Giữ 30 bảng và toàn bộ dữ liệu lịch sử; bổ sung duy nhất Con
 
 BR03 dùng **khả dụng = tồn thực tế − giữ chỗ** thống nhất catalog, Web checkout, POS checkout và đọc tồn. Chưa bỏ cột/giao diện tồn an toàn của UC-ADM-03 cũ; cột đó không còn làm giảm khả dụng.
 
-Test API/SQL và Browser ở `tests/FourChang.Tests/QuanLy/UC-ADM-02`; test công thức tái sử dụng `QuanLy/UC-ADM-04/RecipeAdministrationTests.cs` nhưng gắn Trait UC-ADM-02. Test WinForms tái sử dụng AdminFeaturesUiTests. Mọi test ghi trên DB GUID riêng; không xóa/reset dữ liệu FourChangDb.
+Test API/SQL và Browser ở `tests/FourChang.Tests/QuanLy/UC-ADM-02`; test công thức tái sử dụng `QuanLy/UC-ADM-02/RecipeAdministrationTests.cs` nhưng gắn Trait UC-ADM-02. Test WinForms tái sử dụng AdminFeaturesUiTests. Mọi test ghi trên DB GUID riêng; không xóa/reset dữ liệu FourChangDb.
 
 ## Form công thức dễ dùng — 15/11/2026
 

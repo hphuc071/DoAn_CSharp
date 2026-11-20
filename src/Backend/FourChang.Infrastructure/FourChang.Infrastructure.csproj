@@ -4,27 +4,27 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.33" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <EmbeddedResource Include="../../../docs/database/34-bang/schema.sql" LogicalName="FourChang.Schema34.sql" />
-    <EmbeddedResource Include="../../../docs/database/34-bang/model.json" LogicalName="FourChang.Model34.json" />
-    <EmbeddedResource Include="../../../docs/database/35-bang/model-before-employee-address.json" LogicalName="FourChang.Model35Legacy.json" />
-    <EmbeddedResource Include="../../../docs/database/35-bang/002-employee-contact-address.sql" LogicalName="FourChang.EmployeeAddress.sql" />
-    <EmbeddedResource Include="../../../docs/database/35-bang/schema.sql" LogicalName="FourChang.Schema35.sql" />
-    <EmbeddedResource Include="../../../docs/database/35-bang/model.json" LogicalName="FourChang.Model35.json" />
-    <EmbeddedResource Include="../../../docs/database/35-bang/001-add-ThietBiPOS.sql" LogicalName="FourChang.Upgrade35.sql" />
-    <EmbeddedResource Include="../../../docs/database/37-bang/model.json" LogicalName="FourChang.Model37.json" />
-    <EmbeddedResource Include="../../../docs/database/37-bang/003-menu-and-outbox.sql" LogicalName="FourChang.Upgrade37.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/34-bang/schema.sql" LogicalName="FourChang.Schema34.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/34-bang/model.json" LogicalName="FourChang.Model34.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/35-bang/model-before-employee-address.json" LogicalName="FourChang.Model35Legacy.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/35-bang/002-employee-contact-address.sql" LogicalName="FourChang.EmployeeAddress.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/35-bang/schema.sql" LogicalName="FourChang.Schema35.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/35-bang/model.json" LogicalName="FourChang.Model35.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/35-bang/001-add-ThietBiPOS.sql" LogicalName="FourChang.Upgrade35.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/model.json" LogicalName="FourChang.Model37.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/003-menu-and-outbox.sql" LogicalName="FourChang.Upgrade37.sql" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../../../docs/database/37-bang/model-before-phone-rules.json" LogicalName="FourChang.Model37BeforePhones.json" />
-    <EmbeddedResource Include="../../../docs/database/37-bang/004-customer-phone-rules.sql" LogicalName="FourChang.CustomerPhones.sql" />
-    <EmbeddedResource Include="../../../docs/database/37-bang/model-before-required-phone.json" LogicalName="FourChang.Model37BeforeRequiredPhone.json" />
-    <EmbeddedResource Include="../../../docs/database/37-bang/005-required-customer-phone.sql" LogicalName="FourChang.RequiredCustomerPhone.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/model-before-phone-rules.json" LogicalName="FourChang.Model37BeforePhones.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/004-customer-phone-rules.sql" LogicalName="FourChang.CustomerPhones.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/model-before-required-phone.json" LogicalName="FourChang.Model37BeforeRequiredPhone.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/005-required-customer-phone.sql" LogicalName="FourChang.RequiredCustomerPhone.sql" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../../../docs/database/37-bang/006-admin-operations-and-finance.sql" LogicalName="FourChang.AdminFinance.sql" />
-    <EmbeddedResource Include="../../../docs/database/37-bang/model-before-admin-finance.json" LogicalName="FourChang.Model37BeforeFinance.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/006-admin-operations-and-finance.sql" LogicalName="FourChang.AdminFinance.sql" />
+    <EmbeddedResource Include="../../../docs/database/migrations/37-bang/model-before-admin-finance.json" LogicalName="FourChang.Model37BeforeFinance.json" />
   </ItemGroup>
-  <ItemGroup><EmbeddedResource Include="../../../docs/database/37-bang/007-independent-work-sessions.sql" LogicalName="FourChang.IndependentShifts.sql" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../../../docs/database/migrations/37-bang/007-independent-work-sessions.sql" LogicalName="FourChang.IndependentShifts.sql" /></ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="../../../docs/database/30-bang/model-before-recipe-default.json" LogicalName="FourChang.Model30BeforeRecipeDefaults.json" />
     <EmbeddedResource Include="../../../docs/database/30-bang/009-recipe-default-sugar.sql" LogicalName="FourChang.RecipeDefaults.sql" />

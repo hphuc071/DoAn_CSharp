@@ -33,6 +33,8 @@ internal static class OperationsScenarioSeed
     {
         var key = Guid.NewGuid().ToString("N")[..16];
         var sql = $"""
+            SET XACT_ABORT ON;
+            BEGIN TRANSACTION;
             DECLARE @nv bigint,@ca bigint,@dh bigint,@line bigint,@pay bigint,@inv bigint=NULL,@variant bigint,@recipe bigint,@price decimal(18,0);
             INSERT dbo.NhanVien(HoTen,NgayVaoLam,TrangThai) VALUES(N'Nguyễn Minh Phúc',SYSUTCDATETIME(),'ACTIVE'); SET @nv=SCOPE_IDENTITY();
             INSERT dbo.CaLamViec(MaCaHienThi,MaNhanVien,TenCa,MaMay,BatDauLuc,TrangThai,TienMatDauCa)
@@ -48,12 +50,17 @@ internal static class OperationsScenarioSeed
               2*CEILING(SUM(d.DinhMucCoSo)*10000)/10000,
               {(state == "COMPLETED" ? "2*CEILING(SUM(d.DinhMucCoSo)*10000)/10000" : "0")},0,'{(state == "COMPLETED" ? "CONSUMED" : "RESERVED")}'
               FROM dbo.ChiTietCongThuc d JOIN dbo.NguyenLieu n ON n.MaNguyenLieu=d.MaNguyenLieu WHERE d.MaCongThuc=@recipe GROUP BY d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo;
+            -- Provision only the fixture ingredients needed for this scenario, preserving existing holds.
+            UPDATE t SET TonThucTe=CASE WHEN t.TonThucTe<t.TongGiuCho+g.SoLuongGiuCho
+                THEN t.TongGiuCho+g.SoLuongGiuCho ELSE t.TonThucTe END
+              FROM dbo.TonKho t JOIN dbo.NguyenLieuChiTietDonHang g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;
             UPDATE t SET TongGiuCho=TongGiuCho+{(state == "COMPLETED" ? "0" : "g.SoLuongGiuCho")},TonThucTe=TonThucTe-{(state == "COMPLETED" ? "g.SoLuongDaTieuHao" : "0")}
               FROM dbo.TonKho t JOIN dbo.NguyenLieuChiTietDonHang g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;
             INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TrangThai,XacMinhLuc,MaThaoTac)
               VALUES('TT-{key}',@dh,@ca,'CASH',2*@price,{(paid ? "2*@price" : "0")},'{(paid ? "VERIFIED" : "PENDING")}',{(paid ? "SYSUTCDATETIME()" : "NULL")},NEWID()); SET @pay=SCOPE_IDENTITY();
             {(invoice ? "INSERT dbo.HoaDon(SoHoaDon,MaDonHang,LoaiHoaDon,TenNguoiMua,SoTien,NoiDungHoaDonDaChotJson,TrangThai,PhatHanhLuc,MaQuanLyPhatHanh,MaCaLamViec) VALUES('HD-" + key + "',@dh,'ORIGINAL',N'Nguyễn Tuấn Kiệt',2*@price,N'{\"Version\":1,\"Mon\":\"Cà phê đã chốt\",\"SoLy\":2}', 'ISSUED',SYSUTCDATETIME(),1,@ca); SET @inv=SCOPE_IDENTITY();" : "")}
             SELECT CONCAT(@dh,',',@line,',',@pay,',',@ca,',',ISNULL(CONVERT(varchar(30),@inv),'0'),',',CONVERT(varchar(30),2*@price));
+            COMMIT TRANSACTION;
             """;
         var values = (await api.Sql(sql)).Split(',');
         return new(long.Parse(values[0]), long.Parse(values[1]), long.Parse(values[2]), long.Parse(values[3]), values[4] == "0" ? null : long.Parse(values[4]), decimal.Parse(values[5], System.Globalization.CultureInfo.InvariantCulture));

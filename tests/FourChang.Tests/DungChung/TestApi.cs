@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -386,7 +386,7 @@ public sealed class TestApi : IAsyncDisposable
     private async Task CreateLegacyDatabase()
     {
         await Sql($"CREATE DATABASE [{Database}]", "master");
-        var script = await File.ReadAllTextAsync(Path.Combine(Root, "docs/database/34-bang/schema.sql"));
+        var script = await File.ReadAllTextAsync(Path.Combine(Root, "docs/database/migrations/34-bang/schema.sql"));
         foreach (var batch in Regex.Split(script, @"^\s*GO\s*$", RegexOptions.Multiline | RegexOptions.IgnoreCase))
         {
             if (!string.IsNullOrWhiteSpace(batch))

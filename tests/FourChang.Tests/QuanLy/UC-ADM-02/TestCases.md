@@ -1,4 +1,24 @@
-﻿# UC-ADM-02 — Thực đơn và công thức — Test cases
+# UC-ADM-02 Thực đơn và công thức
+
+Các lớp kiểm thử trong thư mục này dùng project xUnit chung. Danh mục nguồn và bộ lọc nằm trong tests/test-manifest.json.
+
+## Mã kiểm thử
+
+- [MenuAdministrationTests.cs](MenuAdministrationTests.cs)
+- [MenuSynchronizationBrowserTests.cs](MenuSynchronizationBrowserTests.cs)
+- [RecipeAdministrationTests.cs](RecipeAdministrationTests.cs)
+
+## Chạy kiểm thử
+
+~~~powershell
+dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-02"
+~~~
+
+Test API và giao diện sử dụng database thử riêng khi cần SQL. Kết quả đạt cần căn cứ lượt chạy và tệp TRX tương ứng.
+
+## Kịch bản kiểm thử 02
+
+### UC-ADM-02 — Thực đơn và công thức — Test cases
 
 Nguồn: đặc tả 8 UC Quản lý tinh gọn. Quy tắc liên quan: **BR-03, BR-08, BR-11, BR-12, BR-13, BR-23, BR-24, BR-28, BR-29, BR-38**. Tái sử dụng project và file cũ.
 
@@ -48,3 +68,11 @@ Cấu hình nhiều size: CauHinhNhieuSize_Gia_MacDinh_Replay_Rollback kiểm3si
 - 18/11/2026: Danh sách công thức món tinh gọn (WinForms, route recipes): không hiện topping hoặc bộ lọc Món/Topping; còn 5 cột và 2 nút. Kiểm đủ S/M/L, số loại nguyên liệu không đếm trùng giữa size, trạng thái và mở/lưu bảng công thức; so sánh mã công thức topping trước/sau tải lại không đổi. Kết quả recipes-dishes-only.trx: 1/1 đạt, fixture SQL GUID riêng; ảnh ADM02-dish-recipes-clean.png.
 
 - 18/11/2026: recipes-auto-calculation.trx1/1 đạt (WinForms/API/SQL fixture riêng): bảng S/M/L không còn ComboBox Cách tính; nhập/lưu/mở lại lượng lẻ ở cột size đầu; tự nhận Đường=SUGAR, Đá=ICE, Sữa=FIXED; nóng không đá; lưu6cấu hình và đường mặc định75%. Ảnh ADM02-auto-calculation.png.
+
+## Kịch bản kiểm thử 04
+
+### Thư mục công thức cũ — đã gộp vào UC-ADM-02
+
+Giữ nguyên thư mục và RecipeAdministrationTests.cs theo yêu cầu tái sử dụng. Lớp test chuyển Trait sang **UC-ADM-02**, kiểm lưu áp dụng ngay, BOM g/ml, giá/kho, replay/rollback và giữ snapshot cũ; bỏ kiểm clone/lên lịch/mô phỏng theo nghiệp vụ đã bỏ.
+
+Danh sách test và lệnh chạy hiện hành ở `../UC-ADM-02/TestCases.md`. Thư mục này không được coi là triển khai UC-ADM-02 quản lý kho của đặc tả 8 UC mới.

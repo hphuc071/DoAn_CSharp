@@ -18,7 +18,7 @@ Giữ nhận diện 4CHANG LINH NGU LAM, màu nâu/kem, sidebar, luồng thu ti�
 - src/Presentation/FourChang.Desktop/Shared/Controls/Admin/AdminCommandDialog.cs
 - src/Backend/FourChang.Api/Shared/Orders/OrderWorkflowService.cs
 - tests/FourChang.Tests/QuanLy/DungChung/PosSalesUiChecks.cs
-- tests/FourChang.Tests/NhanVien/Orders/StaffOrderWorkflowTests.cs
+- tests/FourChang.Tests/NhanVien/UC-POS-03/StaffOrderWorkflowTests.cs
 
 ## Kiểm chứng
 Build không lỗi/cảnh báo. 10 test liên quan đã đạt trên SQL/API và WinForms thật (pos-preparation-refinement.trx).

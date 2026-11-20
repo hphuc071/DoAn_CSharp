@@ -121,7 +121,7 @@ public sealed class Schema30MigrationTests
     private static async Task Prepare37(TestApi api)
     {
         await api.Sql($"CREATE DATABASE [{api.Database}]", "master");
-        var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs", "database", "37-bang", "schema.sql"));
+        var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs", "database", "migrations", "37-bang", "schema.sql"));
         foreach (var batch in System.Text.RegularExpressions.Regex.Split(schema, @"^\s*GO\s*\r?$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             if (!string.IsNullOrWhiteSpace(batch)) await api.Sql(batch);
         await api.Sql("""

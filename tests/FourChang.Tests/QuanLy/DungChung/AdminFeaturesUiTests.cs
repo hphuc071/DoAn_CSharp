@@ -179,10 +179,16 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
                     await WaitUntil(() => Descendants(form).OfType<DataGridView>().Any(g => g.Name == "RecipesGrid" && g.Rows.Count > 0));
                     Assert.DoesNotContain(Descendants(form).OfType<Button>(), b => b.Text is "Mô phỏng" or "Tạo phiên bản mới" or "Công bố / lên lịch" or "Xóa nháp");
                     var recipeGrid = Descendants(form).OfType<DataGridView>().Single(g => g.Name == "RecipesGrid");
+                    var recipeSnapshot = await LiveSession.Api.GetRecipesAsync();
+                    var variantMenu = await LiveSession.Api.GetAdminMenuAsync();
                     foreach (DataGridViewRow row in recipeGrid.Rows)
                     {
                         var recipe = Assert.IsType<RecipeView>(row.DataBoundItem);
-                        Assert.Equal(recipe.ThanhPhan.Count.ToString(), row.Cells[recipeGrid.Columns.Cast<DataGridViewColumn>().Single(c => c.DataPropertyName == "ThanhPhan").Index].FormattedValue);
+                        var dish = variantMenu.CauHinh.Single(v => v.MaCauHinhMon == recipe.MaCauHinhMon).MaMon;
+                        var variants = variantMenu.CauHinh.Where(v => v.MaMon == dish).Select(v => v.MaCauHinhMon).ToHashSet();
+                        var count = recipeSnapshot.Where(r => r.MaCauHinhMon is { } id && variants.Contains(id))
+                            .SelectMany(r => r.ThanhPhan).Select(l => l.MaNguyenLieu).Distinct().Count();
+                        Assert.Equal(count.ToString(), row.Cells[recipeGrid.Columns.Cast<DataGridViewColumn>().Single(c => c.DataPropertyName == "ThanhPhan").Index].FormattedValue);
                     }
                     Capture(form, Path.Combine(output, "ADM02-recipes-integrated.png"));
                     tabs.SelectedIndex = 0;
@@ -705,8 +711,14 @@ public sealed class AdminFeaturesUiTests(AdminFeatureFixture fixture)
             Assert.True(history.Visible); Assert.True(history.ReadOnly);
             Assert.Equal(new[] { "Thời gian", "Hoạt động", "Số lượng thay đổi", "Nguồn", "Ghi chú" }, history.Columns.Cast<DataGridViewColumn>().Select(c => c.HeaderText));
             Assert.Equal(expected.BienDong.Count, history.RowCount);
-            Assert.Equal("Nhập kho", history.Rows[0].Cells["HoatDong"].Value);
-            Assert.StartsWith("+", history.Rows[0].Cells["SoLuong"].FormattedValue.ToString());
+            var latest = expected.BienDong.OrderByDescending(x => x.PhatSinhLuc).ThenByDescending(x => x.MaBienDong).First();
+            var activity = latest.Loai switch
+            {
+                "RECEIPT" => "Nhập kho", "ISSUE" => "Xuất kho", "ORDER_CONSUMPTION" => "Pha chế",
+                "REVERSAL" => "Hủy phiếu kho", "COUNT" => "Kiểm kê (cũ)", "ADJUSTMENT" => "Điều chỉnh (cũ)", _ => "Biến động khác"
+            };
+            Assert.Equal(activity, history.Rows[0].Cells["HoatDong"].Value);
+            Assert.Equal(latest.SoLuong, history.Rows[0].Cells["SoLuong"].Value);
             Assert.Contains(stock.DonVi, history.Rows[0].Cells["SoLuong"].FormattedValue.ToString());
             Assert.Equal(stock.DonVi, controls.Single(c => c.Name == "InventoryHistoryValue0").Text);
             Capture(dialog, Path.Combine(output, "ADM04-inventory-history.png"));

@@ -28,13 +28,14 @@ public sealed class HttpRegressionTests
         employee = updated.Json;
         var device = await api.NewPosClient(admin);
         var open = api.OpenBody(employee, device);
+        open["MaThaoTac"] = NewId();
         var shift = (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(200, "Mở ca không tài khoản Staff").Json;
         var staff = TestApi.Bearer(shift);
         (await api.Send("GET", "/api/admin/dashboard", headers: staff)).Expect(403, "Staff không vào Dashboard");
         (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(200, "Staff đọc đơn");
         var resume = (await api.Send("POST", "/api/pos/shifts", open, device.Headers)).Expect(200, "Tiếp tục ca").Json;
         Assert.Equal(shift.Number("shiftId"), resume.Number("shiftId"));
-        (await api.Send("POST", "/api/pos/shifts/current/close", Body(("TienMatThucDem", 0), ("LyDoChenhLech", "")), staff)).Expect(400, "Lệch tiền cần lý do");
+        (await api.Send("POST", "/api/pos/shifts/current/close", Body(("TienMatThucDem", 0), ("LyDoChenhLech", "")), staff)).Expect(409, "Thực đếm lệch phải đối chiếu lại");
         (await api.Send("POST", "/api/pos/shifts/current/close", Body(("TienMatThucDem", 500000), ("LyDoChenhLech", "")), staff)).Expect(200, "Đóng ca đúng tiền");
         (await api.Send("GET", "/api/pos/data/DonHang", headers: staff)).Expect(401, "Ca đóng không truy cập");
         input["TrangThai"] = "INACTIVE";

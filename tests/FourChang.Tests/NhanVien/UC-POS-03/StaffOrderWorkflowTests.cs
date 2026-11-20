@@ -9,6 +9,7 @@ namespace FourChang.Tests.Staff;
 
 /// <summary>Kiểm thử quyền Staff trên HTTP/SQL thật, không dùng quyền Admin để thực thi tiến trình.</summary>
 [Collection("AdminFeatures"), Trait("Actor", "NhanVien"), Trait("Feature", "StaffOrderWorkflow")]
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-03")]
 public sealed class StaffOrderWorkflowTests(AdminFeatureFixture fixture)
 {
     /// <summary>Nhân viên xác nhận, pha và hoàn tất; gửi lại không trừ kho hai lần, ca khác không đọc receipt.</summary>

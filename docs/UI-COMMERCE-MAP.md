@@ -32,7 +32,7 @@ Build FourChang.sln: 0 warning / 0 error.
 11 test liên quan đã đạt sau kiểm tra lại (9 đạt lượt đầu, 2 Web gián đoạn SQL đạt khi chạy lại; lượt cuối3 UI đạt sau sửa căn lề).
 Log: commerce-ui-round1.trx, commerce-web-review.trx, commerce-ui-final.trx trong tests/FourChang.Tests/TestResults.
 
-Test mới: KhachHang/CommercePresentationBrowserTests.cs (1440px/390px, 5 trang), NhanVien/StaffDocumentsUiTests.cs (2 route, xem/tìm/resize/dialog), QuanLy/DungChung/StaffDocumentsUiChecks.cs. Dùng chung csproj xUnit hiện có, SQL fixture riêng.
+Test mới: KhachHang/CommercePresentationBrowserTests.cs (1440px/390px, 5 trang), NhanVien/DungChung/StaffDocumentsUiTests.cs (2 route, xem/tìm/resize/dialog), QuanLy/DungChung/StaffDocumentsUiChecks.cs. Dùng chung csproj xUnit hiện có, SQL fixture riêng.
 Chạy tập trung: dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "Feature=CommercePresentation"
 
 Chưa kiểm tra máy in vật lý hoặc mọi test của solution. Giữ nguyên việc tải PDF phụ thuộc nguồn tài liệu đã lưu và khóa hủy đơn hiện có. Không thêm nút xử lý giả cho nhân viên.

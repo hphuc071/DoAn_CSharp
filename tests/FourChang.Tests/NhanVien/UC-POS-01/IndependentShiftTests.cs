@@ -4,6 +4,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Staff;
 
 /// <summary>Một nhân viên làm nhiều ca khác tên trong ngày; mỗi ca giữ tiền và lịch sử riêng.</summary>
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-01")]
 public sealed class IndependentShiftTests
 {
     /// <summary>Mở nhiều ca cùng nhân viên/máy, kể cả ca trước đã khóa; đóng ca này không sửa ca kia.</summary>

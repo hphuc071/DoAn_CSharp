@@ -8,6 +8,7 @@ using Xunit;
 
 namespace FourChang.Tests.NhanVien
 {
+    [Trait("Actor", "NhanVien")]
     public class PosOrderServiceTests
     {
         // Giả lập MenuRepository trong bộ nhớ
@@ -257,7 +258,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 1: Tùy chỉnh và công thức (POS-02, POS-03)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-02")]
         public async Task BuildLineItem_ApDungDuongDaVaToppingVaoDinhMuc_ChinhXac()
         {
             var (service, _, _, _, _, _) = Setup();
@@ -301,7 +302,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 2: Ràng buộc đồ nóng không đá (BR-11)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-02")]
         public async Task BuildLineItem_DoUongNongChonDa_BaoLoi()
         {
             var (service, _, _, _, _, _) = Setup();
@@ -319,7 +320,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 3: Tồn kho và món hết hàng (POS-02, POS-03 - Giữ chỗ khi tạo đơn, trừ khi bắt đầu pha)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-02"), Trait("UseCase", "UC-POS-03")]
         public async Task CreateOrder_GiuChoNguyenLieu_VaTruKhoKhiBatDauPha()
         {
             var (service, _, _, orders, inventory, _) = Setup();
@@ -370,7 +371,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 4: Hủy phần chưa pha giải phóng giữ chỗ (POS-04)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-04")]
         public async Task CancelLineItem_GiaiPhongGiuChoPhanChuaPha()
         {
             var (service, _, _, _, inventory, _) = Setup();
@@ -423,7 +424,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 5: Tiếp nhận đơn Web đã xác minh đủ tiền (BR-16)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-03")]
         public async Task AcceptOrder_DonWebChuaThanhToan_BiTuChoi()
         {
             var (service, _, _, orders, _, _) = Setup();
@@ -453,7 +454,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 6: Bàn giao bị chặn khi chưa thu đủ tiền (POS-03 E9, BR-16)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-03")]
         public async Task ServeOrder_ChuaThuDuTien_BiChanBanGiao()
         {
             var (service, _, _, _, _, _) = Setup();
@@ -500,7 +501,7 @@ namespace FourChang.Tests.NhanVien
         }
 
         // Test 7: Thanh toán tiền mặt tính tiền thừa và chống trùng mã thao tác (BR-14, BR-19)
-        [Fact]
+        [Fact, Trait("UseCase", "UC-POS-05")]
         public async Task ProcessPayment_TinhTienThuaVaChongTrungMaThaoTac()
         {
             var (service, _, _, _, _, _) = Setup();

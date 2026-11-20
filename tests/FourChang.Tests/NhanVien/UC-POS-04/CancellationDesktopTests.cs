@@ -8,6 +8,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Staff;
 
 /// <summary>Thao tác ba vai trò trên WinForms thật: chuyển yêu cầu, duyệt hủy và chi tại quầy bằng dialog thật.</summary>
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-04")]
 public sealed class CancellationDesktopTests
 {
     /// <summary>Chuẩn bị một yêu cầu khách trong fixture riêng rồi worker STA bấm các nút giao diện thực.</summary>

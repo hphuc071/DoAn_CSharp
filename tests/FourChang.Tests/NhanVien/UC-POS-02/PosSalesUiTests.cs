@@ -2,6 +2,7 @@ using FourChang.Tests.Admin;
 namespace FourChang.Tests.Staff;
 /// <summary>Kiểm tra POS thật trên STA, dùng cùng API fixture và csproj của cả nhóm.</summary>
 [Collection("AdminFeatures"), Trait("UseCase","UC-POS-02"), Trait("Layer","WinForms")]
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-02")]
 public sealed class PosSalesUiTests(AdminFeatureFixture fixture)
 {
     /// <summary>Chọn hai món bằng dialog, cấu hình/số lượng và thu CASH; các dòng chỉ xóa sau server đã xác nhận.</summary>
