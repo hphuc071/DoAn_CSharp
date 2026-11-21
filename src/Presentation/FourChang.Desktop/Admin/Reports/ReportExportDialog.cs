@@ -36,7 +36,7 @@ public sealed class ReportExportDialog : Form
                 try
                 {
                     job = await LiveSession.Api.ReportExportStatusAsync(job.MaCongViec); if (IsDisposed) return;
-                    progress.Value = Math.Clamp(job.TienDo, 0, 100); status.Text = job.TrangThai + (job.Loi is null ? "" : " · " + job.Loi);
+                    progress.Value = Math.Clamp(job.TienDo, 0, 100); status.Text = (job.TrangThai switch { "QUEUED" => "Đang chờ tạo tệp", "RUNNING" => "Đang tạo tệp Excel", "READY" => "Tệp đã sẵn sàng để lưu", "FAILED" => "Không tạo được tệp", "CANCELLED" => "Đã hủy", _ => job.TrangThai }) + (job.Loi is null ? "" : " · " + job.Loi);
                     save.Enabled = job.TrangThai == "READY";
                     if (job.TrangThai is "READY" or "FAILED" or "CANCELLED") return;
                 }

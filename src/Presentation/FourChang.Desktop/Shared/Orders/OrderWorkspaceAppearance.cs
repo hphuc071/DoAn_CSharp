@@ -11,6 +11,13 @@ public partial class OrdersWorkspacePage
     /// <summary>Hai hàng lọc rõ ràng: thông tin đơn ở hàng đầu, khoảng ngày/ca và nút tìm ở hàng sau.</summary>
     private void BuildOrderFilters()
     {
+        if (!staff)
+        {
+            SearchBox.PlaceholderText = "Mã đơn hoặc tên khách hàng";
+            CommerceWorkspaceVisuals.AdminFilters(Filters, SearchBox, from, to,
+                ("Nguồn đơn", channel), ("Nhận món", fulfillment), (cancellations ? "Kết quả yêu cầu" : "Trạng thái đơn", state), ("Ca (0: tất cả)", shift));
+            return;
+        }
         SearchBox.Width = 300; SearchBox.PlaceholderText = "Mã đơn hoặc tên khách hàng";
         channel.Width = fulfillment.Width = state.Width = 150;
         var statusField = Ui.Field(cancellations ? "Kết quả yêu cầu" : "Trạng thái đơn", state);
@@ -31,6 +38,8 @@ public partial class OrdersWorkspacePage
         return row.YeuCauHuy?.TrangThai switch
         {
             "REQUESTED" => "Chờ gửi duyệt", "FORWARDED" => "Chờ Quản lý duyệt",
+            _ when !staff && row.KetQuaHuy?.TrangThai == "REJECTED" => "Đã từ chối",
+            _ when !staff && row.KetQuaHuy?.TrangThai == "APPROVED" => "Đã duyệt hủy",
             _ when row.TrangThai == "CANCELLED" => "Hủy thành công", _ => OperationsPresentation.Label(row.TrangThai)
         };
     }
@@ -48,7 +57,9 @@ public partial class OrdersWorkspacePage
             if (e.ColumnIndex < 0 || e.RowIndex < 0 || Grid.Rows[e.RowIndex].DataBoundItem is not AdminOrderRow row) return;
             var property = Grid.Columns[e.ColumnIndex].DataPropertyName;
             if (property == "TrangThai") { e.Value = OrderStatusCaption(row); e.FormattingApplied = true; }
-            if (property == "TaiChinh") { e.Value = (counterOnly ? row.TaiChinh.PhaiHoan : row.TaiChinh.DaThu).ToString("N0") + "đ"; e.FormattingApplied = true; }
+            if (!staff && property is "TienHang" or "PhiGiaoHang") { e.Value = ((decimal)e.Value!).ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + "đ"; e.FormattingApplied = true; }
+            if (!staff && !cancellations && property == "TenKhachHang") Grid.Rows[e.RowIndex].Cells[e.ColumnIndex].ToolTipText = $"Khách hàng: {row.TenKhachHang}\nNhân viên: {row.NhanVien ?? "Chưa tiếp nhận"}";
+            if (property == "TaiChinh") { e.Value = (counterOnly ? row.TaiChinh.PhaiHoan : row.TaiChinh.DaThu).ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")) + "đ"; e.FormattingApplied = true; }
             if (property == "TaoLuc") { e.Value = row.TaoLuc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"); e.FormattingApplied = true; }
         };
         Grid.CellPainting += PaintOrderStatus;
@@ -72,8 +83,13 @@ public partial class OrdersWorkspacePage
     private void PaintOrderStatus(object? sender, DataGridViewCellPaintingEventArgs e)
     {
         if (e.RowIndex < 0 || e.ColumnIndex < 0 || Grid.Columns[e.ColumnIndex].DataPropertyName != "TrangThai" || Grid.Rows[e.RowIndex].DataBoundItem is not AdminOrderRow row) return;
+        if (!staff)
+        {
+            CommerceWorkspaceVisuals.StatusBadge(Grid, e, OrderStatusCaption(row), row.TrangThai == "COMPLETED" || cancellations && row.KetQuaHuy?.TrangThai == "APPROVED", row.TrangThai == "DELIVERY_FAILED" || cancellations && row.KetQuaHuy?.TrangThai == "REJECTED");
+            return;
+        }
         e.PaintBackground(e.ClipBounds, true);
-        var positive = counterOnly ? row.TaiChinh.PhaiHoan == 0 : row.TrangThai is "CANCELLED" or "COMPLETED";
+        var positive = counterOnly ? row.TaiChinh.PhaiHoan == 0 : row.TrangThai is "CANCELLED" or "COMPLETED" || !staff && cancellations && row.KetQuaHuy?.TrangThai == "APPROVED";
         var foreground = positive ? Color.FromArgb(44, 101, 61) : CafeTheme.Coffee;
         var background = positive ? Color.FromArgb(231, 241, 228) : Color.FromArgb(244, 234, 218);
         var bounds = Rectangle.Inflate(e.CellBounds, -9, -13);

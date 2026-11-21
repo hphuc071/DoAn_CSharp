@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.WorkSessions;
 
-/// <summary>UC-ADM-12: đọc nguồn tiền thật, giám sát và xác nhận ca; không sửa thu/hoàn để ép khớp quỹ.</summary>
+/// <summary>UC-ADM-08: lịch sử ca, đơn hoàn thành, kiểm đếm và bàn giao; không sửa giao dịch tiền nguồn.</summary>
 public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Orders.OrderFinancials financials)
 {
     /// <summary>Giữ snapshot tên lúc mở ca; dữ liệu cũ thiếu audit chỉ hiển thị tên hồ sơ hiện tại có nhãn.</summary>
@@ -25,10 +25,10 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
     }
 
     /// <summary>Lọc theo khóa nhân viên, ngày UTC, tên ca, trạng thái, máy và phân trang ổn định.</summary>
-    public async Task<IResult> Search(long? employee, DateTime? from, DateTime? to, string? name, string? status, string? machine, int page, int pageSize)
+    public async Task<IResult> Search(long? employee, DateTime? from, DateTime? to, string? name, string? status, string? machine, int page, int pageSize, string? search = null)
     {
         if (page < 1 || pageSize is < 1 or > 100 || (long)(page - 1) * pageSize > int.MaxValue ||
-            employee <= 0 || from > to || machine?.Length > 50 || name is not (null or "" or "Sáng" or "Chiều" or "Tối") ||
+            employee <= 0 || from > to || machine?.Length > 50 || search?.Length > 120 || name is not (null or "" or "Sáng" or "Chiều" or "Tối") ||
             status is not (null or "" or "OPEN" or "LOCKED" or "CLOSED" or "HANDED_OVER"))
             return Results.Problem(statusCode: 400, detail: "Khoảng ngày hoặc bộ lọc ca không hợp lệ.");
         var query = db.CaLamViec.AsNoTracking();
@@ -38,6 +38,12 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         if (!string.IsNullOrEmpty(name)) query = query.Where(x => x.TenCa == name);
         if (!string.IsNullOrEmpty(status)) query = query.Where(x => x.TrangThai == status);
         if (!string.IsNullOrWhiteSpace(machine)) query = query.Where(x => x.MaMay == machine.Trim());
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            var matching = db.NhanVien.Where(x => EF.Functions.Collate(x.HoTen, "Vietnamese_100_CI_AI").Contains(term)).Select(x => x.MaNhanVien);
+            query = query.Where(x => matching.Contains(x.MaNhanVien));
+        }
         var total = await query.CountAsync();
         var shifts = await query.OrderByDescending(x => x.MaCaLamViec).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
         var rows = new List<WorkSessionInfo>();
@@ -67,10 +73,14 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         var cashIn = ownPayments.Where(x => x.PhuongThuc == "CASH" && x.TrangThai == "VERIFIED").Sum(x => x.SoTienDaXacMinh);
         var cashOut = ownRefunds.Where(x => x.PhuongThuc == "CASH" && x.TrangThai == "SUCCEEDED").Sum(x => x.SoTien);
         var expected = shift.TienMatDauCa + cashIn - cashOut;
+        var refundKeys = ownRefunds.Select(x => x.MaHoanTien).Distinct().ToArray();
+        var refundOrders = await db.HoSoHoanTien.AsNoTracking().Where(x => refundKeys.Contains(x.MaHoanTien)).ToDictionaryAsync(x => x.MaHoanTien, x => x.MaDonHang);
+        var transactionOrders = ownPayments.Select(x => x.MaDonHang).Concat(refundOrders.Values).Distinct().ToArray();
+        var orderChannels = await db.DonHang.AsNoTracking().Where(x => transactionOrders.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang, x => x.KenhDatHang);
+        string? Code(long? order) => order is { } key && orderChannels.TryGetValue(key, out var channel) ? FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(key, channel) : null;
         var transactions = ownPayments.Select(x => new ShiftTransaction("Thu", x.MaThanhToan, x.MaDonHang, x.MaThanhToanHienThi,
-            x.PhuongThuc, x.SoTienDaXacMinh, x.TrangThai)).Concat(ownRefunds.Select(x => new ShiftTransaction("Hoàn", x.MaLanChiHoan,
-            null, x.MaHoanTien.ToString(), x.PhuongThuc, x.SoTien, x.TrangThai))).ToList();
-        var unresolved = payments.Where(x => x.TrangThai is "PENDING" or "PARTIAL" or "RECONCILING")
+            x.PhuongThuc, x.SoTienDaXacMinh, x.TrangThai, Code(x.MaDonHang))).Concat(ownRefunds.Select(x => new ShiftTransaction("Hoàn", x.MaLanChiHoan,
+            refundOrders.GetValueOrDefault(x.MaHoanTien), x.MaHoanTien.ToString(), x.PhuongThuc, x.SoTien, x.TrangThai, Code(refundOrders.GetValueOrDefault(x.MaHoanTien))))).ToList();        var unresolved = payments.Where(x => x.TrangThai is "PENDING" or "PARTIAL" or "RECONCILING")
             .Select(x => "PAYMENT:" + x.MaThanhToan).Concat(refunds.Where(x => x.TrangThai is "PENDING" or "RECONCILING")
                 .Select(x => "REFUND:" + x.MaLanChiHoan)).Order().ToList();
         var orders = await db.DonHang.AsNoTracking().Where(x => x.MaCaLamViec != null && ids.Contains(x.MaCaLamViec.Value) &&
@@ -84,12 +94,12 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         var handover = handoverJson is null ? null : HandoverLink.Read(handoverJson);
         // Đơn do ca nào hoàn tất được tính vào ca đó; tiền thu vẫn giữ ca đã thực thu.
         // Bản cũ/Admin hoàn tất không có ca trong audit thì dùng ca gắn với đơn để tương thích dữ liệu.
-        var completions = db.NhatKyHeThong.AsNoTracking().Where(x => x.LoaiDoiTuong == "DonHang" && x.HanhDong == "ORDER_COMPLETE" && x.MaCaLamViec != null);
-        var finished = await db.DonHang.AsNoTracking().Where(x => x.TrangThai == "COMPLETED" &&
-            (completions.Any(a => a.MaDoiTuong == x.MaDonHang.ToString() && a.MaCaLamViec == shift.MaCaLamViec) ||
-             x.MaCaLamViec == shift.MaCaLamViec && !completions.Any(a => a.MaDoiTuong == x.MaDonHang.ToString()))).ToListAsync();
-        decimal completedTotal = 0;
-        foreach (var order in finished) completedTotal += (await financials.Read(order)).NghiaVu;
+        var finished = await HandoverLink.CompletedByShift(db, db.DonHang.AsNoTracking(), shift.MaCaLamViec).ToListAsync();
+        var completedOrders = new List<ShiftCompletedOrder>();
+        foreach (var order in finished.OrderByDescending(x => x.HoanTatLuc).ThenByDescending(x => x.MaDonHang))
+            completedOrders.Add(new(order.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang),
+                order.HoanTatLuc, (await financials.Read(order)).NghiaVu, order.MaCaLamViec));
+        var completedTotal = completedOrders.Sum(x => x.SoTien);
         return new(await View(shift), cashIn, cashOut, expected, shift.TienMatThucDem is { } counted ? counted - expected : null,
             transactions, orders, unresolved, audits, handover, DateTime.UtcNow,
             Convert.ToHexString(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new {
@@ -98,7 +108,7 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
                 Refunds = ownRefunds.OrderBy(x => x.MaLanChiHoan).Select(x => new { x.MaLanChiHoan, x.PhienBanDuLieu }),
                 Orders = orders, Unresolved = unresolved }))),
             shift.TrangThai == "LOCKED" && await LastLifecycle(shift.MaCaLamViec) == "SHIFT_RECONCILIATION_SENT",
-            await HasRecentResumeRequest(shift.MaCaLamViec), await LastLifecycle(shift.MaCaLamViec), finished.Count, completedTotal);
+            await HasRecentResumeRequest(shift.MaCaLamViec), await LastLifecycle(shift.MaCaLamViec), finished.Count, completedTotal, completedOrders);
     }
 
     /// <summary>Chốt từ số thực đếm POS đã gửi; kiểm tra lại nguồn tiền ngay trong giao dịch, không chốt lần hai.</summary>
@@ -130,9 +140,9 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
             throw new AdminRule(400, "Nhân viên nhận phải đang làm. Mã máy chỉ dùng ghi lịch sử.");
         if (shift.MaNhanVien == input.MaNhanVienNhan && shift.MaMay == machine)
             throw new AdminRule(400, "Bàn giao cần đổi người hoặc máy.");
-        if (await db.CaLamViec.AnyAsync(x => x.MaCaLamViec != id && x.KetThucLuc == null && (x.MaNhanVien == input.MaNhanVienNhan || x.MaMay == machine)) ||
-            (await HandoverLink.Pending(db)).Any(x => x.MaNhanVienNhan == input.MaNhanVienNhan || x.MaMayNhan == machine))
-            throw new AdminRule(409, "Nhân viên hoặc máy nhận có ca/bàn giao đang chờ.");
+        if (await db.CaLamViec.AnyAsync(x => x.MaCaLamViec != id && x.KetThucLuc == null && x.MaNhanVien == input.MaNhanVienNhan) ||
+            (await HandoverLink.Pending(db)).Any(x => x.MaNhanVienNhan == input.MaNhanVienNhan))
+            throw new AdminRule(409, "Nhân viên nhận còn ca chưa kết thúc hoặc bàn giao đang chờ.");
         var detail = await Detail(shift);
         ValidateCount(shift, detail.TienMatDuKienHienTai);
         if (!detail.DangChoDoiChieu) throw new AdminRule(409, "Cần nhân viên Gửi đối chiếu tại POS; ca phải đang khóa chờ đối chiếu.");

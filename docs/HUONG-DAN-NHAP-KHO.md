@@ -29,7 +29,7 @@ Ví dụ tồn trước là 10.000 g, nhập 2.000 g: lưu nháp vẫn 10.000 g;
 
 - `src/Presentation/FourChang.Desktop/Admin/StockDocuments/StockDocumentEditorForm.cs`
 - `src/Presentation/FourChang.Desktop/Admin/StockDocuments/StockDocumentsPage.cs`
-- `tests/FourChang.Tests/QuanLy/UC-ADM-06/StockDocumentEditorChecks.cs`
+- `tests/FourChang.Tests/QuanLy/UC-ADM-04/StockDocumentEditorChecks.cs`
 - `tests/FourChang.Tests/QuanLy/DungChung/AdminFeaturesUiTests.cs` (gọi bộ kiểm tra editor theo UC).
 
 Kiểm thử dùng SQL/API fixture riêng; không đưa hàng mẫu hoặc sửa tồn của database quán.

@@ -26,7 +26,7 @@ and refuses a stopped container; no automatic restart. Stop targets only the sav
 
 ## Seed and schema
 
-Canonical `docs/database/35-bang/schema.sql`,35tables/73FKs/11triggers, no EXPIRED migration. F0 zero
+Canonical `docs/database/migrations/35-bang/schema.sql`,35tables/73FKs/11triggers, no EXPIRED migration. F0 zero
 business rows. One seed transaction produced2locked synthetic Customers,1Admin,10TAKEAWAY orders,
 10PENDING bank-transfer requests,10immutable BOMs/RESERVED holds and1stock row (1000g,100g held).
 Contacts use distinct reserved example.invalid addresses. All foreign IDs come from entities after

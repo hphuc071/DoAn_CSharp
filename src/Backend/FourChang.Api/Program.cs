@@ -62,6 +62,7 @@ try
     builder.Services.AddScoped<InventoryService>();
     builder.Services.AddHostedService<MenuOutboxWorker>();
     builder.Services.AddHostedService<RecipeScheduleWorker>();
+    builder.Services.AddHostedService<StockDocumentScheduleWorker>();
     builder.Services.AddScoped<CustomerAccessService>();
     builder.Services.AddScoped<CustomerSelfService>();
     builder.Services.AddScoped<ICustomerOrderReader, CustomerOrderReader>();

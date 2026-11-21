@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using FourChang.Tests.Shared;
 using Microsoft.Data.SqlClient;
 
@@ -7,6 +7,44 @@ namespace FourChang.Tests.Integration;
 /// <summary>Kiểm chuyển đổi dữ liệu có đơn/tiền/giữ chỗ; không dùng database thật của quán.</summary>
 public sealed class Schema30MigrationTests
 {
+    /// <summary>Nâng cấp lịch phiếu kho chỉ thêm lỗi nullable/mở trạng thái, giữ nguyên header và rowversion cũ.</summary>
+    [Fact, Trait("Layer", "Database"), Trait("UseCase", "UC-ADM-04")]
+    public async Task Schema30_ThemLichPhieuKho_GiuDuLieuCu()
+    {
+        string? before = null;
+        await using var api = await TestApi.Start("Schema30-StockSchedule", beforeInitialize: async f =>
+        {
+            await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
+            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
+            await f.Sql(schema.Replace(" [LoiXuLy] nvarchar(500) NULL,", "").Replace("TrangThai IN ('DRAFT','SCHEDULED','FAILED','POSTED','CANCELLED')", "TrangThai IN ('DRAFT','POSTED')"));
+            await f.Sql("INSERT dbo.TaiKhoanQuanLy(TenDangNhapChuanHoa,HoTen,MatKhauBam,TrangThai,BatBuocDoiMatKhau,SoLanDangNhapSai) VALUES('quanly',N'Quản lý',REPLICATE('x',64),'ACTIVE',0,0); INSERT dbo.PhieuKho(SoPhieuKho,LoaiPhieu,TrangThai,MaQuanLyLap,MaThaoTac,LyDo) VALUES('PN-OLD','RECEIPT','DRAFT',1,NEWID(),N'Nháp giữ nguyên');");
+            before = await f.Sql("SELECT SoPhieuKho,TrangThai,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho='PN-OLD' FOR JSON PATH");
+        });
+        Assert.Equal(before, await api.Sql("SELECT SoPhieuKho,TrangThai,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho='PN-OLD' FOR JSON PATH"));
+        await api.RunApiCommand("--init-db"); await api.RunApiCommand("--check-db");
+        Assert.Equal(before, await api.Sql("SELECT SoPhieuKho,TrangThai,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho='PN-OLD' FOR JSON PATH"));
+    }
+
+    /// <summary>Chỉ thêm ngày nullable vào schema30 hiện hữu, không cập nhật hay xóa chứng từ cũ.</summary>
+    [Fact, Trait("Layer", "Database"), Trait("UseCase", "UC-ADM-04")]
+    public async Task Schema30_ThemNgayChungTu_GiuDuLieu_ChayLaiAnToan()
+    {
+        string? original = null;
+        await using var api = await TestApi.Start("Schema30-StockDate", beforeInitialize: async f =>
+        {
+            await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
+            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
+            await f.Sql(schema.Replace(" [LoiXuLy] nvarchar(500) NULL,", "").Replace(" [NgayThucHien] date NULL,", ""));
+            await f.Sql("INSERT dbo.TaiKhoanQuanLy(TenDangNhapChuanHoa,HoTen,MatKhauBam,TrangThai,BatBuocDoiMatKhau,SoLanDangNhapSai) VALUES('quanly',N'Quản lý',REPLICATE('x',64),'ACTIVE',0,0); INSERT dbo.PhieuKho(SoPhieuKho,LoaiPhieu,TrangThai,MaQuanLyLap,MaThaoTac,LyDo) VALUES('PN-CU','RECEIPT','DRAFT',1,NEWID(),N'Nháp cũ'); INSERT dbo.PhieuKho(SoPhieuKho,LoaiPhieu,TrangThai,MaQuanLyLap,MaQuanLyDuyet,GhiSoLuc,MaThaoTac,LyDo) VALUES('PX-CU','ISSUE','POSTED',1,1,SYSUTCDATETIME(),NEWID(),N'Đã chốt');");
+            original = await f.Sql("SELECT SoPhieuKho,TrangThai,LyDo,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho IN ('PN-CU','PX-CU') ORDER BY MaPhieuKho FOR JSON PATH");
+        });
+        Assert.Equal(original, await api.Sql("SELECT SoPhieuKho,TrangThai,LyDo,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho IN ('PN-CU','PX-CU') ORDER BY MaPhieuKho FOR JSON PATH"));
+        Assert.Equal("0", await api.Sql("SELECT COUNT(*) FROM dbo.PhieuKho WHERE NgayThucHien IS NOT NULL"));
+        await api.RunApiCommand("--init-db");
+        Assert.Equal(original, await api.Sql("SELECT SoPhieuKho,TrangThai,LyDo,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho IN ('PN-CU','PX-CU') ORDER BY MaPhieuKho FOR JSON PATH"));
+        await api.RunApiCommand("--check-db");
+    }
+
     /// <summary>Nâng schema30 cũ có công thức, thêm mặc định50 và giữ dữ liệu; chạy lại không thay đổi bản ghi.</summary>
     [Fact, Trait("Layer", "Database"), Trait("UseCase", "Schema30")]
     public async Task Schema30Cu_ThemDuongMacDinh_GiuCongThuc_ChayLaiAnToan()
@@ -15,7 +53,7 @@ public sealed class Schema30MigrationTests
         {
             await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
             var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
-            schema = schema.Replace(" [PhanTramDuongMacDinh] int NOT NULL CONSTRAINT DF_CongThuc_PhanTramDuongMacDinh DEFAULT(50),", "")
+            schema = schema.Replace(" [LoiXuLy] nvarchar(500) NULL,", "").Replace(" [NgayThucHien] date NULL,", "").Replace(" [PhanTramDuongMacDinh] int NOT NULL CONSTRAINT DF_CongThuc_PhanTramDuongMacDinh DEFAULT(50),", "")
                 .Replace(" CONSTRAINT [CK_CongThuc_DuongMacDinh] CHECK (PhanTramDuongMacDinh IN (0,25,50,75,100)),", "");
             await f.Sql(schema);
             await f.Sql("INSERT dbo.TaiKhoanQuanLy(TenDangNhapChuanHoa,HoTen,MatKhauBam,TrangThai,BatBuocDoiMatKhau,SoLanDangNhapSai) VALUES('quanly',N'Quản lý',REPLICATE('x',64),'ACTIVE',0,0); INSERT dbo.Mon(LoaiMon,TenMon,ThuTuHienThi,DaCongBo,DangBan) VALUES(N'Cà phê',N'Món đã có',1,0,0); INSERT dbo.CauHinhMon(MaMon,KichCo,NhietDo,GiaBan,DangBan,LaMacDinh) VALUES(1,'M','ICED',39000,0,1); INSERT dbo.CongThuc(MaCauHinhMon,SoPhienBan,TenCongThuc,TrangThai,MaQuanLyTao,GhiChu) VALUES(1,1,N'Công thức cũ','DRAFT',1,N'Giữ nguyên');");
@@ -83,7 +121,7 @@ public sealed class Schema30MigrationTests
     private static async Task Prepare37(TestApi api)
     {
         await api.Sql($"CREATE DATABASE [{api.Database}]", "master");
-        var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs", "database", "37-bang", "schema.sql"));
+        var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs", "database", "migrations", "37-bang", "schema.sql"));
         foreach (var batch in System.Text.RegularExpressions.Regex.Split(schema, @"^\s*GO\s*\r?$", System.Text.RegularExpressions.RegexOptions.Multiline | System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             if (!string.IsNullOrWhiteSpace(batch)) await api.Sql(batch);
         await api.Sql("""

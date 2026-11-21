@@ -1,4 +1,27 @@
-# UC-ADM-01 — Test theo đặc tả tinh gọn
+# UC-ADM-01 Quản lý khách hàng
+
+Các lớp kiểm thử trong thư mục này dùng project xUnit chung. Danh mục nguồn và bộ lọc nằm trong tests/test-manifest.json.
+
+## Mã kiểm thử
+
+- [CustomerAddressAdministrationTests.cs](CustomerAddressAdministrationTests.cs)
+- [CustomerAdministrationTests.cs](CustomerAdministrationTests.cs)
+- [CustomerPasswordResetUiTests.cs](CustomerPasswordResetUiTests.cs)
+- [CustomerPhoneTests.cs](CustomerPhoneTests.cs)
+- [CustomersUiTests.cs](WinForms/CustomersUiTests.cs)
+- [TemporaryPasswordBrowserTests.cs](Web/TemporaryPasswordBrowserTests.cs)
+
+## Chạy kiểm thử
+
+~~~powershell
+dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-01"
+~~~
+
+Test API và giao diện sử dụng database thử riêng khi cần SQL. Kết quả đạt cần căn cứ lượt chạy và tệp TRX tương ứng.
+
+## Kịch bản kiểm thử 01
+
+### UC-ADM-01 — Test theo đặc tả tinh gọn
 
 BR: **07, 08, 13, 28, 29, 31, 39**. Mọi thay đổi test áp dụng ngay trong file cũ. SQL/API chạy bằng database GUID riêng, WinForms dùng worker STA, Web dùng Playwright; không tác động dữ liệu quán.
 

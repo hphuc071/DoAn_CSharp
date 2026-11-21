@@ -8,4 +8,4 @@ Thiết kế và mã nguồn hiện dùng [schema 30 bảng](30-bang/README.md),
 - [Từ điển dữ liệu](30-bang/TU-DIEN-DU-LIEU.md)
 - [Hướng dẫn chạy](../../HUONG-DAN-DATABASE.md)
 
-Các thư mục 34/35/37 giữ lại cho nâng cấp và đối chiếu lịch sử. Không chạy schema cũ để khởi tạo môi trường hiện hành.
+Thư mục [migrations](migrations) giữ các script và manifest 34/35/37 còn được bootstrap và test nâng cấp sử dụng. Các tài liệu mô tả schema cũ và bản thiết kế nháp đã được dọn. Khi tạo mới dùng schema 30 bảng.

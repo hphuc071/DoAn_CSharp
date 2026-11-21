@@ -7,6 +7,8 @@ public sealed partial class CafeApiClient
 {
     /// <summary>Đọc danh mục nguyên liệu và đơn vị để tìm kiếm/chọn thông tin trong biểu mẫu.</summary>
     public Task<IngredientSnapshot> GetIngredientsAsync() => SendAsync<IngredientSnapshot>(HttpMethod.Get, "/api/admin/ingredients");
+    /// <summary>Đọc ảnh hưởng hiện tại trước khi xác nhận ngừng; không sửa công thức hoặc tồn kho.</summary>
+    public Task<IngredientImpact> GetIngredientImpactAsync(long id) => SendAsync<IngredientImpact>(HttpMethod.Get, $"/api/admin/ingredients/{id}/impact");
     /// <summary>Gửi lệnh nguyên liệu có cùng mã thao tác khi thử lại sau timeout.</summary>
     public Task<AdminSaveReceipt> SaveIngredientAsync(long? id, IngredientInput input) => SendAsync<AdminSaveReceipt>(id is null ? HttpMethod.Post : HttpMethod.Put, "/api/admin/ingredients" + (id is null ? "" : "/" + id), input);
     /// <summary>Yêu cầu server kiểm tra tham chiếu trước xóa nguyên liệu.</summary>

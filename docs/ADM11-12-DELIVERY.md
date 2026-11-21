@@ -16,7 +16,7 @@ Giữ thương hiệu **4CHANG LINH NGU LAM**, logo và palette hiện có: Coff
 - Chặn ngừng/xóa người đang chờ nhận bàn giao; không âm thầm đổi người nhận hoặc tên lịch sử.
 - Admin cấp mã phục hồi dùng một lần khi mất hẳn phiên; nhân viên chỉ nhập/gửi đối chiếu, không bán hoặc tự chốt bằng phiên phục hồi.
 - Cấp DELETE riêng `dbo.NhanVien` cho `fourchang_app`; vẫn DENY DELETE ca, tiền và nhật ký. Kết quả kiểm trên FourChangDb: NhanVien=1, CaLamViec=0, NhatKyHeThong=0.
-- Giữ 37 bảng / 74 FK, không thêm bảng/cột và không xóa dữ liệu hiện hữu. Script quyền: `database/37-bang/005-employee-delete-permission.sql`; bootstrap cho database mới cũng cập nhật đúng whitelist.
+- Giữ 37 bảng / 74 FK, không thêm bảng/cột và không xóa dữ liệu hiện hữu. Script quyền: `database/migrations/37-bang/005-employee-delete-permission.sql`; bootstrap cho database mới cũng cập nhật đúng whitelist.
 
 ## Kiểm tra đã thực hiện
 
@@ -45,13 +45,13 @@ Lượt hồi quy cũ ban đầu thất bại vì còn yêu cầu máy đăng k�
 | POS API | src/Backend/FourChang.Api/Features/Staff/WorkSessions/WorkEndpoints.cs; ReconciliationEndpoints.cs |
 | Phiên / bàn giao | src/Backend/FourChang.Api/Security/ShiftSessionCodec.cs; SessionAuthentication.cs; Shared/WorkSessions/HandoverLink.cs |
 | Đăng ký service | src/Backend/FourChang.Api/Program.cs |
-| Quyền database | src/Backend/FourChang.Infrastructure/Database/Initialization/DatabaseBootstrap.cs; docs/database/37-bang/005-employee-delete-permission.sql |
+| Quyền database | src/Backend/FourChang.Infrastructure/Database/Initialization/DatabaseBootstrap.cs; docs/database/migrations/37-bang/005-employee-delete-permission.sql |
 | Contract / client | src/Shared/FourChang.Presentation.Shared/Contracts/Admin/EmployeeContracts.cs; WorkSessionContracts.cs; Contracts/Staff/WorkSessionContracts.cs; Contracts/Common/ScreenCatalog.cs; ApiClients/Admin/WorkforceClient.cs |
 | Admin UI | src/Presentation/FourChang.Desktop/Admin/Employees/EmployeesPage.cs; EmployeeEditorForm.cs; Admin/WorkSessions/WorkSessionsPage.cs; WorkSessionDetailsForm.cs |
 | POS UI | src/Presentation/FourChang.Desktop/Staff/WorkSessions/ShiftPage.cs; ShiftRecoveryForm.cs |
 | UI dùng chung | src/Presentation/FourChang.Desktop/Shared/Controls/Admin/WorkforceDialogs.cs; Security/ShiftSessionFile.cs; Security/PosDeviceCredentials.cs; Session/LiveSession.cs |
 | Điều hướng | src/Presentation/FourChang.Desktop/Shell/EntryForm.cs; MainForm.cs; Shared/Database/DatabaseViews.cs |
-| Test | tests/FourChang.Tests/QuanLy/UC-ADM-11; UC-ADM-12; QuanLy/DungChung/WorkforceScenarios.cs; WorkforceUiChecks.cs; DungChung/DesktopWorker.cs; TestApi.cs; TichHop/HttpRegressionTests.cs; NhanVien/UC-POS-01/EmployeeIdentityTests.cs; tests/test-manifest.json |
+| Test | tests/FourChang.Tests/QuanLy/UC-ADM-08; UC-ADM-12; QuanLy/DungChung/WorkforceScenarios.cs; WorkforceUiChecks.cs; DungChung/DesktopWorker.cs; TestApi.cs; TichHop/HttpRegressionTests.cs; NhanVien/UC-POS-01/EmployeeIdentityTests.cs; tests/test-manifest.json |
 | Tài liệu | docs/use-cases/UC-ADM-11.md; UC-ADM-12.md; docs/INTEGRATION-ADM-11-12.md; TestCases.md trong từng UC; .gitignore bỏ qua TestResults |
 
 Các phương thức mới có chú thích tiếng Việt về nhiệm vụ; comment trong phần ghi giải thích version/idempotency, khóa giao dịch, lịch sử bất biến và giới hạn phiên phục hồi. Không đổi cấu trúc project, không tạo csproj mới. Repo đang có nhiều thay đổi từ các công việc trước; bảng này là phạm vi liên quan ADM-11/12, không khẳng định toàn bộ git diff thuộc đợt này.

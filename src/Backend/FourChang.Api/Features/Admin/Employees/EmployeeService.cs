@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.Employees;
 
-/// <summary>UC-ADM-11: quản lý hồ sơ; tuyệt đối không sinh tài khoản hoặc mã hiển thị nhân viên riêng.</summary>
+/// <summary>UC-ADM-08: quản lý hồ sơ; tuyệt đối không sinh tài khoản hoặc mã hiển thị nhân viên riêng.</summary>
 public sealed class EmployeeService(CafeDbContext db)
 {
     /// <summary>Ánh xạ đúng các trường công khai của hồ sơ; khóa nội bộ được dùng phân biệt người trùng tên.</summary>
@@ -84,7 +84,7 @@ public sealed class EmployeeService(CafeDbContext db)
     {
         AdminOperation.Reason(reason);
         if (await db.CaLamViec.AnyAsync(x => x.MaNhanVien == item.MaNhanVien && x.KetThucLuc == null))
-            throw new AdminRule(409, "Nhân viên còn ca chưa kết thúc. Mở UC-ADM-12 để chốt hoặc bàn giao trước.");
+            throw new AdminRule(409, "Nhân viên còn ca chưa kết thúc. Mở Ca làm việc để kết thúc hoặc bàn giao trước.");
         if (await HandoverLink.HasPendingReceiver(db, item.MaNhanVien))
             throw new AdminRule(409, "Nhân viên đang nhận bàn giao. Cần tiếp nhận và xử lý ca trước khi đổi trạng thái.");
     }

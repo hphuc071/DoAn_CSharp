@@ -112,8 +112,8 @@ dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-AD
 | UC-ADM-01 | BR-06, BR-07, BR-08, BR-09, BR-13, BR-14, BR-28, BR-29 | `Features/Admin/Customers`, Desktop `Admin/Customers`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-01/TestCases.md` |
 | UC-ADM-02 | BR-03, BR-05, BR-08, BR-11, BR-12, BR-13, BR-14, BR-24, BR-28, BR-29, BR-35 | `Features/Admin/Menu`, Desktop `Admin/Menu`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-02/TestCases.md` |
 | UC-ADM-03 | BR-03, BR-08, BR-14, BR-23, BR-24, BR-28, BR-29 | `Features/Admin/Ingredients`, Desktop `Admin/Ingredients`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-03/TestCases.md` |
-| UC-ADM-04 | BR-02, BR-03, BR-08, BR-11, BR-13, BR-14, BR-23, BR-24, BR-28, BR-29 | `Features/Admin/Recipes`, Desktop `Admin/Recipes`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-04/TestCases.md` |
-| UC-ADM-05 | BR-02, BR-03, BR-05, BR-08, BR-14, BR-23, BR-24, BR-26, BR-29, BR-35 | `Features/Admin/Inventory`, Desktop `Admin/Inventory`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-05/TestCases.md` |
+| UC-ADM-04 | BR-02, BR-03, BR-08, BR-11, BR-13, BR-14, BR-23, BR-24, BR-28, BR-29 | `Features/Admin/Recipes`, Desktop `Admin/Recipes`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-02/TestCases.md` |
+| UC-ADM-05 | BR-02, BR-03, BR-05, BR-08, BR-14, BR-23, BR-24, BR-26, BR-29, BR-35 | `Features/Admin/Inventory`, Desktop `Admin/Inventory`, Shared contracts/client | `tests/FourChang.Tests/QuanLy/UC-ADM-03/TestCases.md` |
 
 Các quy tắc liên kết tới đơn/thanh toán/giữ-trừ kho được bảo vệ bằng snapshot/tham chiếu và nguồn catalog chung trong phạm vi năm UC. Không ghi nhận việc mở thêm giao hàng, chứng từ kho hay thay xác thực POS là đã triển khai.
 
@@ -123,16 +123,16 @@ Danh sách dưới đây bao gồm file code, cấu hình, tài liệu và test 
 
 ```text
 docs/ADM01-05-IMPLEMENTATION.md
-docs/database/35-bang/002-employee-contact-address.sql
-docs/database/35-bang/model-before-employee-address.json
-docs/database/35-bang/model.json
-docs/database/35-bang/schema.sql
-docs/database/37-bang/003-menu-and-outbox.sql
-docs/database/37-bang/004-customer-phone-rules.sql
-docs/database/37-bang/README.md
-docs/database/37-bang/model-before-phone-rules.json
-docs/database/37-bang/model.json
-docs/database/37-bang/schema.sql
+docs/database/migrations/35-bang/002-employee-contact-address.sql
+docs/database/migrations/35-bang/model-before-employee-address.json
+docs/database/migrations/35-bang/model.json
+docs/database/migrations/35-bang/schema.sql
+docs/database/migrations/37-bang/003-menu-and-outbox.sql
+docs/database/migrations/37-bang/004-customer-phone-rules.sql
+docs/database/migrations/37-bang/README.md
+docs/database/migrations/37-bang/model-before-phone-rules.json
+docs/database/migrations/37-bang/model.json
+docs/database/migrations/37-bang/schema.sql
 scripts/Start-LocalBackend.ps1
 src/Backend/FourChang.Api/Features/Admin/Customers/CustomerAddressEndpoints.cs
 src/Backend/FourChang.Api/Features/Admin/Customers/CustomerAddressService.cs
@@ -233,10 +233,10 @@ tests/FourChang.Tests/QuanLy/UC-ADM-02/MenuSynchronizationBrowserTests.cs
 tests/FourChang.Tests/QuanLy/UC-ADM-02/TestCases.md
 tests/FourChang.Tests/QuanLy/UC-ADM-03/IngredientAdministrationTests.cs
 tests/FourChang.Tests/QuanLy/UC-ADM-03/TestCases.md
-tests/FourChang.Tests/QuanLy/UC-ADM-04/RecipeAdministrationTests.cs
-tests/FourChang.Tests/QuanLy/UC-ADM-04/TestCases.md
-tests/FourChang.Tests/QuanLy/UC-ADM-05/InventoryAdministrationTests.cs
-tests/FourChang.Tests/QuanLy/UC-ADM-05/TestCases.md
+tests/FourChang.Tests/QuanLy/UC-ADM-02/RecipeAdministrationTests.cs
+tests/FourChang.Tests/QuanLy/UC-ADM-02/TestCases.md
+tests/FourChang.Tests/QuanLy/UC-ADM-03/InventoryAdministrationTests.cs
+tests/FourChang.Tests/QuanLy/UC-ADM-03/TestCases.md
 tests/FourChang.Tests/TichHop/DatabaseTests.cs
 tests/test-manifest.json
 ```

@@ -11,8 +11,12 @@ namespace FourChang.Api.Shared.Orders;
 public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money)
 {
     /// <summary>Thực thi một lệnh có version, idempotency và audit; Staff chỉ được hành động trong ca OPEN.</summary>
-    public Task<IResult> Execute(long id, OrderActionInput input, HttpContext context) =>
-        AdminOperation.Execute(db, input.MaThaoTac, "ORDER_" + input.HanhDong, "DonHang", new { id, input }, context, async () =>
+    public Task<IResult> Execute(long id, OrderActionInput input, HttpContext context)
+    {
+        // Kiểm trước receipt/idempotency: không phát lại một lệnh Admin đã bị loại khỏi phạm vi UC-ADM-05.
+        if (context.User.IsInRole("ADMIN") && input.HanhDong != "FAIL_DELIVERY")
+            return Task.FromResult<IResult>(Results.Problem(statusCode: 403, detail: "Quản lý chỉ theo dõi đơn và duyệt yêu cầu hủy. Tiếp nhận/pha chế/bàn giao thuộc Nhân viên."));
+        return AdminOperation.Execute(db, input.MaThaoTac, "ORDER_" + input.HanhDong, "DonHang", new { id, input }, context, async () =>
         {
             await LockOrder(id);
             var order = await db.DonHang.SingleOrDefaultAsync(x => x.MaDonHang == id) ?? throw new AdminRule(404, "Không tìm thấy đơn.");
@@ -87,9 +91,9 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
                     order.TrangThai = "COMPLETED"; order.HoanTatLuc = now; break;
                 case "FAIL_DELIVERY":
                     Require(order.HinhThucNhanMon == "DELIVERY" && order.TrangThai == "DELIVERING", "Đơn không ở trạng thái đang giao.");
-                    Require(!string.IsNullOrWhiteSpace(input.ChungCu) && !string.IsNullOrWhiteSpace(input.ResolutionCode), "Cần chứng cứ và mã xử lý giao thất bại.");
-                    Require(input.ResolutionCode!.Length <= 30, "Mã xử lý tối đa 30 ký tự.");
-                    order.TrangThai = "DELIVERY_FAILED"; order.MaXuLyNgoaiLe = input.ResolutionCode; break;
+                    Require((input.ResolutionCode?.Length ?? 0) <= 30, "Mã xử lý tối đa 30 ký tự.");
+                    order.TrangThai = "DELIVERY_FAILED";
+                    order.MaXuLyNgoaiLe = string.IsNullOrWhiteSpace(input.ResolutionCode) ? "DELIVERY_FAILED" : input.ResolutionCode; break;
                 case "RETRY_DELIVERY":
                     Require(order.HinhThucNhanMon == "DELIVERY" && order.TrangThai == "DELIVERING", "Chỉ giao lại khi sự cố chưa được chốt kết thúc.");
                     Require(!string.IsNullOrWhiteSpace(input.ChungCu), "Cần xác nhận giao lại của khách và chứng cứ."); break;
@@ -101,6 +105,7 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             await db.SaveChangesAsync();
             return (id, (object)new OrderActionReceipt(id, order.TrangThai, order.PhienBanDuLieu), before, reason);
         }, allowStaff: true);
+    }
 
     /// <summary>Nhân viên chỉ gửi phần chưa pha cho Quản lý: không giải phóng kho, đổi trạng thái đơn hay tạo hoàn.</summary>
     private async Task RequestCancellation(DonHang order,List<ChiTietDonHang> lines,OrderActionInput input,long shift)

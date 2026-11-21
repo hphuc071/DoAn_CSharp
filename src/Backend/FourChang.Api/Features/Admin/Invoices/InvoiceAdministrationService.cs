@@ -56,7 +56,12 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
         var root = invoice.MaHoaDonGoc ?? id;
         var related = await db.HoaDon.AsNoTracking().Where(x => x.MaHoaDonGoc == root).ToListAsync();
         var audits = await db.NhatKyHeThong.AsNoTracking().Where(x => x.LoaiDoiTuong == "HoaDon" && x.MaDoiTuong == id.ToString()).OrderByDescending(x => x.PhatSinhLuc).ToListAsync();
-        var result = new AdminInvoiceDetail(View(invoice), invoice.NoiDungHoaDonDaChotJson, await financials.Read(order), related.Select(View).ToList(),
+        var view = View(invoice) with
+        {
+            MaDon = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang),
+            NguoiMua = !string.IsNullOrWhiteSpace(invoice.TenNguoiMua) ? invoice.TenNguoiMua : order.TenNguoiNhan ?? "Khách lẻ"
+        };
+        var result = new AdminInvoiceDetail(view, invoice.NoiDungHoaDonDaChotJson, await financials.Read(order), related.Select(View).ToList(),
             audits.Select(x => new AdminTraceRow(x.MaNhatKy, x.PhatSinhLuc, x.TenNguoiThucHienDaChot, x.MaCaLamViec, x.MaMayDaChot, x.HanhDong, x.LyDo, x.KetQua,
                 x.DuLieuTruocJson, x.DuLieuSauJson, x.MaLienKetXuLy)).ToList());
         await tx.CommitAsync(); return result;

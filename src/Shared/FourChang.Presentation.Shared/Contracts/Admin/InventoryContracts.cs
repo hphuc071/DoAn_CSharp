@@ -1,6 +1,6 @@
 ﻿namespace FourChang.Presentation.Shared.Contracts.Admin;
 
-/// <summary>Danh mục và quy đổi nguyên liệu; không chứa quyền sửa tồn trực tiếp.</summary>
+/// <summary>Hồ sơ nguyên liệu; TonAnToan/QuyDoi chỉ giữ hợp đồng cũ, không còn là trường quản trị riêng.</summary>
 public sealed record IngredientView(long MaNguyenLieu, string TenNguyenLieu, long MaDonViCoSo,
     decimal TonAnToan, decimal NguongCanhBao, string? MoTa, bool DangSuDung, byte[] PhienBanDuLieu,
     IReadOnlyList<ConversionInput> QuyDoi, long SoThamChieu);
@@ -9,7 +9,9 @@ public sealed record ConversionInput(long MaDonVi, decimal HeSoVeDonViCoSo);
 public sealed record IngredientSnapshot(IReadOnlyList<IngredientView> NguyenLieu, IReadOnlyList<UnitView> DonVi);
 public sealed record IngredientInput(string TenNguyenLieu, long MaDonViCoSo, decimal TonAnToan,
     decimal NguongCanhBao, string? MoTa, bool DangSuDung, IReadOnlyList<ConversionInput> QuyDoi,
-    byte[]? PhienBanDuLieu, Guid MaThaoTac);
+    byte[]? PhienBanDuLieu, Guid MaThaoTac, string? PhienBanAnhHuong = null);
+/// <summary>Danh sách công thức phụ thuộc và dấu xác nhận để phát hiện thay đổi trong lúc người dùng xem.</summary>
+public sealed record IngredientImpact(long MaNguyenLieu, IReadOnlyList<string> MonPhuThuoc, string PhienBanAnhHuong);
 public sealed record UnitInput(string KyHieu, string TenDonVi, bool DangSuDung, byte[]? PhienBanDuLieu, Guid MaThaoTac);
 public sealed record AdminDeleteInput(byte[] PhienBanDuLieu, Guid MaThaoTac);
 public sealed record AdminSaveReceipt(long Ma, byte[]? PhienBanDuLieu, bool DaXoa = false);

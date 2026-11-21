@@ -1,4 +1,4 @@
-﻿using FourChang.Tests.Shared;
+using FourChang.Tests.Shared;
 
 namespace FourChang.Tests.Admin;
 
@@ -7,6 +7,24 @@ internal sealed record OperationsScenario(long Order, long Line, long Payment, l
 /// <summary>Dữ liệu chuẩn bị riêng cho test các UC sau đặt đơn; không chứng minh luồng bán hàng POS đã tích hợp SQL.</summary>
 internal static class OperationsScenarioSeed
 {
+    /// <summary>Chuẩn bị yêu cầu bằng Staff thật rồi Admin duyệt; không dùng lệnh hủy trực tiếp đã bỏ.</summary>
+    internal static async Task<Dictionary<string,string>> RequestAndApprove(AdminFeatureFixture fixture, OperationsScenario data, bool approve = true)
+    {
+        var api = fixture.Api;
+        var employee = await api.Employee(fixture.Admin, "Nhân viên giao diện");
+        var opened = (await api.Send("POST", "/api/pos/shifts", FourChang.Tests.Shared.TestData.Body(
+            ("MaNhanVien", employee.Number("maNhanVien")), ("HoTen", employee.Text("hoTen")), ("TenCa", "Sáng"),
+            ("MaMay", Guid.NewGuid().ToString("N")), ("TienMatDauCa", 500000), ("MaThaoTac", Guid.NewGuid().ToString())))).Expect(200,"Mở ca fixture").Json;
+        async Task<FourChang.Presentation.Shared.Contracts.Admin.AdminOrderDetail> Detail() =>
+            System.Text.Json.JsonSerializer.Deserialize<FourChang.Presentation.Shared.Contracts.Admin.AdminOrderDetail>((await fixture.Send("GET",$"/api/admin/orders/{data.Order}")).ToJsonString(), new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))!;
+        var order = await Detail(); var group = Guid.NewGuid();
+        var command = new FourChang.Presentation.Shared.Contracts.Admin.OrderActionInput("CANCEL", "Khách đề nghị hủy", order.Don.PhienBanDuLieu, group, data.Line, 1);
+        (await api.Send("POST", $"/api/pos/orders/{data.Order}/actions", System.Text.Json.JsonSerializer.SerializeToNode(command), TestApi.Bearer(opened))).Expect(200,"Staff gửi hủy");
+        order = await Detail();
+        await fixture.Send("POST",$"/api/admin/orders/{data.Order}/cancellation", new FourChang.Presentation.Shared.Contracts.Orders.CancellationCommand(approve?"APPROVE":"REJECT", group, "Đã kiểm tra yêu cầu", order.Don.PhienBanDuLieu, Guid.NewGuid(), true));
+        return TestApi.Bearer(opened);
+    }
+
     /// <summary>Tạo ca/đơn/snapshot/giữ chỗ/thu có kiểm soát trong database fixture GUID để test hành vi quản trị.</summary>
     internal static Task<OperationsScenario> Create(AdminFeatureFixture fixture, string state = "PENDING_CONFIRMATION", bool paid = true, bool invoice = false) => Create(fixture.Api, state, paid, invoice);
 
@@ -15,6 +33,8 @@ internal static class OperationsScenarioSeed
     {
         var key = Guid.NewGuid().ToString("N")[..16];
         var sql = $"""
+            SET XACT_ABORT ON;
+            BEGIN TRANSACTION;
             DECLARE @nv bigint,@ca bigint,@dh bigint,@line bigint,@pay bigint,@inv bigint=NULL,@variant bigint,@recipe bigint,@price decimal(18,0);
             INSERT dbo.NhanVien(HoTen,NgayVaoLam,TrangThai) VALUES(N'Nguyễn Minh Phúc',SYSUTCDATETIME(),'ACTIVE'); SET @nv=SCOPE_IDENTITY();
             INSERT dbo.CaLamViec(MaCaHienThi,MaNhanVien,TenCa,MaMay,BatDauLuc,TrangThai,TienMatDauCa)
@@ -30,12 +50,17 @@ internal static class OperationsScenarioSeed
               2*CEILING(SUM(d.DinhMucCoSo)*10000)/10000,
               {(state == "COMPLETED" ? "2*CEILING(SUM(d.DinhMucCoSo)*10000)/10000" : "0")},0,'{(state == "COMPLETED" ? "CONSUMED" : "RESERVED")}'
               FROM dbo.ChiTietCongThuc d JOIN dbo.NguyenLieu n ON n.MaNguyenLieu=d.MaNguyenLieu WHERE d.MaCongThuc=@recipe GROUP BY d.MaNguyenLieu,n.TenNguyenLieu,n.DonViCoSo;
+            -- Provision only the fixture ingredients needed for this scenario, preserving existing holds.
+            UPDATE t SET TonThucTe=CASE WHEN t.TonThucTe<t.TongGiuCho+g.SoLuongGiuCho
+                THEN t.TongGiuCho+g.SoLuongGiuCho ELSE t.TonThucTe END
+              FROM dbo.TonKho t JOIN dbo.NguyenLieuChiTietDonHang g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;
             UPDATE t SET TongGiuCho=TongGiuCho+{(state == "COMPLETED" ? "0" : "g.SoLuongGiuCho")},TonThucTe=TonThucTe-{(state == "COMPLETED" ? "g.SoLuongDaTieuHao" : "0")}
               FROM dbo.TonKho t JOIN dbo.NguyenLieuChiTietDonHang g ON g.MaNguyenLieu=t.MaNguyenLieu WHERE g.MaChiTietDonHang=@line;
             INSERT dbo.ThanhToan(MaThanhToanHienThi,MaDonHang,MaCaLamViec,PhuongThuc,SoTienYeuCau,SoTienDaXacMinh,TrangThai,XacMinhLuc,MaThaoTac)
               VALUES('TT-{key}',@dh,@ca,'CASH',2*@price,{(paid ? "2*@price" : "0")},'{(paid ? "VERIFIED" : "PENDING")}',{(paid ? "SYSUTCDATETIME()" : "NULL")},NEWID()); SET @pay=SCOPE_IDENTITY();
             {(invoice ? "INSERT dbo.HoaDon(SoHoaDon,MaDonHang,LoaiHoaDon,TenNguoiMua,SoTien,NoiDungHoaDonDaChotJson,TrangThai,PhatHanhLuc,MaQuanLyPhatHanh,MaCaLamViec) VALUES('HD-" + key + "',@dh,'ORIGINAL',N'Nguyễn Tuấn Kiệt',2*@price,N'{\"Version\":1,\"Mon\":\"Cà phê đã chốt\",\"SoLy\":2}', 'ISSUED',SYSUTCDATETIME(),1,@ca); SET @inv=SCOPE_IDENTITY();" : "")}
             SELECT CONCAT(@dh,',',@line,',',@pay,',',@ca,',',ISNULL(CONVERT(varchar(30),@inv),'0'),',',CONVERT(varchar(30),2*@price));
+            COMMIT TRANSACTION;
             """;
         var values = (await api.Sql(sql)).Split(',');
         return new(long.Parse(values[0]), long.Parse(values[1]), long.Parse(values[2]), long.Parse(values[3]), values[4] == "0" ? null : long.Parse(values[4]), decimal.Parse(values[5], System.Globalization.CultureInfo.InvariantCulture));

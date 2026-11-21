@@ -2,6 +2,7 @@ using System.Globalization;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
+using FourChang.Desktop.Shared.Orders;
 using FourChang.Desktop.Shared.Theme;
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Admin;
@@ -31,9 +32,9 @@ public sealed class WorkSessionDetailsForm : Form
         data = details; Name = "WorkSessionDetails"; Text = $"Đối chiếu ca #{data.Ca.MaCaLamViec}";
         ClientSize = new Size(1220, 850); MinimumSize = new Size(940, 650); StartPosition = FormStartPosition.CenterParent;
         BackColor = CafeTheme.Cream; Font = CafeTheme.Body(); AutoScaleMode = AutoScaleMode.Dpi;
-        closeShift = Button("Xác nhận chốt", CloseShift, true); closeShift.Name = "AdminConfirmShift";
+        closeShift = Button("Chốt ca chờ đối chiếu", CloseShift, true); closeShift.Name = "AdminConfirmShift";
         handover = Button("Bàn giao", Handover); handover.Name = "AdminHandoverShift";
-        recovery = Button("Cấp mã phục hồi", IssueRecovery); recovery.Name = "AdminIssueShiftRecovery";
+        recovery = Button("Hỗ trợ mất phiên", IssueRecovery); recovery.Name = "AdminIssueShiftRecovery";
         reload = Button("Tải lại đối chiếu", Reload);
         dismiss = Ui.Button("Đóng", () => Close());
         var body = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(16) };
@@ -76,50 +77,46 @@ public sealed class WorkSessionDetailsForm : Form
         var grid = Ui.Grid(new([], []), 280); grid.Name = name; grid.AutoGenerateColumns = false;
         foreach (var (property, caption) in columns) grid.Columns.Add(new DataGridViewTextBoxColumn { Name = property, DataPropertyName = property, HeaderText = caption, SortMode = DataGridViewColumnSortMode.NotSortable });
         grid.DataSource = rows;
-        OperationsPresentation.Grid(grid);
+        OperationsPresentation.Grid(grid); CommerceWorkspaceVisuals.FormatGrid(grid);
+        grid.CellFormatting += (_, e) =>
+        {
+            if (e.ColumnIndex < 0) return;
+            if (e.Value is decimal money) { e.Value = Money(money); e.FormattingApplied = true; }
+            if (e.Value is DateTime at) { e.Value = at.ToLocalTime().ToString("dd/MM/yyyy HH:mm"); e.FormattingApplied = true; }
+        };
         return grid;
     }
 
-    /// <summary>Vẽ lại snapshot từ API: tách CASH/CK, nguồn chưa rõ và lịch sử; không sửa trạng thái khi xem.</summary>
+    /// <summary>Chỉ đọc hồ sơ ca, ba chỉ tiêu và ba bảng; giao dịch tiền vẫn thuộc ca thực sự thu/chi.</summary>
     private void ShowSnapshot()
     {
         snapshot.SuspendLayout();
         foreach (Control control in snapshot.Controls) control.Dispose(); snapshot.Controls.Clear();
         var ca = data.Ca;
-        var status = ca.TrangThai switch { "OPEN" => "Đang mở", "CLOSED" => "Đã chốt", "HANDED_OVER" => "Đã bàn giao", _ => data.DangChoDoiChieu ? "Khóa chờ đối chiếu" : data.SuKienTrangThai == "SHIFT_TEMP_LOCKED" ? "Khóa tạm" : data.SuKienTrangThai == "SHIFT_RECOVERY_ISSUED" ? "Khóa phục hồi · chờ nhân viên gửi đối chiếu" : "Đang khóa · cần kiểm tra lịch sử" };
-        var header = Ui.Panel($"{ca.HoTen} · Ca #{ca.MaCaLamViec}",
-            Ui.Label($"Mã NV {ca.MaNhanVien} · Ca {ca.TenCa} · Máy (lịch sử): {ca.MaMay} · Bắt đầu {ca.BatDauLuc.ToLocalTime():dd/MM/yyyy HH:mm}", 10),
-            Ui.Label(status, 10, true),
-            Ui.Label($"Đã hoàn thành: {data.SoDonHoanThanh} đơn · Tổng tiền: {data.TongTienDonHoanThanh:N0}đ", 12, true));
-        var cash = Ui.Panel("Đối chiếu tiền mặt", MoneyGrid(("Tiền đầu ca", Money(ca.TienMatDauCa)), ("Thu đã xác minh", Money(data.ThuTienMat)),
-            ("Hoàn thành công", Money(data.HoanTienMat)), ("Dự kiến", Money(data.TienMatDuKienHienTai)),
-            ("Tiền cuối ca", ca.TienMatThucDem is { } amount ? Money(amount) : "Chưa gửi"),
-            ("Tiền mặt thu được", data.TienThuDuoc is { } received ? Money(received) : "Chưa gửi")),
-            Ui.Label($"Chênh lệch: {(data.ChenhLech is { } delta ? Money(delta) : "Chưa có thực đếm")}", 10, false, CafeTheme.Muted));
-        WrapCardLabels(header); WrapCardLabels(cash);
-        var columns = new (string, string)[] { ("Loai", "Thu / hoàn"), ("Ma", "Mã nguồn"), ("MaDonHang", "Mã đơn"), ("ThamChieu", "Tham chiếu"), ("PhuongThuc", "Phương thức"), ("SoTien", "Số tiền"), ("TrangThai", "Trạng thái") };
-        var cashGrid = Grid("ShiftCashTransactions", data.GiaoDich.Where(x => x.PhuongThuc == "CASH").ToList(), columns);
-        var bankGrid = Grid("ShiftBankTransactions", data.GiaoDich.Where(x => x.PhuongThuc == "BANK_TRANSFER").ToList(), columns);
-        var orders = Grid("ShiftPendingOrders", data.DonDangXuLy.ToList(), ("MaDonHang", "Mã đơn"), ("MaDonHienThi", "Số đơn"), ("TrangThai", "Trạng thái"), ("MaCaNguon", "Ca nguồn"));
-        var unresolved = Grid("ShiftUnresolved", data.KhoanChuaRo.Select(x => new { Nguon = x }).ToList(), ("Nguon", "Nguồn cần đối soát"));
-        var audits = Grid("ShiftAudit", data.NhatKy.ToList(), ("ThoiDiem", "Thời điểm UTC"), ("NguoiThucHien", "Người thực hiện"), ("HanhDong", "Hành động"), ("LyDo", "Lý do"));
-        var tabs = Ui.Tabs(("Tiền mặt", cashGrid), ("Chuyển khoản", bankGrid), ($"Đơn đang xử lý ({data.DonDangXuLy.Count})", orders),
-            ($"Khoản chưa rõ ({data.KhoanChuaRo.Count})", unresolved), ("Nhật ký", audits)); tabs.Height = 340;
-        foreach (TabPage tab in tabs.TabPages)
-        {
-            tab.AutoScroll = false;
-            foreach (var table in tab.Controls.OfType<DataGridView>()) { table.Dock = DockStyle.Fill; table.MinimumSize = Size.Empty; }
-        }
-        tabs.SelectedIndex = Math.Clamp(activeTab, 0, tabs.TabCount - 1);
-        tabs.SelectedIndexChanged += (_, _) => activeTab = tabs.SelectedIndex;
-        var handoverText = data.BanGiao is { } link ? $"Đã bàn giao cho nhân viên #{link.MaNhanVienNhan} · Máy lịch sử {link.MaMayNhan}. Ca nhận được mở tại POS."
-            : ca.MaCaBanGiaoTruoc is { } source ? $"Ca này tiếp nhận từ ca #{source}. Giao dịch cũ vẫn thuộc ca nguồn." : "Chưa có liên kết bàn giao.";
-        snapshot.Controls.Add(AdminListLayout.Column(header, cash, Ui.Panel("Giao dịch và truy vết", Ui.Label("Dự kiến tiền mặt = đầu ca + thu CASH đã xác minh − hoàn CASH thành công. Chuyển khoản hiển thị riêng.", 9, false, CafeTheme.Muted), tabs, Ui.Label(handoverText, 9, false, CafeTheme.Muted))));
+        var status = ca.TrangThai switch { "OPEN" => "Đang làm", "CLOSED" => "Đã chốt", "HANDED_OVER" => "Đã bàn giao", _ => "Chờ đối chiếu / hỗ trợ" };
+        var header = OrderDetailsForm.Section("Thông tin ca làm việc", OrderDetailsForm.Value("Mã ca", ca.MaCaLamViec.ToString()),
+            OrderDetailsForm.Value("Nhân viên", $"{ca.HoTen} · NV {ca.MaNhanVien}", 370), OrderDetailsForm.Value("Ca", ca.TenCa), OrderDetailsForm.Value("Trạng thái", status, 220),
+            OrderDetailsForm.Value("Bắt đầu", ca.BatDauLuc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"), 220),
+            OrderDetailsForm.Value("Kết thúc", ca.KetThucLuc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Chưa kết thúc", 220));
+        var completed = OrderDetailsForm.Section("Kết quả phục vụ", OrderDetailsForm.Value("Số đơn hoàn thành", data.SoDonHoanThanh.ToString()), OrderDetailsForm.Value("Tổng tiền đơn hoàn thành", Money(data.TongTienDonHoanThanh), 300));
+        var cash = OrderDetailsForm.Section("Kết quả kiểm đếm", OrderDetailsForm.Value("Tiền đầu ca", Money(ca.TienMatDauCa), 200),
+            OrderDetailsForm.Value("Tiền mặt hệ thống", Money(data.TienMatDuKienHienTai), 200), OrderDetailsForm.Value("Tiền nhân viên kiểm đếm", ca.TienMatThucDem is { } counted ? Money(counted) : "Chưa gửi", 220),
+            OrderDetailsForm.Value("Chênh lệch", data.ChenhLech is { } delta ? Money(delta) : "Chưa gửi", 180));
+        var done = Grid("ShiftCompletedOrders", (data.DonHoanThanh ?? []).ToList(), ("MaDon", "Mã đơn"), ("SoTien", "Tổng tiền"), ("HoanTatLuc", "Hoàn thành lúc"));
+        var waiting = Grid("ShiftPendingOrders", data.DonDangXuLy.ToList(), ("MaDonHienThi", "Mã đơn"), ("TrangThai", "Trạng thái"), ("MaCaNguon", "Ca nguồn"));
+        var transactions = Grid("ShiftTransactions", data.GiaoDich.ToList(), ("MaDon", "Mã đơn"), ("Loai", "Thu / hoàn"), ("PhuongThuc", "Phương thức"), ("SoTien", "Số tiền"), ("TrangThai", "Kết quả"));
+        var tabs = Ui.Tabs(($"Đơn hoàn thành ({data.SoDonHoanThanh})", done), ($"Đơn cần bàn giao ({data.DonDangXuLy.Count})", waiting), ("Thu / hoàn tiền", transactions));
+        tabs.Name = "WorkSessionTables"; tabs.Height = 290;
+        foreach (TabPage tab in tabs.TabPages) { tab.AutoScroll = false; foreach (var table in tab.Controls.OfType<DataGridView>()) { table.Dock = DockStyle.Fill; table.MinimumSize = Size.Empty; } }
+        tabs.SelectedIndex = Math.Clamp(activeTab, 0, tabs.TabCount - 1); tabs.SelectedIndexChanged += (_, _) => activeTab = tabs.SelectedIndex;
+        var handoverText = data.BanGiao is { } link ? $"Đã bàn giao cho nhân viên #{link.MaNhanVienNhan}. Nhân viên nhận mở ca tại POS để tiếp tục xử lý đơn."
+            : ca.MaCaBanGiaoTruoc is { } source ? $"Đã tiếp nhận đơn từ ca #{source}. Tiền thu/hoàn của ca cũ không chuyển sang ca này." : "Chưa có liên kết bàn giao.";
+        var note = data.KhoanChuaRo.Count > 0 ? $"Có {data.KhoanChuaRo.Count} khoản chưa xác minh; xử lý ở Đơn hàng/Hoàn tiền hoặc bàn giao có liên kết." : "Tiền mặt hệ thống = tiền đầu ca + thu tiền mặt đã xác minh − hoàn tiền mặt thành công. Chuyển khoản không cộng vào két.";
+        snapshot.Controls.Add(AdminListLayout.Column(header, completed, cash, Ui.Panel("Đơn và giao dịch của ca", Ui.Label(note, 9, false, CafeTheme.Muted), tabs, Ui.Label(handoverText, 9, false, CafeTheme.Muted))));
         snapshot.ResumeLayout(true);
         if (IsHandleCreated) BeginInvoke(new Action(ResetViewport));
         ApplyState();
     }
-
     /// <summary>Không để TabControl đầu tiên tự kéo vùng cuộn xuống khi mở form chỉ đọc, làm mất phần quỹ phía trên.</summary>
     private void ResetViewport()
     {
@@ -129,43 +126,15 @@ public sealed class WorkSessionDetailsForm : Form
             if (parent is ScrollableControl { AutoScroll: true } scroll) scroll.AutoScrollPosition = Point.Empty;
     }
 
-    /// <summary>Các cột chia theo tỷ lệ: tránh đo Flow lồng nhau làm card tiền mặt cao rỗng hàng trăm px.</summary>
-    private static Control MoneyGrid(params (string Caption, string Value)[] values)
-    {
-        var row = new TableLayoutPanel { Dock = DockStyle.Top, Height = 110, ColumnCount = values.Length, RowCount = 1, Margin = Padding.Empty };
-        row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        for (var i = 0; i < values.Length; i++)
-        {
-            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / values.Length));
-            var cell = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0, 0, 12, 0) };
-            cell.RowStyles.Add(new RowStyle(SizeType.Absolute, 28)); cell.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-            var caption = Ui.Label(values[i].Caption, 9, false, CafeTheme.Muted);
-            var value = Ui.Label(values[i].Value, 16, true);
-            caption.Dock = value.Dock = DockStyle.Fill; caption.AutoSize = value.AutoSize = false;
-            caption.Margin = value.Margin = Padding.Empty;
-            value.TextAlign = ContentAlignment.TopLeft;
-            cell.Controls.Add(caption, 0, 0); cell.Controls.Add(value, 0, 1);
-            row.Controls.Add(cell, i, 0);
-        }
-        return row;
-    }
-
-    /// <summary>Nhãn dài được xuống hàng trong thẻ, không kéo ngang dialog khi tên/địa chỉ dài.</summary>
-    private static void WrapCardLabels(SurfacePanel card)
-    {
-        card.SizeChanged += (_, _) =>
-        {
-            var width = Math.Max(200, card.ClientSize.Width - card.Padding.Horizontal);
-            foreach (var label in card.Controls.OfType<TableLayoutPanel>().SelectMany(x => x.Controls.OfType<Label>()))
-                label.MaximumSize = new Size(width, 0);
-        };
-    }
-
     /// <summary>Nút dựa trạng thái thật; pending giữ quyền tra lại dù ca đã kết thúc sau commit.</summary>
     private void ApplyState()
     {
         if (IsDisposed) return;
         var active = data.Ca.KetThucLuc is null;
+        // Ca đã kết thúc hợp lệ chỉ đọc. Nút chốt chỉ hỗ trợ ca còn khóa chờ thực đếm, không phê duyệt lại ca đã xong.
+        closeShift.Visible = pendingClose is not null || active && data.DangChoDoiChieu && data.DonDangXuLy.Count == 0 && data.KhoanChuaRo.Count == 0;
+        handover.Visible = pendingHandover is not null || active && data.DangChoDoiChieu && (data.DonDangXuLy.Count > 0 || data.KhoanChuaRo.Count > 0);
+        recovery.Visible = pendingRecovery is not null || active;
         closeShift.Enabled = !busy && (pendingClose is not null || active && data.DangChoDoiChieu && data.DonDangXuLy.Count == 0 && data.KhoanChuaRo.Count == 0);
         handover.Enabled = !busy && (pendingHandover is not null || active && data.DangChoDoiChieu);
         recovery.Enabled = !busy && (pendingRecovery is not null || active);
@@ -205,17 +174,17 @@ public sealed class WorkSessionDetailsForm : Form
     /// <summary>Form bàn giao hiển thị mã để phân biệt tên trùng; không cần cấp/thu hồi máy.</summary>
     private async Task<HandoverWorkSessionInput?> ReadHandover()
     {
-        var employees = (await LiveSession.Api.GetEmployeesAsync(true)).Where(x => x.TrangThai == "ACTIVE").Select(x => new { Employee = x.MaNhanVien, Label = $"#{x.MaNhanVien} · {x.HoTen}" }).ToList();
+        var employees = (await LiveSession.Api.GetEmployeesAsync(true)).Where(x => x.TrangThai == "ACTIVE" && x.MaNhanVien != data.Ca.MaNhanVien).Select(x => new { Employee = x.MaNhanVien, Label = $"#{x.MaNhanVien} · {x.HoTen}" }).ToList();
         using var form = AdminUi.Dialog("Xác nhận bàn giao", 820, 540);
         var receiver = new ComboBox { DataSource = employees, DisplayMember = "Label", ValueMember = "Employee", DropDownStyle = ComboBoxStyle.DropDownList, Width = 640, Name = "HandoverReceiver" };
         receiver.SelectedIndex = -1;
-        var machine = Ui.Input("Máy nhận (thông tin lịch sử)", data.Ca.MaMay, 640);
+
         var reason = Ui.Input("Lý do bàn giao", "", 640); reason.MaxLength = 500;
         var error = Ui.Label("", 9, false, CafeTheme.Danger);
         var confirm = Ui.Button("Xác nhận bàn giao", () => { if (receiver.SelectedValue is not long || string.IsNullOrWhiteSpace(reason.Text)) { error.Text = "Chọn nhân viên nhận và nhập lý do."; return; } form.DialogResult = DialogResult.OK; }, true);
-        AdminUi.Compose(form, Ui.Panel("Người nhận và nguồn bàn giao", Ui.Field("Nhân viên nhận *", receiver), Ui.Field("Máy nhận (lịch sử)", machine), Ui.Field("Lý do *", reason),
+        AdminUi.Compose(form, Ui.Panel("Người nhận và nguồn bàn giao", Ui.Field("Nhân viên nhận *", receiver), Ui.Field("Lý do *", reason),
             Ui.Label($"Bàn giao toàn bộ {data.DonDangXuLy.Count} đơn đang xử lý và {data.KhoanChuaRo.Count} khoản chưa rõ trong đối chiếu hiện tại.", 9, false, CafeTheme.Muted), error), confirm, Ui.Button("Hủy", () => form.Close()));
-        return form.ShowDialog(this) == DialogResult.OK ? new((long)receiver.SelectedValue!, machine.Text, reason.Text,
+        return form.ShowDialog(this) == DialogResult.OK ? new((long)receiver.SelectedValue!, data.Ca.MaMay, reason.Text,
             data.DonDangXuLy.Select(x => x.MaDonHang).ToArray(), data.KhoanChuaRo.ToArray(), data.Ca.PhienBanDuLieu, Guid.NewGuid(), data.MaDoiChieu) : null;
     }
 

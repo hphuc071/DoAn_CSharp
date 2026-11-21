@@ -95,6 +95,8 @@ internal static class WorkforceUiChecks
             Assert.NotNull(cashSurface);
             Assert.InRange(cashSurface!.Height, 100, 300);
             Assert.Empty(Descendants(detail).OfType<NumericUpDown>());
+            Assert.Equal(3,Find<TabControl>(detail,"WorkSessionTables").TabPages.Count);
+            Assert.DoesNotContain(Descendants(shell).OfType<Button>(),x=>x.Text.Contains("Xóa"));
             Assert.False(Find<Button>(detail, "AdminConfirmShift").Enabled);
             File.WriteAllLines(Path.Combine(output, "UC-ADM-12-detail-layout.txt"), Descendants(detail).Select(c => $"{c.GetType().Name} {c.Name} bounds={c.Bounds} parent={c.Parent?.GetType().Name}"));
             Capture(detail, Path.Combine(output, "UC-ADM-12-detail.png"));

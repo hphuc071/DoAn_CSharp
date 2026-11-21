@@ -1,18 +1,25 @@
-# UC-ADM-07 — Giám sát và xử lý đơn hàng
+# UC-ADM-07 Báo cáo và nhật ký
 
-Nguồn: `dac-25-Uc.docx`, giữ nguyên đánh số 25 UC. Quy tắc: BR-02, BR-04, BR-05, BR-08, BR-13, BR-14, BR-15, BR-16, BR-17, BR-21, BR-22, BR-26, BR-29, BR-33, BR-34, BR-36.
+Các lớp kiểm thử trong thư mục này dùng project xUnit chung. Danh mục nguồn và bộ lọc nằm trong tests/test-manifest.json.
 
-| Test xUnit | Kết quả cần bảo đảm |
-|---|---|
-| `VongDoi_TruKhoLucBatDau_KhongTruLaiLucHoanTat` | Bắt đầu pha tiêu hao một lần; không hủy món đã pha. |
-| `HuyMotPhan_GiaiPhongGiuCho_TaoHoSoChoHoan` | Hủy trước pha giải phóng giữ chỗ, tạo REQUESTED; chưa ghi chi. |
-| `ChuaThuDu_KhongHoanTat_VersionCuKhongGhiDe` | Chưa trả đủ chặn bàn giao; stale version 409. |
-| `GiaoThatBai_CoChungCu_GiaoLai_KhongHoiKho` | Giao lại có xác nhận khi chưa chốt thất bại; DELIVERY_FAILED kết thúc ngoại lệ, không hoàn kho. |
+## Mã kiểm thử
 
-Test UI chung: `QuanLy/DungChung/OperationsUiTests.cs`, mở WinForms thật với API/SQL, chụp desktop/compact, kiểm tra wrap nút và chiều cao báo cáo; ADM-06 kiểm tra thêm/bỏ dòng và lưu nháp qua form thật.
+- [ReportAdministrationTests.cs](ReportAdministrationTests.cs)
+- [ReportNavigationUiTests.cs](ReportNavigationUiTests.cs)
 
-```powershell
+## Chạy kiểm thử
+
+~~~powershell
 dotnet test tests/FourChang.Tests/FourChang.Tests.csproj --filter "UseCase=UC-ADM-07"
-```
+~~~
 
-Database GUID riêng trong Docker; không chạy reset/seed trên database quán. Test không thay thế kiểm thử máy in thật và sao kê ngân hàng thực tế.
+Test API và giao diện sử dụng database thử riêng khi cần SQL. Kết quả đạt cần căn cứ lượt chạy và tệp TRX tương ứng.
+
+## Kịch bản kiểm thử 10
+
+### UC-ADM-07 — tái sử dụng thư mục UC-ADM-07
+- Đã trả tiền nhưng chưa hoàn thành không tính; đúng kỳ hoàn thành mới tính. Giá snapshot, phí giao và giảm trừ hợp lệ; bỏ ly hủy khỏi tổng đơn/top món.
+- Tiền hoàn chỉ khi chi thành công, đúng ngày/ca chi thực tế; không nhầm ca gốc hoặc duyệt hủy là đã trả. Replay payout không tăng số hai lần.
+- Kỳ trống0/bảng trống; bộ lọc sai400; Customer403. Nhật ký không có route sửa/xóa và che mật khẩu/token/tài khoản.
+- Excel5sheet, số có kiểu numeric, không formula, đúng snapshot trước khi phát sinh đơn mới; chống gửi trùng job. Tạo PDF báo cáo bị chặn; không ảnh hưởng PDF hóa đơn.
+- UI3card/3tab, không PDF/tệp đã xuất; resize không cắt bộ lọc/KPI, số tiền lớn không bị che. Nhật ký chỉ đọc. Ba tab điều hướng đúng trang kể cả không chọn dòng.

@@ -9,7 +9,7 @@ namespace FourChang.Desktop.Shared.Orders;
 public sealed class OrderDetailsForm : Form
 {
     /// <summary>Hiển thị snapshot đã chốt; không sửa đơn, giá, kho hoặc trạng thái thanh toán.</summary>
-    public OrderDetailsForm(AdminOrderDetail data)
+    public OrderDetailsForm(AdminOrderDetail data, bool showCancellation = false)
     {
         Name = "BasicOrderDetails"; Text = "Chi tiết đơn " + data.Don.MaDon;
         ClientSize = new(1080, 790); MinimumSize = new(900, 650);
@@ -19,6 +19,18 @@ public sealed class OrderDetailsForm : Form
             Value("Thời gian đặt", order.TaoLuc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")),
             Value("Trạng thái", OperationsPresentation.Label(order.TrangThai)), Value("Nguồn", order.Kenh),
             Value("Hình thức nhận", OperationsPresentation.Label(order.HinhThuc)));
+        if (showCancellation)
+        {
+            var request = order.YeuCauHuy ?? order.KetQuaHuy;
+            if (request is not null)
+            {
+                // Kết quả duyệt nằm trong phần thông tin đơn, không thêm bảng kỹ thuật.
+                var body = information.Controls.OfType<FlowLayoutPanel>().Single();
+                body.Controls.Add(Value("Yêu cầu hủy", request.TrangThai switch { "REQUESTED" => "Chờ Nhân viên chuyển", "FORWARDED" => "Chờ duyệt", "APPROVED" => "Đã duyệt", "REJECTED" => "Đã từ chối", _ => request.TrangThai }));
+                body.Controls.Add(Value("Lý do", request.LyDo, 480));
+                body.Controls.Add(Value("Món yêu cầu hủy", string.Join("; ", (data.MonYeuCauHuy ?? []).Select(x => $"{x.TenMon}: {x.SoLy} ly")), 480));
+            }
+        }
         information.Name = "OrderInformation";
         var customerFields = new List<Control> { Value("Khách hàng", string.IsNullOrWhiteSpace(data.TenNguoiNhan) ? "Khách tại quầy" : data.TenNguoiNhan), Value("Số điện thoại", data.DienThoai) };
         if (order.HinhThuc == "DINE_IN") customerFields.Add(Value("Bàn", data.Ban));

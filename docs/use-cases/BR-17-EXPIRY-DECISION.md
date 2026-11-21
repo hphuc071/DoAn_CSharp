@@ -80,7 +80,7 @@ deployment phê duyệt riêng mới bật process-local flags. Hiện mọi đi
 
 | Thành phần | Nguồn cần đồng bộ/kiểm chứng | Tác động |
 | --- | --- | --- |
-| SQL canonical | `docs/database/35-bang/schema.sql`, `model.json` cùng thư mục | `CK_DonHang_7`: 11 → 12 states, thêm EXPIRED bằng WITH CHECK, trusted/enabled. Không status FK, không cần đổi FK hiện có; không backfill |
+| SQL canonical | `docs/database/migrations/35-bang/schema.sql`, `model.json` cùng thư mục | `CK_DonHang_7`: 11 → 12 states, thêm EXPIRED bằng WITH CHECK, trusted/enabled. Không status FK, không cần đổi FK hiện có; không backfill |
 | EF/entity | `src/Backend/FourChang.Infrastructure/Database/Configurations/Orders/DonHangConfiguration.cs`; `src/Backend/FourChang.Domain/Entities/Orders/DonHang.cs` | TrangThai là string, không có enum trung tâm; đồng bộ CHECK/varchar(25), giữ rowversion/deadline. Không tự dùng HoanTatLuc làm mốc expiry |
 | Payment/holds | `Configurations/Payments/ThanhToanConfiguration.cs`, `Configurations/Inventory/GiuChoNguyenLieuConfiguration.cs` dưới Infrastructure/Database | Đã có EXPIRED riêng; không thêm lại. Payment EXPIRED không chứng minh order đã terminal |
 | Partial/refund actor | `CK_HuyMon_3`, `CK_HoSoHoanTien_4` trong schema35 | Bắt buộc một Customer/Staff/Admin, không SYSTEM. Giữ `PARTIAL_EXPIRY_ACTOR_POLICY_REQUIRED`; không giả mạo Customer hoặc âm thầm nới CHECK |
@@ -131,7 +131,7 @@ BR-15: Web chỉ PENDING_CONFIRMATION sau khi thu đủ đã xác minh; hủy to
 
 | Nguồn | Kết quả khảo sát |
 | --- | --- |
-| `FourChang.Infrastructure.csproj` + `DatabaseBootstrap.cs` | Embed/use `docs/database/35-bang/schema.sql` và `model.json`; 34 bảng chỉ là nguồn upgrade cũ. Không dùng bản thiết kế gợi ý/SQL tiếng Anh để kết luận schema hiệu lực |
+| `FourChang.Infrastructure.csproj` + `DatabaseBootstrap.cs` | Embed/use `docs/database/migrations/35-bang/schema.sql` và `model.json`; 34 bảng chỉ là nguồn upgrade cũ. Không dùng bản thiết kế gợi ý/SQL tiếng Anh để kết luận schema hiệu lực |
 | `35-bang/schema.sql`, `DonHangConfiguration.cs` | CK_DonHang_7 cho DRAFT, PENDING_PAYMENT, PENDING_CONFIRMATION, ACCEPTED, PREPARING, READY, DELIVERING, COMPLETED, REJECTED, CANCELLED, DELIVERY_FAILED. Không có EXPIRED |
 | `DonHang.cs` | TrangThai là string varchar(25) theo mapping, không có enum đơn dùng chung; HetHanLuc, HoanTatLuc, rowversion; chưa có trường phân loại hết hạn riêng |
 | `ThanhToanConfiguration.cs` | Payment: PENDING, PARTIAL, VERIFIED, EXPIRED, FAILED, RECONCILING. Không có PAID SQL; payment EXPIRED không chứng minh order đã kết thúc |

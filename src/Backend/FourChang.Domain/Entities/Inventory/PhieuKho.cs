@@ -9,6 +9,10 @@ public sealed class PhieuKho
     public string? TenNhaCungCapDaChot { get; set; }
     public string? MaMucDich { get; set; }
     public string? LyDo { get; set; }
+    /// <summary>Ngày nhập/xuất do quản lý chọn; null dành cho chứng từ lịch sử trước khi có trường này.</summary>
+    public DateOnly? NgayThucHien { get; set; }
+    /// <summary>Lỗi nghiệp vụ khi phiếu hẹn ngày không ghi sổ được; chờ Admin sửa hoặc hủy.</summary>
+    public string? LoiXuLy { get; set; }
     public DateTime? MocKiemKe { get; set; }
     public long? MaPhieuBiDao { get; set; }
     public long MaQuanLyLap { get; set; }

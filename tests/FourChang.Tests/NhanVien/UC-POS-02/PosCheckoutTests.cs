@@ -4,6 +4,7 @@ using static FourChang.Tests.Shared.TestData;
 namespace FourChang.Tests.Staff;
 
 /// <summary>Chạy HTTP/SQL thật trong database riêng: giỏ nhiều món, thu tiền, giữ kho, replay và QR mô phỏng.</summary>
+[Trait("Actor", "NhanVien"), Trait("UseCase", "UC-POS-02")]
 public sealed class PosCheckoutTests
 {
     /// <summary>Thu CASH đủ tiền phát hành một hóa đơn; QR GET không thu, POST mô phỏng một lần và tự đổi trạng thái.</summary>

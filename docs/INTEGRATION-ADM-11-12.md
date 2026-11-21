@@ -13,7 +13,7 @@ Theo `dac-25-Uc.docx`: ADM-11 quản lý danh sách nhân viên; ADM-12 quản l
 | Desktop Admin | Presentation/FourChang.Desktop/Admin/Employees; Admin/WorkSessions | Danh sách, biểu mẫu, đối chiếu chỉ đọc nguồn |
 | Desktop POS | Presentation/FourChang.Desktop/Staff/WorkSessions | Nhân viên nhập và gửi số thực đếm; khôi phục giới hạn |
 | Bảo vệ phiên local | Presentation/FourChang.Desktop/Shared/Security/ShiftSessionFile.cs | Windows DPAPI; chỉ lưu Staff/reconciliation, kiểm tra lại máy chủ |
-| Test | tests/FourChang.Tests/QuanLy/UC-ADM-11, UC-ADM-12 | Chung project xUnit hiện có |
+| Test | tests/FourChang.Tests/QuanLy/UC-ADM-08, UC-ADM-12 | Chung project xUnit hiện có |
 
 ## Contract và quy tắc tích hợp
 
@@ -61,7 +61,7 @@ Khóa tạm được phân biệt với chờ đối chiếu qua nhật ký life
 ## Database và cấu hình
 
 - Giữ 37 bảng, 74 FK; không thêm cột/bảng trong ADM-11/12. Giữ dữ liệu hiện hữu.
-- Đã được duyệt cấp DELETE riêng `dbo.NhanVien`. Với database cũ, chạy `docs/database/37-bang/005-employee-delete-permission.sql` trong FourChangDb bằng quyền quản trị. Bootstrap mới cũng áp dụng whitelist này.
+- Đã được duyệt cấp DELETE riêng `dbo.NhanVien`. Với database cũ, chạy `docs/database/migrations/37-bang/005-employee-delete-permission.sql` trong FourChangDb bằng quyền quản trị. Bootstrap mới cũng áp dụng whitelist này.
 - Không cấp DELETE ca, tiền, nhật ký. API vẫn kiểm tra tham chiếu, phiên bản, quyền và audit nguyên tử.
 - `FOURCHANG_POS_KEY` là khóa ký phía server theo tên cấu hình hiện có, không đưa vào client/Git. Không gửi khóa ký cho POS.
 - `.env` nằm ngoài Git; mỗi thành viên cấu hình local theo `.env.example`. Không chia sẻ token/mật khẩu trong commit.

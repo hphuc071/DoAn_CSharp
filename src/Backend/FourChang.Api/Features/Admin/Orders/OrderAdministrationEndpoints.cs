@@ -5,10 +5,10 @@ using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Api.Features.Admin.Orders;
 
-/// <summary>UC-ADM-07: Admin giám sát; POS gọi cùng service cho tiến trình, không được gọi ngoại lệ Admin.</summary>
+/// <summary>UC-ADM-05: Quản lý theo dõi và quyết định yêu cầu hủy; thao tác pha chế thuộc POS.</summary>
 public static class OrderAdministrationEndpoints
 {
-    /// <summary>Đăng ký truy vấn/phân trang, lệnh có version và địa chỉ có chấp thuận.</summary>
+    /// <summary>Đăng ký truy vấn, quyết định có phiên bản và giữ endpoint địa chỉ cũ trả lỗi rõ ràng.</summary>
     public static void MapOrderAdministration(this WebApplication app)
     {
         var g = app.MapGroup("/api/admin/orders").RequireAuthorization("Admin");

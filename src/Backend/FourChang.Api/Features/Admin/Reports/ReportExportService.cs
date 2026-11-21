@@ -15,7 +15,7 @@ public sealed class ReportExportService(CafeDbContext db, ReportSnapshotStore st
     {
         var actor = Actor(context); var snapshot = await store.Read(input.MaSnapshot, actor);
         permissions.Demand(snapshot.Audit ? "AuditExport" : "ReportsExport");
-        if (input.DinhDang is not ("PDF" or "EXCEL")) throw new AdminRule(400, "Chỉ xuất Excel hoặc PDF.");
+        if (input.DinhDang != "EXCEL") throw new AdminRule(400, "Báo cáo tinh gọn chỉ xuất Excel. Tải PDF hóa đơn ở trang Hóa đơn.");
         return await AdminOperation.Execute(db, input.MaThaoTac, "REPORT_EXPORT_REQUEST", "ReportExport", input, context, async () =>
         {
             var job = new ReportExportJob(Guid.NewGuid(), "QUEUED", 0, null, input.MaSnapshot, input.DinhDang, snapshot.Snapshot.MocDuLieu);

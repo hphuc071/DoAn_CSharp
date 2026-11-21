@@ -75,7 +75,7 @@ dotnet run --project src/Backend/FourChang.Api/FourChang.Api.csproj --no-build -
 dotnet run --project src/Backend/FourChang.Api/FourChang.Api.csproj --no-build -- --check-db
 ```
 
-Trước nâng cấp database có dữ liệu: dừng API đang ghi, backup SQL Server và xác minh backup. `--init-db` kiểm tra đúng schema cũ trước khi áp dụng `docs/database/37-bang/006-admin-operations-and-finance.sql`. Không chạy EnsureDeleted/reset/reseed để thay migration. Sau nâng cấp phải là **37 bảng nghiệp vụ, 74 FK**; `sysdiagrams` giữ nguyên và không tính bảng nghiệp vụ.
+Trước nâng cấp database có dữ liệu: dừng API đang ghi, backup SQL Server và xác minh backup. `--init-db` kiểm tra đúng schema cũ trước khi áp dụng `docs/database/migrations/37-bang/006-admin-operations-and-finance.sql`. Không chạy EnsureDeleted/reset/reseed để thay migration. Sau nâng cấp phải là **37 bảng nghiệp vụ, 74 FK**; `sysdiagrams` giữ nguyên và không tính bảng nghiệp vụ.
 
 Khởi động backend bằng `Chay-Backend.cmd`; mở quản lý bằng `Chay-QuanLy.cmd` sau khi backend ready. Các route menu hiện có: Chứng từ kho, Đơn hàng, Hóa đơn, Hoàn tiền, Báo cáo và nhật ký.
 

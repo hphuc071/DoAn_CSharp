@@ -2389,6 +2389,16 @@
           "name": "PhienBanDuLieu",
           "sql": "rowversion",
           "nullable": false
+        },
+        {
+          "name": "NgayThucHien",
+          "sql": "date",
+          "nullable": true
+        },
+        {
+          "name": "LoiXuLy",
+          "sql": "nvarchar(500)",
+          "nullable": true
         }
       ],
       "checks": [

@@ -1,4 +1,4 @@
-﻿# UC-ADM-02 — Quản lý thực đơn và công thức
+# UC-ADM-02 — Quản lý thực đơn và công thức
 
 Nguồn: `Dac-ta-8-UC-Quan-ly-Quy-tac-lien-quan.docx`, bản tinh gọn đã chốt ngày 15/11/2026. Thay nội dung ADM02 theo số cũ. Chỉ áp dụng **BR-03, BR-08, BR-11, BR-12, BR-13, BR-23, BR-24, BR-28, BR-29, BR-38**.
 
@@ -27,7 +27,7 @@ Giữ 30 bảng và toàn bộ dữ liệu lịch sử; bổ sung duy nhất Con
 
 BR03 dùng **khả dụng = tồn thực tế − giữ chỗ** thống nhất catalog, Web checkout, POS checkout và đọc tồn. Chưa bỏ cột/giao diện tồn an toàn của UC-ADM-03 cũ; cột đó không còn làm giảm khả dụng.
 
-Test API/SQL và Browser ở `tests/FourChang.Tests/QuanLy/UC-ADM-02`; test công thức tái sử dụng `QuanLy/UC-ADM-04/RecipeAdministrationTests.cs` nhưng gắn Trait UC-ADM-02. Test WinForms tái sử dụng AdminFeaturesUiTests. Mọi test ghi trên DB GUID riêng; không xóa/reset dữ liệu FourChangDb.
+Test API/SQL và Browser ở `tests/FourChang.Tests/QuanLy/UC-ADM-02`; test công thức tái sử dụng `QuanLy/UC-ADM-02/RecipeAdministrationTests.cs` nhưng gắn Trait UC-ADM-02. Test WinForms tái sử dụng AdminFeaturesUiTests. Mọi test ghi trên DB GUID riêng; không xóa/reset dữ liệu FourChangDb.
 
 ## Form công thức dễ dùng — 15/11/2026
 
@@ -84,3 +84,11 @@ POST /api/admin/menu/variants/batch lưu một transaction/receipt/audit/outbox;
 ## Định lượng topping ngay trong form
 
 Form Topping chọn nguyên liệu kho, nhập lượng mỗi phần (g/ml tự theo nguyên liệu), giá, giới hạn phần/ly và Đang sử dụng. MenuManagementPage nạp nguyên liệu/công thức vào form. Lưu tự tạo/sửa BOM FIXED một nguyên liệu trong cùng transaction topping, audit/receipt/outbox menu; lỗi lượng hoặc phiên bản công thức hoàn tác cả topping. SaveCore công thức được dùng lại nên giữ BOM/đơn cũ bất biến. DTO DinhLuong tùy chọn để client cũ giữ nguyên công thức. Công thức nhiều nguyên liệu cũ có lựa chọn Giữ định lượng hiện tại, không tự chuyển đổi dữ liệu quán. Không thay schema.
+
+## Danh sách công thức chỉ dành cho món — 18/11/2026
+- Tab Công thức không liệt kê topping, không có bộ lọc Món/Topping hoặc nút thêm size. Hai thao tác: Thêm công thức và Chỉnh sửa/nhấp đúp; cấu hình size vẫn ở tab Cấu hình món.
+- Bảng gồm Tên món, Size, Nóng/lạnh, Nguyên liệu, Tình trạng. Size hiển thị đủ S/M/L đúng thứ tự; số nguyên liệu là số loại khác nhau trong toàn bộ size/nhiệt độ của món. Trạng thái phân biệt chưa có/chưa đủ/đã có công thức.
+- Topping tiếp tục nhập nguyên liệu và lượng mỗi phần ở tab Topping; công thức nội bộ và lịch sử giữ nguyên để tính kho. Không đổi API, schema hoặc dữ liệu quán.
+
+## Bỏ lựa chọn cách tính thủ công — 18/11/2026
+Bảng công thức món chỉ hiện Nguyên liệu, Đơn vị và lượng từng size. Thêm Đường/Đá tự chọn cách tính theo phần trăm; nguyên liệu khác dùng lượng cố định. Công thức đã lưu giữ cách tính hiện có khi mở/sửa; không tự cập nhật database. Đường/đá khai báo lượng ở mức100%; bảng Nóng không dùng đá.

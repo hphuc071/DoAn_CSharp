@@ -182,6 +182,10 @@ internal static class PosSalesUiChecks
                 }
                 catch(Exception error){failure=error;dialog.Close();handled=true;}
             };
+            var workspace=Controls(shell).OfType<FourChang.Desktop.Shared.Orders.OrdersWorkspacePage>().Single();
+            var busy=typeof(FourChang.Desktop.Shared.Controls.Admin.AdminWorkspacePage<AdminOrderRow>)
+                .GetField("Busy",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+            await AdminFeaturesUiTests.WaitUntil(()=>!(bool)busy.GetValue(workspace)!);
             timer.Start();Controls(shell).OfType<Button>().Single(x=>x.Name=="OrderNextAction").PerformClick();
             try { await AdminFeaturesUiTests.WaitUntil(()=>handled&&!Application.OpenForms.Cast<Form>().Any(x=>Controls(x).OfType<Button>().Any(b=>b.Name=="CommandConfirm"))); }
             catch(Exception error)

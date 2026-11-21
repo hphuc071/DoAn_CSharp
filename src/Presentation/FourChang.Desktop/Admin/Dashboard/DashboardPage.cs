@@ -1,88 +1,102 @@
-﻿using System.Globalization;
+using System.Globalization;
 using FourChang.Desktop.Shared.Controls;
+using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shared.Theme;
 using FourChang.Desktop.Shell;
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Presentation.Shared.Contracts.Common;
-using FourChang.Presentation.Shared.Contracts.Customer;
 
 namespace FourChang.Desktop.Admin.Dashboard;
 
-/// <summary>Dashboard chỉ trình bày số liệu thật từ API; không tạo biểu đồ hoặc xu hướng giả.</summary>
+/// <summary>Tổng quan chỉ đọc: cùng số liệu đơn hoàn thành với Báo cáo, không dùng tiền thu làm doanh thu.</summary>
 public static class DashboardPage
 {
-    /// <summary>Giữ bốn KPI và các vùng doanh thu/thực đơn/kho/nhật ký theo bố cục đang có.</summary>
     public static Control Create() => new DashboardWorkspace();
 
-    /// <summary>Quản lý trạng thái tải và vùng nội dung; refresh thất bại vẫn giữ dữ liệu đã tải có nhãn thời điểm.</summary>
     private sealed class DashboardWorkspace : UserControl
     {
-        private readonly Label sync = Ui.Label("Đang lấy số liệu hoạt động…", 9, false, CafeTheme.Muted);
-        private readonly Button reload = Ui.Button("Làm mới", () => { });
+        private readonly Label status = Ui.Label("Đang tải tổng quan…", 9, false, CafeTheme.Muted);
+        private readonly Button reload = Ui.Button("Tải lại", () => { });
         private readonly Panel content = new() { Dock = DockStyle.Top, AutoSize = true, Margin = Padding.Empty };
         private bool loading;
         private bool started;
-        private DateTime? loadedAt;
+        private bool hasSnapshot;
+        private string? boundSnapshot;
+        private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
 
-        /// <summary>Tạo thanh cập nhật và vùng nội dung co giãn; không đổi sidebar hay header của MainForm.</summary>
         internal DashboardWorkspace()
         {
             Name = "DashboardWorkspace"; Dock = DockStyle.Top; AutoSize = true;
-            AutoSizeMode = AutoSizeMode.GrowAndShrink; BackColor = CafeTheme.Cream; Padding = new Padding(16);
-            var toolbar = new TableLayoutPanel { Dock = DockStyle.Top, Height = 54, ColumnCount = 2, Margin = Padding.Empty };
-            toolbar.ColumnStyles.Add(new(SizeType.Percent, 100)); toolbar.ColumnStyles.Add(new(SizeType.Absolute, 128));
-            sync.Dock = DockStyle.Fill; sync.AutoSize = false; sync.TextAlign = ContentAlignment.MiddleLeft;
-            reload.Dock = DockStyle.Top; reload.Height = 44; reload.Name = "DashboardReload";
-            toolbar.Controls.Add(sync, 0, 0); toolbar.Controls.Add(reload, 1, 0);
-            Controls.Add(content); Controls.Add(toolbar);
+            AutoSizeMode = AutoSizeMode.GrowAndShrink; BackColor = CafeTheme.Cream;
+            Padding = new Padding(16); DoubleBuffered = true;
+            var header = Ui.Stack(Ui.Label("4CHANG  /  TỔNG QUAN", 8, true, CafeTheme.Coffee),
+                Ui.Label("Tổng quan hoạt động", 18, true),
+                Ui.Label("Toàn bộ thời gian • Web và POS • Chỉ cộng tiền đơn đã hoàn thành", 9));
+            reload.Name = "DashboardReload";
+            var actions = Ui.Row(reload, Link("Đơn hàng", "manage-orders", "DashboardOrdersLink"),
+                Link("Hoàn tiền", "refunds", "DashboardRefundsLink"), Link("Báo cáo", "reports", "DashboardReportsLink"));
+            OperationsPresentation.FitRows(actions);
+            status.Visible = true;
+            status.TextChanged += (_, _) => status.Visible = !string.IsNullOrWhiteSpace(status.Text);
+            Controls.Add(AdminListLayout.Column(header, actions, status, content));
             reload.Click += async (_, _) => await LoadSnapshot();
             HandleCreated += async (_, _) => { if (started) return; started = true; await LoadSnapshot(); };
         }
 
-        /// <summary>Chỉ thay nội dung khi cả bốn nguồn đọc thành công, tránh trộn số mới và dữ liệu cũ trên cùng dashboard.</summary>
+        /// <summary>Tái sử dụng báo cáo hiện hành để giá snapshot, topping, ly hủy và phí giao luôn khớp.</summary>
         private async Task LoadSnapshot()
         {
             if (loading || IsDisposed) return;
-            loading = true; reload.Enabled = false; sync.Text = "Đang cập nhật số liệu…";
+            loading = true; reload.Enabled = false; status.Text = "Đang tải tổng quan…";
             try
             {
-                var totals = LiveSession.Api.DashboardAsync();
-                var menu = LiveSession.Api.GetMenuAsync();
-                var stock = LiveSession.Api.GetInventoryAsync();
-                var audit = LiveSession.Api.ReadTableAsync("NhatKyHeThong");
-                await Task.WhenAll(totals, menu, stock, audit);
+                var reportTask = LiveSession.Api.GetReportAsync(new ReportFilter(
+                    DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc), DateTime.UtcNow));
+                var totalsTask = LiveSession.Api.DashboardAsync();
+                var stockTask = LiveSession.Api.GetInventoryAsync();
+                await Task.WhenAll(reportTask, totalsTask, stockTask);
                 if (IsDisposed) return;
-                Render(await totals, await menu, await stock, await audit);
-                loadedAt = DateTime.Now;
-                sync.Text = "";
-                sync.ForeColor = CafeTheme.Muted;
+                var report = await reportTask; var totals = await totalsTask; var stock = await stockTask;
+                // Không đưa mã snapshot/thời điểm tải vào phép so sánh: tải lại cùng dữ liệu không dựng lại bảng.
+                var signature = System.Text.Json.JsonSerializer.Serialize(new { report.ChiSo, report.Bang, totals.PendingRefunds, stock.NguyenLieu });
+                if (signature != boundSnapshot)
+                {
+                    Render(report, totals, stock); boundSnapshot = signature;
+                }
+                hasSnapshot = true; status.Text = ""; status.ForeColor = CafeTheme.Muted;
             }
             catch (CafeApiException error)
             {
                 if (IsDisposed) return;
-                sync.Text = error.Message + (loadedAt is null ? " Chưa tải được số liệu." : " · Đang hiển thị dữ liệu đã tải trước đó.");
-                sync.ForeColor = CafeTheme.Danger;
+                status.Text = error.Message + (hasSnapshot ? " Đang giữ dữ liệu đã tải trước đó." : " Chưa tải được tổng quan.");
+                status.ForeColor = CafeTheme.Danger;
             }
             finally { loading = false; if (!reload.IsDisposed) reload.Enabled = true; }
         }
 
-        /// <summary>Ánh xạ DTO vào control; công thức doanh thu và số đơn vẫn do API hiện hữu cung cấp.</summary>
-        private void Render(DashboardData data, List<MenuProduct> menu, StockSnapshot stock, TableData audit)
+        private void Render(ReportSnapshot report, DashboardData totals, StockSnapshot stock)
         {
-            var summary = Ui.Kpis(("Thực thu sau hoàn", MoneyDisplay.Format(data.Revenue), "Thu đã xác minh trừ chi hoàn"),
-                ("Đơn hoàn tất", data.CompletedOrders.ToString(), "Đã phục vụ / giao thành công"),
-                ("Chờ hoàn tiền", data.PendingRefunds.ToString(), "Hồ sơ chưa hoàn tất"),
-                ("Nguyên liệu cảnh báo", data.LowIngredients.ToString(), "Theo tồn kho và lượng giữ"));
-            var top = Ui.Columns(Card("Tổng quan doanh thu", "Số liệu thực thu hiện tại", Revenue(data), 278),
-                Card("Thực đơn đang bán", "Giá và trạng thái từ thực đơn chung", Products(menu), 278), 36);
-            var lower = Ui.Columns(Card("Nguyên liệu và tồn kho", "Khả dụng = tồn thực tế − giữ chỗ", StockGrid(stock), 300),
-                Card("Nhật ký gần đây", "Các thao tác mới nhất đã được ghi nhận", AuditGrid(audit), 300), 50);
-            var body = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-            body.ColumnStyles.Add(new(SizeType.Percent, 100));
-            foreach (var section in new Control[] { summary, top, lower })
-            { section.Dock = DockStyle.Top; section.Margin = new Padding(0, 0, 0, 16); body.Controls.Add(section); }
+            var attention = stock.NguyenLieu.Count(x => x.CanhBao is "OUT" or "LOW" or "UNKNOWN");
+            var summary = Ui.Kpis(("Tiền đơn hoàn tất", MoneyDisplay.Format(report.ChiSo.DoanhThuThuan), "Gồm topping và phí giao"),
+                ("Đơn hoàn thành", report.ChiSo.HoanTat.ToString("N0", Vietnamese), "Chỉ đơn phục vụ xong"),
+                ("Chờ hoàn tiền", totals.PendingRefunds.ToString("N0", Vietnamese), "Hồ sơ hoàn chưa kết thúc"),
+                ("Cần kiểm tra kho", attention.ToString("N0", Vietnamese), "Hết / sắp hết / chưa có tồn"));
+            summary.Name = "DashboardMetrics";
+            // Tổng quan chỉ cần ba cột; chi tiết khách/món nằm ở trang Đơn hàng.
+            var recent = new ReportTable("Đơn hoàn thành", [new("Mã đơn"), new("Tổng tiền", "number"), new("Hoàn thành lúc", "datetime")],
+                report.Bang[0].Dong.Take(6).Select(x => (IReadOnlyList<string?>)new[] { x[0], x[2], x[3] }).ToList());
+            var completed = Reports.ReportsManagementPage.Table(recent);
+            completed.Name = "DashboardCompletedOrders";
+            var stockGrid = StockGrid(stock);
+            var tables = Ui.Columns(Card("Đơn hoàn thành gần đây", "6 đơn mới nhất • Tổng tiền theo đơn đã chốt", completed,
+                    Link("Xem đơn hàng", "manage-orders", "DashboardCompletedLink")),
+                Card("Theo dõi tồn kho", "Ưu tiên nguyên liệu cần kiểm tra", stockGrid,
+                    Link("Xem tồn kho", "inventory", "DashboardInventoryLink")), 44);
+            var definition = Ui.Label("Tiền đã thu của đơn chưa hoàn thành chưa được cộng. Tiền hoàn được theo dõi riêng tại Báo cáo và Hoàn tiền.", 9, false, CafeTheme.Muted);
+            definition.MaximumSize = new Size(980, 0);
+            var body = AdminListLayout.Column(summary, definition, tables);
             content.SuspendLayout();
             var old = content.Controls.Cast<Control>().ToArray();
             content.Controls.Clear(); content.Controls.Add(body);
@@ -90,91 +104,52 @@ public static class DashboardPage
             content.ResumeLayout(true);
         }
 
-        /// <summary>Thẻ cùng chiều cao cho hai cột; tiêu đề/phụ đề tách khỏi bảng để không bị đè khi resize.</summary>
-        private static Control Card(string title, string subtitle, Control body, int height)
+        /// <summary>Nút điều hướng chỉ mở trang liên quan, không ghi hay sửa dữ liệu.</summary>
+        private static Button Link(string text, string route, string name)
         {
-            var panel = new SurfacePanel { Dock = DockStyle.Top, Height = height, AutoSize = false, Padding = new Padding(20), Margin = Padding.Empty };
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty };
+            var button = Ui.Button(text, () => { }); button.Name = name;
+            button.Click += (_, _) => (button.FindForm() as MainForm)?.Navigate(route);
+            return button;
+        }
+
+        private static Control Card(string title, string subtitle, DataGridView grid, Button link)
+        {
+            var panel = new AdminSurface { Dock = DockStyle.Top, Height = 480, Padding = new Padding(16), Margin = Padding.Empty };
+            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty };
             layout.ColumnStyles.Add(new(SizeType.Percent, 100));
-            layout.RowStyles.Add(new(SizeType.Absolute, 30)); layout.RowStyles.Add(new(SizeType.Absolute, 30)); layout.RowStyles.Add(new(SizeType.Percent, 100));
-            var heading = Ui.Label(title, 12, true); heading.Dock = DockStyle.Fill; heading.AutoSize = false; heading.Margin = Padding.Empty; heading.TextAlign = ContentAlignment.MiddleLeft;
-            var detail = Ui.Label(subtitle, 9, false, CafeTheme.Muted); detail.Dock = DockStyle.Fill; detail.AutoSize = false; detail.Margin = Padding.Empty; detail.TextAlign = ContentAlignment.MiddleLeft;
-            body.Dock = DockStyle.Fill; body.Margin = Padding.Empty;
-            layout.Controls.Add(heading, 0, 0); layout.Controls.Add(detail, 0, 1); layout.Controls.Add(body, 0, 2);
+            layout.RowStyles.Add(new(SizeType.Absolute, 32)); layout.RowStyles.Add(new(SizeType.Absolute, 34));
+            layout.RowStyles.Add(new(SizeType.Percent, 100)); layout.RowStyles.Add(new(SizeType.Absolute, 52));
+            var heading = Ui.Label(title, 12, true); heading.Dock = DockStyle.Fill;
+            var detail = Ui.Label(subtitle, 9, false, CafeTheme.Muted); detail.Dock = DockStyle.Fill;
+            grid.Dock = DockStyle.Fill; grid.Margin = Padding.Empty;
+            layout.Controls.Add(heading, 0, 0); layout.Controls.Add(detail, 0, 1); layout.Controls.Add(grid, 0, 2);
+            var actions = Ui.Row(link); actions.Dock = DockStyle.Fill; layout.Controls.Add(actions, 0, 3);
             panel.Controls.Add(layout); return panel;
         }
 
-        /// <summary>Hiển thị tổng tiền rõ ràng thay các đường biểu đồ không có dữ liệu thời gian.</summary>
-        private static Control Revenue(DashboardData data)
+        /// <summary>Giữ đơn vị g/ml, số vi-VN và tồn chưa xác định; không giả tồn thiếu là 0.</summary>
+        private static DataGridView StockGrid(StockSnapshot snapshot)
         {
-            var panel = new Panel { Dock = DockStyle.Fill, BackColor = CafeTheme.Soft, Padding = new Padding(14) };
-            var amount = Ui.Label(MoneyDisplay.Format(data.Revenue), 30, true, CafeTheme.Coffee);
-            amount.Dock = DockStyle.Top; amount.AutoSize = false; amount.Height = 56; amount.Name = "DashboardRevenue";
-            var description = Ui.Label("Thu đã xác minh, sau khi trừ các lần hoàn tiền thành công.", 10, false, CafeTheme.Muted);
-            description.Dock = DockStyle.Top; description.AutoSize = false; description.Height = 40;
-            var action = Ui.Button("Xem hóa đơn", () => (panel.FindForm() as MainForm)?.Navigate("invoices"));
-            action.Dock = DockStyle.Bottom;
-            panel.Controls.Add(description); panel.Controls.Add(amount); panel.Controls.Add(action); return panel;
-        }
-
-        /// <summary>Dùng ảnh, tên, giá và khả dụng từ catalog; không khai báo sản phẩm hay giá mẫu tại Dashboard.</summary>
-        private static Control Products(List<MenuProduct> menu)
-        {
-            var items = menu.Where(x => x.Available).Take(3).ToList();
-            if (items.Count == 0) return Ui.EmptyState("Chưa có món có thể đặt", "Kiểm tra thực đơn và nguyên liệu.", 170);
-            var rows = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = items.Count, Margin = Padding.Empty };
-            rows.ColumnStyles.Add(new(SizeType.Absolute, 68)); rows.ColumnStyles.Add(new(SizeType.Percent, 100));
-            for (var index = 0; index < items.Count; index++)
+            var grid = Ui.Grid(new([], []), 300); grid.AutoGenerateColumns = false; grid.Name = "DashboardStock";
+            foreach (var column in new[] { ("Ten", "Nguyên liệu", 135f), ("DonVi", "Đơn vị", 50f), ("KhaDung", "Khả dụng", 90f), ("TrangThai", "Trạng thái", 110f) })
+                grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = column.Item1, HeaderText = column.Item2, FillWeight = column.Item3, SortMode = DataGridViewColumnSortMode.NotSortable });
+            CommerceWorkspaceVisuals.FormatGrid(grid);
+            grid.RowTemplate.Height = 48; grid.ColumnHeadersHeight = 46; grid.ColumnHeadersDefaultCellStyle.Font = CafeTheme.Strong(8.5f);
+            foreach (DataGridViewColumn column in grid.Columns)
             {
-                var item = items[index]; rows.RowStyles.Add(new(SizeType.Percent, 100f / items.Count));
-                var image = CatalogImage.Create(item.ImagePath ?? "sprite:" + item.ImageIndex, item.Name, 52);
-                image.Size = new Size(52, 52); image.Margin = Padding.Empty;
-                var text = Ui.Stack(Ui.Label(item.Name, 10, true), Ui.Label(MoneyDisplay.Format(item.Price), 9, true, CafeTheme.Coffee));
-                text.Dock = DockStyle.Fill; rows.Controls.Add(image, 0, index); rows.Controls.Add(text, 1, index);
+                column.MinimumWidth = column.DataPropertyName switch { "Ten" => 100, "DonVi" => 74, "KhaDung" => 100, _ => 90 };
+                column.DefaultCellStyle.Padding = new Padding(6, 6, 6, 6);
+                column.HeaderCell.Style.Padding = new Padding(3, 6, 3, 6);
+                if (column.DataPropertyName == "KhaDung")
+                { column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleRight; }
             }
-            return rows;
-        }
-
-        /// <summary>Tạo bảng vừa vùng chứa, tooltip giữ nội dung dài; mã đơn vị kỹ thuật không được dùng thay ký hiệu đơn vị.</summary>
-        private static DataGridView Grid(params (string Property, string Title, float Weight)[] columns)
-        {
-            var grid = Ui.Grid(new([], []), 200); grid.AutoGenerateColumns = false; grid.Dock = DockStyle.Fill;
-            grid.ColumnHeadersHeight = 38; grid.RowTemplate.Height = 42; grid.Font = CafeTheme.Body(9);
-            foreach (var column in columns)
-                grid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = column.Property, HeaderText = column.Title, FillWeight = column.Weight, SortMode = DataGridViewColumnSortMode.NotSortable });
-            return grid;
-        }
-
-        /// <summary>Tồn theo DTO ADM-05, ưu tiên cảnh báo; không tính lại hoặc ghi số dư tại Dashboard.</summary>
-        private static Control StockGrid(StockSnapshot snapshot)
-        {
-            var grid = Grid(("Ten", "Nguyên liệu", 150), ("DonVi", "Đơn vị", 75), ("KhaDung", "Khả dụng", 90), ("TrangThai", "Trạng thái", 100));
-            grid.Name = "DashboardStock";
-            grid.DataSource = snapshot.NguyenLieu.OrderBy(x => x.CanhBao switch { "OUT" => 0, "LOW" => 1, "UNKNOWN" => 2, _ => 3 }).ThenBy(x => x.MaNguyenLieu)
+            grid.DataSource = snapshot.NguyenLieu.OrderBy(x => x.CanhBao switch { "OUT" => 0, "LOW" => 1, "UNKNOWN" => 2, _ => 3 }).ThenBy(x => x.MaNguyenLieu).Take(6)
                 .Select(x => new
                 {
-                    Ten = x.TenNguyenLieu,
-                    x.DonVi,
-                    KhaDung = x.KhaDung?.ToString("#,##0.####", CultureInfo.GetCultureInfo("vi-VN")) ?? "Chưa xác định",
-                    TrangThai = x.CanhBao switch { "OUT" => "Hết", "LOW" => "Sắp hết", "UNKNOWN" => "Chưa xác định", _ => "Còn" }
+                    Ten = x.TenNguyenLieu, x.DonVi,
+                    KhaDung = x.KhaDung?.ToString("#,##0.####", Vietnamese) ?? "Chưa có tồn",
+                    TrangThai = x.CanhBao switch { "OUT" => "Hết", "LOW" => "Sắp hết", "UNKNOWN" => "Chưa có tồn", _ => "Còn" }
                 }).ToList();
-            return grid;
-        }
-
-        /// <summary>Lấy cột theo tên contract thay vì vị trí, tránh nhầm người thực hiện khi server bổ sung cột.</summary>
-        private static string Cell(TableData data, string[] row, string key)
-        {
-            var index = Array.IndexOf(data.Columns, key);
-            return index >= 0 && index < row.Length ? row[index] : "";
-        }
-
-        /// <summary>Hiển thị nhật ký mới nhất trong tập API trả về, không đưa JSON nhạy cảm vào tooltip hay bảng.</summary>
-        private static Control AuditGrid(TableData data)
-        {
-            var grid = Grid(("ThoiDiem", "Thời điểm", 105), ("Nguoi", "Người thực hiện", 115), ("ThaoTac", "Thao tác", 150));
-            grid.Name = "DashboardAudit";
-            grid.DataSource = data.Rows.OrderByDescending(row => long.TryParse(Cell(data, row, "MaNhatKy"), out var id) ? id : 0).Take(12)
-                .Select(row => new { ThoiDiem = Cell(data, row, "PhatSinhLuc"), Nguoi = Cell(data, row, "TenNguoiThucHienDaChot"), ThaoTac = Cell(data, row, "HanhDong") }).ToList();
             return grid;
         }
     }
