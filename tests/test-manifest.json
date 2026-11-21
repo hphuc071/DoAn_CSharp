@@ -265,9 +265,11 @@
   ],
   "databaseSchema": {
     "tables": 30,
-    "foreignKeys": 64,
+    "columns": 402,
+    "foreignKeys": 63,
     "manifest": "../docs/database/30-bang/model.json",
     "migrationTests": "FourChang.Tests/TichHop/Schema30MigrationTests.cs",
+    "columnSimplificationTests": "FourChang.Tests/TichHop/ColumnSimplificationTests.cs",
     "filter": "UseCase=Schema30"
   }
 }

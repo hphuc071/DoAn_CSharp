@@ -15,7 +15,7 @@ public sealed class Schema30MigrationTests
         await using var api = await TestApi.Start("Schema30-StockSchedule", beforeInitialize: async f =>
         {
             await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
-            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
+            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/migrations/30-bang/schema-before-column-simplification.sql"));
             await f.Sql(schema.Replace(" [LoiXuLy] nvarchar(500) NULL,", "").Replace("TrangThai IN ('DRAFT','SCHEDULED','FAILED','POSTED','CANCELLED')", "TrangThai IN ('DRAFT','POSTED')"));
             await f.Sql("INSERT dbo.TaiKhoanQuanLy(TenDangNhapChuanHoa,HoTen,MatKhauBam,TrangThai,BatBuocDoiMatKhau,SoLanDangNhapSai) VALUES('quanly',N'Quản lý',REPLICATE('x',64),'ACTIVE',0,0); INSERT dbo.PhieuKho(SoPhieuKho,LoaiPhieu,TrangThai,MaQuanLyLap,MaThaoTac,LyDo) VALUES('PN-OLD','RECEIPT','DRAFT',1,NEWID(),N'Nháp giữ nguyên');");
             before = await f.Sql("SELECT SoPhieuKho,TrangThai,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho='PN-OLD' FOR JSON PATH");
@@ -33,7 +33,7 @@ public sealed class Schema30MigrationTests
         await using var api = await TestApi.Start("Schema30-StockDate", beforeInitialize: async f =>
         {
             await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
-            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
+            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/migrations/30-bang/schema-before-column-simplification.sql"));
             await f.Sql(schema.Replace(" [LoiXuLy] nvarchar(500) NULL,", "").Replace(" [NgayThucHien] date NULL,", ""));
             await f.Sql("INSERT dbo.TaiKhoanQuanLy(TenDangNhapChuanHoa,HoTen,MatKhauBam,TrangThai,BatBuocDoiMatKhau,SoLanDangNhapSai) VALUES('quanly',N'Quản lý',REPLICATE('x',64),'ACTIVE',0,0); INSERT dbo.PhieuKho(SoPhieuKho,LoaiPhieu,TrangThai,MaQuanLyLap,MaThaoTac,LyDo) VALUES('PN-CU','RECEIPT','DRAFT',1,NEWID(),N'Nháp cũ'); INSERT dbo.PhieuKho(SoPhieuKho,LoaiPhieu,TrangThai,MaQuanLyLap,MaQuanLyDuyet,GhiSoLuc,MaThaoTac,LyDo) VALUES('PX-CU','ISSUE','POSTED',1,1,SYSUTCDATETIME(),NEWID(),N'Đã chốt');");
             original = await f.Sql("SELECT SoPhieuKho,TrangThai,LyDo,PhienBanDuLieu FROM dbo.PhieuKho WHERE SoPhieuKho IN ('PN-CU','PX-CU') ORDER BY MaPhieuKho FOR JSON PATH");
@@ -52,7 +52,7 @@ public sealed class Schema30MigrationTests
         await using var api = await TestApi.Start("Schema30-RecipeDefaults", beforeInitialize: async f =>
         {
             await f.Sql($"CREATE DATABASE [{f.Database}]", "master");
-            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/30-bang/schema.sql"));
+            var schema = await File.ReadAllTextAsync(Path.Combine(TestApi.Root, "docs/database/migrations/30-bang/schema-before-column-simplification.sql"));
             schema = schema.Replace(" [LoiXuLy] nvarchar(500) NULL,", "").Replace(" [NgayThucHien] date NULL,", "").Replace(" [PhanTramDuongMacDinh] int NOT NULL CONSTRAINT DF_CongThuc_PhanTramDuongMacDinh DEFAULT(50),", "")
                 .Replace(" CONSTRAINT [CK_CongThuc_DuongMacDinh] CHECK (PhanTramDuongMacDinh IN (0,25,50,75,100)),", "");
             await f.Sql(schema);
@@ -93,7 +93,7 @@ public sealed class Schema30MigrationTests
     {
         await using var api = await TestApi.Start("Schema30-PopulatedUpgrade", beforeInitialize: Prepare37);
         Assert.Equal("30", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0"));
-        Assert.Equal("64", await api.Sql("SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=0 AND is_not_trusted=0"));
+        Assert.Equal("63", await api.Sql("SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=0 AND is_not_trusted=0"));
         Assert.Equal("39000", await api.Sql("SELECT SoTienDaXacMinh FROM dbo.ThanhToan WHERE MaThanhToan=1"));
         Assert.Equal("39000", await api.Sql("SELECT SoTien FROM dbo.HoaDon WHERE MaHoaDon=1"));
         Assert.Equal("1000.0000|18.0000", await api.Sql("SELECT CONCAT(TonThucTe,'|',TongGiuCho) FROM dbo.TonKho WHERE MaNguyenLieu=1"));

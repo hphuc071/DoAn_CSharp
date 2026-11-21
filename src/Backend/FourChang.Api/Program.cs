@@ -40,7 +40,7 @@ try
         Console.WriteLine($"Đã thêm {added} khách hàng mẫu; dữ liệu hiện hữu được giữ nguyên.");
         return;
     }
-    if (args.Contains("--check-db")) { await using var connection = new SqlConnection(DatabaseSettings.ConnectionString()); await connection.OpenAsync(); await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("CHECK OK: đúng 30 bảng và 64 FK, kết nối bằng fourchang_app."); return; }
+    if (args.Contains("--check-db")) { await using var connection = new SqlConnection(DatabaseSettings.ConnectionString()); await connection.OpenAsync(); await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("CHECK OK: đúng 30 bảng, 402 thuộc tính và 63 FK, kết nối bằng fourchang_app."); return; }
     if (args.Contains("--test-db")) { await DatabaseChecks.RunAsync(); return; }
     var builder = WebApplication.CreateBuilder(args);
     // EXPIRED đã được chốt và migration hỗ trợ; chỉ bật đọc, không tự bật worker hay xác minh ngân hàng.

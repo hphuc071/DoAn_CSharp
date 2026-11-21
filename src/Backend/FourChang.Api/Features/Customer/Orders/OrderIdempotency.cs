@@ -141,7 +141,6 @@ internal static class OrderIdempotency
         KetQua = "SUCCESS",
         MaBamYeuCau = fingerprint,
         KetQuaDaChotJson = JsonSerializer.Serialize(receipt),
-        PhatSinhLuc = now,
-        ThoiDiemTao = now
+        PhatSinhLuc = now
     };
 }

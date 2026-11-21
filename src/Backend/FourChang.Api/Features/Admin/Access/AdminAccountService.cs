@@ -54,7 +54,7 @@ public sealed class AdminAccountService(CafeDbContext db)
         var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
         // Mật khẩu tạm chỉ mở phiên PASSWORD_CHANGE, không được mở Dashboard hoặc API Admin.
         db.PhienDangNhap.Add(new PhienDangNhap { MaQuanLy = 1, MaLamMoiDaBam = Passwords.TokenHash(token),
-            PhamViPhien = user.BatBuocDoiMatKhau ? "PASSWORD_CHANGE" : "FULL", LoaiUngDung = "DESKTOP",
+            PhamViPhien = user.BatBuocDoiMatKhau ? "PASSWORD_CHANGE" : "FULL",
             HetHanLuc = user.BatBuocDoiMatKhau ? DateTime.UtcNow.AddMinutes(15) : DateTime.UtcNow.AddHours(8) });
         var success = AuditFactory.Create("ADMIN", 1, "ADMIN_LOGIN_SUCCEEDED", "TaiKhoanQuanLy", 1);
         success.TenNguoiThucHienDaChot = user.HoTen; db.NhatKyHeThong.Add(success);

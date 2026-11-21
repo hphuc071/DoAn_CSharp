@@ -33,6 +33,8 @@
     <EmbeddedResource Include="../../../docs/database/30-bang/model-before-stock-schedule.json" LogicalName="FourChang.Model30BeforeStockSchedule.json" />
     <EmbeddedResource Include="../../../docs/database/30-bang/011-stock-document-schedule.sql" LogicalName="FourChang.StockSchedule.sql" />
     <EmbeddedResource Include="../../../docs/database/30-bang/model.json" LogicalName="FourChang.Model30.json" />
+    <EmbeddedResource Include="../../../docs/database/migrations/30-bang/model-before-column-simplification.json" LogicalName="FourChang.Model30BeforeColumnSimplification.json" />
+    <EmbeddedResource Include="../../../docs/database/30-bang/012-simplify-columns.sql" LogicalName="FourChang.SimplifyColumns.sql" />
     <EmbeddedResource Include="../../../docs/database/30-bang/schema.sql" LogicalName="FourChang.Schema30.sql" />
     <EmbeddedResource Include="../../../docs/database/30-bang/008-simplify-to-30.sql" LogicalName="FourChang.Upgrade30.sql" />
   </ItemGroup>

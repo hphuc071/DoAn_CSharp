@@ -228,24 +228,9 @@
           "nullable": false
         },
         {
-          "name": "LoaiUngDung",
-          "sql": "varchar(15)",
-          "nullable": false
-        },
-        {
-          "name": "ThongTinThietBi",
-          "sql": "nvarchar(300)",
-          "nullable": true
-        },
-        {
           "name": "HetHanLuc",
           "sql": "datetime2(3)",
           "nullable": false
-        },
-        {
-          "name": "HoatDongLanCuoiLuc",
-          "sql": "datetime2(3)",
-          "nullable": true
         },
         {
           "name": "ThuHoiLuc",
@@ -838,11 +823,6 @@
           "nullable": false
         },
         {
-          "name": "TonAnToan",
-          "sql": "decimal(18,4)",
-          "nullable": false
-        },
-        {
           "name": "NguongCanhBao",
           "sql": "decimal(18,4)",
           "nullable": false
@@ -876,7 +856,7 @@
         }
       ],
       "checks": [
-        "TonAnToan >= 0 AND NguongCanhBao >= TonAnToan",
+        "NguongCanhBao >= 0",
         "DonViCoSo IN ('g','ml')"
       ],
       "unique": [
@@ -1045,34 +1025,11 @@
           "name": "DinhMucCoSo",
           "sql": "decimal(18,4)",
           "nullable": false
-        },
-        {
-          "name": "TyLeHaoHut",
-          "sql": "decimal(9,6)",
-          "nullable": false
-        },
-        {
-          "name": "ThoiDiemTao",
-          "sql": "datetime2(3)",
-          "nullable": false,
-          "default": "SYSUTCDATETIME()"
-        },
-        {
-          "name": "ThoiDiemCapNhat",
-          "sql": "datetime2(3)",
-          "nullable": false,
-          "default": "SYSUTCDATETIME()"
-        },
-        {
-          "name": "PhienBanDuLieu",
-          "sql": "rowversion",
-          "nullable": false
         }
       ],
       "checks": [
         "LoaiDinhMuc IN ('FIXED','SUGAR','ICE')",
-        "DinhMucCoSo > 0",
-        "TyLeHaoHut >= 0 AND TyLeHaoHut < 1"
+        "DinhMucCoSo > 0"
       ],
       "unique": [],
       "indexes": [],
@@ -1102,16 +1059,6 @@
           "nullable": false
         },
         {
-          "name": "TenKhuVuc",
-          "sql": "nvarchar(100)",
-          "nullable": true
-        },
-        {
-          "name": "SoChoNgoi",
-          "sql": "int",
-          "nullable": true
-        },
-        {
           "name": "DangSuDung",
           "sql": "bit",
           "nullable": false
@@ -1134,9 +1081,7 @@
           "nullable": false
         }
       ],
-      "checks": [
-        "SoChoNgoi IS NULL OR SoChoNgoi > 0"
-      ],
+      "checks": [],
       "unique": [
         [
           "MaBanHienThi"
@@ -1170,11 +1115,6 @@
         },
         {
           "name": "MaCaLamViec",
-          "sql": "bigint",
-          "nullable": true
-        },
-        {
-          "name": "MaDonLienQuan",
           "sql": "bigint",
           "nullable": true
         },
@@ -1448,23 +1388,6 @@
         {
           "name": "GiaMoiPhanDaChot",
           "sql": "decimal(18,0)",
-          "nullable": false
-        },
-        {
-          "name": "ThoiDiemTao",
-          "sql": "datetime2(3)",
-          "nullable": false,
-          "default": "SYSUTCDATETIME()"
-        },
-        {
-          "name": "ThoiDiemCapNhat",
-          "sql": "datetime2(3)",
-          "nullable": false,
-          "default": "SYSUTCDATETIME()"
-        },
-        {
-          "name": "PhienBanDuLieu",
-          "sql": "rowversion",
           "nullable": false
         }
       ],
@@ -2215,11 +2138,6 @@
           "nullable": true
         },
         {
-          "name": "MaSoThueNguoiMua",
-          "sql": "varchar(30)",
-          "nullable": true
-        },
-        {
           "name": "SoTien",
           "sql": "decimal(18,0)",
           "nullable": false
@@ -2344,11 +2262,6 @@
           "nullable": true
         },
         {
-          "name": "MocKiemKe",
-          "sql": "datetime2(3)",
-          "nullable": true
-        },
-        {
           "name": "MaPhieuBiDao",
           "sql": "bigint",
           "nullable": true
@@ -2462,21 +2375,6 @@
           "nullable": true
         },
         {
-          "name": "TonSoDaChot",
-          "sql": "decimal(18,4)",
-          "nullable": true
-        },
-        {
-          "name": "SoLuongThucDem",
-          "sql": "decimal(18,4)",
-          "nullable": true
-        },
-        {
-          "name": "PhienBanTonKhoDaChot",
-          "sql": "binary(8)",
-          "nullable": true
-        },
-        {
           "name": "GhiChu",
           "sql": "nvarchar(500)",
           "nullable": true
@@ -2501,9 +2399,7 @@
       ],
       "checks": [
         "SoLuongTheoDonViNhap >= 0",
-        "DonGiaNhap IS NULL OR DonGiaNhap >= 0",
-        "TonSoDaChot IS NULL OR TonSoDaChot >= 0",
-        "SoLuongThucDem IS NULL OR SoLuongThucDem >= 0"
+        "DonGiaNhap IS NULL OR DonGiaNhap >= 0"
       ],
       "unique": [
         [
@@ -2619,12 +2515,6 @@
           "name": "GhiChu",
           "sql": "nvarchar(500)",
           "nullable": true
-        },
-        {
-          "name": "ThoiDiemTao",
-          "sql": "datetime2(3)",
-          "nullable": false,
-          "default": "SYSUTCDATETIME()"
         }
       ],
       "checks": [
@@ -2743,12 +2633,6 @@
           "name": "PhatSinhLuc",
           "sql": "datetime2(3)",
           "nullable": false
-        },
-        {
-          "name": "ThoiDiemTao",
-          "sql": "datetime2(3)",
-          "nullable": false,
-          "default": "SYSUTCDATETIME()"
         }
       ],
       "checks": [
@@ -3096,16 +2980,6 @@
       "parent": "CaLamViec",
       "target": [
         "MaCaLamViec"
-      ]
-    },
-    {
-      "child": "DonHang",
-      "fields": [
-        "MaDonLienQuan"
-      ],
-      "parent": "DonHang",
-      "target": [
-        "MaDonHang"
       ]
     },
     {

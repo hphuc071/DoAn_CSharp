@@ -1,4 +1,4 @@
-﻿using FourChang.Domain.Shared;
+using FourChang.Domain.Shared;
 using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;
@@ -250,7 +250,7 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
             // Trigger chỉ cho ghi dòng khi DRAFT; hoàn thiện nguyên liệu trước khi bật hiệu lực.
             foreach (var line in ingredients)
                 db.ChiTietCongThuc.Add(new() { MaCongThuc = copy.MaCongThuc, MaNguyenLieu = line.MaNguyenLieu,
-                    DinhMucCoSo = line.DinhMucCoSo, LoaiDinhMuc = line.LoaiDinhMuc, TyLeHaoHut = 0 });
+                    DinhMucCoSo = line.DinhMucCoSo, LoaiDinhMuc = line.LoaiDinhMuc });
             await db.SaveChangesAsync();
             copy.TrangThai = "ACTIVE"; copy.HieuLucTu = now; copy.MaQuanLyDuyet = actor;
             await db.SaveChangesAsync();

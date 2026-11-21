@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FourChang.Tests.Shared;
@@ -378,7 +378,7 @@ public sealed class MenuAdministrationTests
             var oldRecipe = await api.Sql($"SELECT MaCongThuc FROM dbo.CongThuc WHERE MaCauHinhMon={old.MaCauHinhMon} AND TrangThai='ACTIVE'");
             var newRecipe = await api.Sql($"SELECT MaCongThuc FROM dbo.CongThuc WHERE MaCauHinhMon={current.MaCauHinhMon} AND TrangThai='ACTIVE'");
             Assert.NotEqual(oldRecipe, newRecipe);
-            var projection = "MaNguyenLieu,DinhMucCoSo,LoaiDinhMuc,TyLeHaoHut";
+            var projection = "MaNguyenLieu,DinhMucCoSo,LoaiDinhMuc";
             Assert.Equal(await api.Sql($"SELECT {projection} FROM dbo.ChiTietCongThuc WHERE MaCongThuc={oldRecipe} ORDER BY MaNguyenLieu,LoaiDinhMuc FOR JSON PATH"),
                 await api.Sql($"SELECT {projection} FROM dbo.ChiTietCongThuc WHERE MaCongThuc={newRecipe} ORDER BY MaNguyenLieu,LoaiDinhMuc FOR JSON PATH"));
         }

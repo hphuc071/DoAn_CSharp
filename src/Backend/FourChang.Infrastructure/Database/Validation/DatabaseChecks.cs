@@ -12,7 +12,7 @@ public static class DatabaseChecks
     public static async Task RunAsync()
     {
         await using var connection = new SqlConnection(DatabaseSettings.ConnectionString()); await connection.OpenAsync();
-        await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("PASS: 30 bảng, đúng cột và 64 FK hoạt động.");
+        await DatabaseBootstrap.ValidateAsync(connection); Console.WriteLine("PASS: 30 bảng, đúng cột và 63 FK hoạt động.");
         await using var db = new CafeDbContext(new DbContextOptionsBuilder<CafeDbContext>().UseSqlServer(DatabaseSettings.ConnectionString()).Options);
         if (db.Model.GetEntityTypes().Count() != 30) throw new InvalidOperationException("EF Core ánh xạ sai số bảng.");
         if (!Passwords.Verify("Test-password-123!", Passwords.Hash("Test-password-123!")) || Passwords.Verify("Wrong", Passwords.Hash("Test-password-123!"))) throw new InvalidOperationException("Password hashing failed.");
@@ -20,7 +20,7 @@ public static class DatabaseChecks
         await Reject(connection, "FK khách hàng không tồn tại", "INSERT dbo.DiaChiKhachHang(MaKhachHang,TenNguoiNhan,DienThoaiNguoiNhan,DiaChiChiTiet,LaDiaChiMacDinh,DangSuDung) VALUES(9223372036854775800,N'Test','0900000000',N'Test',0,1)");
         await Reject(connection, "Chỉ dùng đơn vị g/ml", "UPDATE dbo.NguyenLieu SET DonViCoSo='kg' WHERE MaNguyenLieu=(SELECT MIN(MaNguyenLieu) FROM dbo.NguyenLieu)");
         await Reject(connection, "Giá cấu hình không âm", "UPDATE dbo.CauHinhMon SET GiaBan=-1 WHERE MaCauHinhMon=(SELECT MIN(MaCauHinhMon) FROM dbo.CauHinhMon)");
-        await Reject(connection, "Phiên đăng nhập có đúng một chủ sở hữu", "INSERT dbo.PhienDangNhap(MaLamMoiDaBam,PhamViPhien,LoaiUngDung,HetHanLuc) VALUES(CRYPT_GEN_RANDOM(32),'FULL','WEB',DATEADD(hour,1,SYSUTCDATETIME()))");
+        await Reject(connection, "Phiên đăng nhập có đúng một chủ sở hữu", "INSERT dbo.PhienDangNhap(MaLamMoiDaBam,PhamViPhien,HetHanLuc) VALUES(CRYPT_GEN_RANDOM(32),'FULL',DATEADD(hour,1,SYSUTCDATETIME()))");
         await Reject(connection, "Tồn kho không âm", "UPDATE dbo.TonKho SET TonThucTe=-1 WHERE MaNguyenLieu=(SELECT MIN(MaNguyenLieu) FROM dbo.TonKho)");
         await Reject(connection, "Giữ chỗ không vượt tồn thực tế", "UPDATE dbo.TonKho SET TongGiuCho=TonThucTe+1 WHERE MaNguyenLieu=(SELECT MIN(MaNguyenLieu) FROM dbo.TonKho)");
         await Reject(connection, "Công thức có đúng một chủ sở hữu", "INSERT dbo.CongThuc(SoPhienBan,TenCongThuc,TrangThai,MaQuanLyTao) VALUES(1,N'Test','DRAFT',1)");

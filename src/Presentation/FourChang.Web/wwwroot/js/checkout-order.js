@@ -62,6 +62,14 @@
   }
   function update() {
     try {
+      if (!creationEnabled) {
+        button.disabled = true;
+        button.textContent = "Tạm ngừng nhận đơn";
+        login.hidden = true;
+        receiptPanel.hidden = pendingDetails.hidden = true;
+        status.textContent = "";
+        return;
+      }
       const intent = readIntent();
       if ((intent && !owns(intent)) || (!intent && (!ownerId || !ownerProof))) {
         button.disabled = true;
@@ -69,9 +77,10 @@
         name.value = phone.value = "";
         receiptPanel.hidden = pendingDetails.hidden = true;
         login.hidden = false;
+        button.textContent = "Đăng nhập để đặt món";
         status.textContent = intent
           ? "Không xác minh được thao tác thuộc tài khoản hiện tại. Dữ liệu cũ được giữ nguyên; đăng nhập đúng tài khoản hoặc liên hệ đối soát."
-          : "Cần xác minh Customer đang đăng nhập trước khi đặt. Đăng nhập rồi tải lại Checkout.";
+          : "Vui lòng đăng nhập để tiếp tục đặt món.";
         return;
       }
       const completed = intent?.receipt && validReceipt(intent.receipt, intent);

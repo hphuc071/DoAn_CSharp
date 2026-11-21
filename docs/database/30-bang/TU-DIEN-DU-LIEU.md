@@ -1,6 +1,6 @@
-﻿# Từ điển dữ liệu: 30 bảng
+# Từ điển dữ liệu: 30 bảng
 
-Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion được giữ để bảo vệ lịch sử. Hai mã lựa chọn MaDanhMuc/MaDonViCoSo trong DTO không phải cột SQL.
+Schema hiện hành có 30 bảng, 402 thuộc tính, 63 FK; PK/FK, snapshot và rowversion được giữ để bảo vệ lịch sử. Hai mã lựa chọn MaDanhMuc/MaDonViCoSo trong DTO không phải cột SQL.
 
 ## 1. TaiKhoanKhachHang
 
@@ -47,10 +47,7 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaQuanLy | bigint | Không | FK → TaiKhoanQuanLy |
 | MaLamMoiDaBam | binary(32) | Có |  |
 | PhamViPhien | varchar(20) | Có |  |
-| LoaiUngDung | varchar(15) | Có |  |
-| ThongTinThietBi | nvarchar(300) | Không |  |
 | HetHanLuc | datetime2(3) | Có |  |
-| HoatDongLanCuoiLuc | datetime2(3) | Không |  |
 | ThuHoiLuc | datetime2(3) | Không |  |
 | LyDoThuHoi | nvarchar(250) | Không |  |
 | ThoiDiemTao | datetime2(3) | Có |  |
@@ -164,7 +161,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaNguyenLieu | bigint | Có | PK |
 | TenNguyenLieu | nvarchar(150) | Có |  |
 | DonViCoSo | varchar(2) | Có |  |
-| TonAnToan | decimal(18,4) | Có |  |
 | NguongCanhBao | decimal(18,4) | Có |  |
 | MoTa | nvarchar(500) | Không |  |
 | DangSuDung | bit | Có |  |
@@ -200,10 +196,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaNguyenLieu | bigint | Có | PK / FK → NguyenLieu |
 | LoaiDinhMuc | varchar(10) | Có | PK |
 | DinhMucCoSo | decimal(18,4) | Có |  |
-| TyLeHaoHut | decimal(9,6) | Có |  |
-| ThoiDiemTao | datetime2(3) | Có |  |
-| ThoiDiemCapNhat | datetime2(3) | Có |  |
-| PhienBanDuLieu | rowversion | Có | Chống ghi đè đồng thời |
 
 ## 13. Ban
 
@@ -212,8 +204,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaBan | bigint | Có | PK |
 | MaBanHienThi | varchar(20) | Có |  |
 | TenBan | nvarchar(100) | Có |  |
-| TenKhuVuc | nvarchar(100) | Không |  |
-| SoChoNgoi | int | Không |  |
 | DangSuDung | bit | Có |  |
 | ThoiDiemTao | datetime2(3) | Có |  |
 | ThoiDiemCapNhat | datetime2(3) | Có |  |
@@ -227,7 +217,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaDonHienThi | varchar(30) | Có |  |
 | MaKhachHang | bigint | Không | FK → TaiKhoanKhachHang |
 | MaCaLamViec | bigint | Không | FK → CaLamViec |
-| MaDonLienQuan | bigint | Không | FK → DonHang |
 | KenhDatHang | varchar(10) | Có |  |
 | HinhThucNhanMon | varchar(15) | Có |  |
 | MaBan | bigint | Không | FK → Ban |
@@ -282,9 +271,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | TenMonThemDaChot | nvarchar(100) | Có |  |
 | SoPhanMoiLy | int | Có |  |
 | GiaMoiPhanDaChot | decimal(18,0) | Có |  |
-| ThoiDiemTao | datetime2(3) | Có |  |
-| ThoiDiemCapNhat | datetime2(3) | Có |  |
-| PhienBanDuLieu | rowversion | Có | Chống ghi đè đồng thời |
 
 ## 17. NguyenLieuChiTietDonHang
 
@@ -433,7 +419,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaHoaDonGoc | bigint | Không | FK → HoaDon |
 | MaHuyMon | bigint | Không | FK → HuyMon |
 | TenNguoiMua | nvarchar(150) | Không |  |
-| MaSoThueNguoiMua | varchar(30) | Không |  |
 | SoTien | decimal(18,0) | Có |  |
 | NoiDungHoaDonDaChotJson | nvarchar(max) | Có |  |
 | TrangThai | varchar(15) | Có |  |
@@ -457,7 +442,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | TenNhaCungCapDaChot | nvarchar(200) | Không |  |
 | MaMucDich | varchar(30) | Không |  |
 | LyDo | nvarchar(500) | Không |  |
-| MocKiemKe | datetime2(3) | Không |  |
 | MaPhieuBiDao | bigint | Không | FK → PhieuKho |
 | MaQuanLyLap | bigint | Có | FK → TaiKhoanQuanLy |
 | MaQuanLyDuyet | bigint | Không | FK → TaiKhoanQuanLy |
@@ -466,6 +450,8 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | ThoiDiemTao | datetime2(3) | Có |  |
 | ThoiDiemCapNhat | datetime2(3) | Có |  |
 | PhienBanDuLieu | rowversion | Có | Chống ghi đè đồng thời |
+| NgayThucHien | date | Không | Ngày nghiệp vụ của phiếu |
+| LoiXuLy | nvarchar(500) | Không | Lỗi xử lý lịch phiếu |
 
 ## 25. ChiTietPhieuKho
 
@@ -478,9 +464,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | SoLuongTheoDonViNhap | decimal(18,4) | Có |  |
 | ChenhLechDonViCoSo | decimal(18,4) | Có |  |
 | DonGiaNhap | decimal(18,2) | Không |  |
-| TonSoDaChot | decimal(18,4) | Không |  |
-| SoLuongThucDem | decimal(18,4) | Không |  |
-| PhienBanTonKhoDaChot | binary(8) | Không |  |
 | GhiChu | nvarchar(500) | Không |  |
 | ThoiDiemTao | datetime2(3) | Có |  |
 | ThoiDiemCapNhat | datetime2(3) | Có |  |
@@ -511,7 +494,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaBienDongBiDao | bigint | Không | FK → BienDongKho |
 | PhatSinhLuc | datetime2(3) | Có |  |
 | GhiChu | nvarchar(500) | Không |  |
-| ThoiDiemTao | datetime2(3) | Có |  |
 
 ## 28. NhatKyHeThong
 
@@ -536,7 +518,6 @@ Schema hiện hành có 30 bảng, 64 FK; PK/FK, snapshot và rowversion đượ
 | MaBamYeuCau | binary(32) | Không |  |
 | KetQuaDaChotJson | nvarchar(max) | Không |  |
 | PhatSinhLuc | datetime2(3) | Có |  |
-| ThoiDiemTao | datetime2(3) | Có |  |
 
 ## 29. Banner
 

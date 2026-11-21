@@ -21,5 +21,4 @@ public sealed class NhatKyHeThong
     public byte[]? MaBamYeuCau { get; set; }
     public string? KetQuaDaChotJson { get; set; }
     public DateTime PhatSinhLuc { get; set; }
-    public DateTime ThoiDiemTao { get; set; }
 }

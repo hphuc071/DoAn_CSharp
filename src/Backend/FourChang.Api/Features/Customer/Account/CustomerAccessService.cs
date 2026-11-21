@@ -84,7 +84,7 @@ public sealed class CustomerAccessService(CafeDbContext db)
             await db.SaveChangesAsync(); await tx.CommitAsync(); return Denied();
         }
         user!.SoLanDangNhapSai = 0; user.KhoaDenLuc = null; user.DangNhapLanCuoiLuc = DateTime.UtcNow;
-        db.PhienDangNhap.Add(new() { MaKhachHang = user.MaKhachHang, MaLamMoiDaBam = Passwords.TokenHash(token), PhamViPhien = user.BatBuocDoiMatKhau ? "PASSWORD_CHANGE" : "FULL", LoaiUngDung = "WEB", HetHanLuc = DateTime.UtcNow.AddMinutes(user.BatBuocDoiMatKhau ? 15 : 480) });
+        db.PhienDangNhap.Add(new() { MaKhachHang = user.MaKhachHang, MaLamMoiDaBam = Passwords.TokenHash(token), PhamViPhien = user.BatBuocDoiMatKhau ? "PASSWORD_CHANGE" : "FULL", HetHanLuc = DateTime.UtcNow.AddMinutes(user.BatBuocDoiMatKhau ? 15 : 480) });
         var success = AuditFactory.Create("CUSTOMER", user.MaKhachHang, "CUSTOMER_LOGIN_SUCCEEDED", "TaiKhoanKhachHang", user.MaKhachHang); success.TenNguoiThucHienDaChot = user.HoTen; success.MaThaoTac = operation; success.MaBamYeuCau = digest; db.NhatKyHeThong.Add(success);
         await db.SaveChangesAsync(); await tx.CommitAsync(); return Results.Ok(new SessionResult(token, "CUSTOMER", user.HoTen, user.MaKhachHang, MustChangePassword: user.BatBuocDoiMatKhau));
     }

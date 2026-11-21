@@ -1,10 +1,11 @@
-﻿# Database hiện hành: 30 bảng
+# Database hiện hành: 30 bảng
 
-Schema SQL Server và EF Core cùng ánh xạ **30 bảng nghiệp vụ, 64 khóa ngoại, 11 trigger**. Bảng `dbo.sysdiagrams` do SSMS tạo được giữ nguyên và không tính là bảng nghiệp vụ. Không tạo `__EFMigrationsHistory` hoặc view giả tên bảng đã bỏ.
+Schema SQL Server và EF Core cùng ánh xạ **30 bảng nghiệp vụ, 402 thuộc tính, 63 khóa ngoại, 11 trigger**. Bảng `dbo.sysdiagrams` do SSMS tạo được giữ nguyên và không tính là bảng nghiệp vụ. Không tạo `__EFMigrationsHistory` hoặc view giả tên bảng đã bỏ.
 
 - `schema.sql`: tạo database rỗng 30 bảng.
 - `model.json`: manifest cột, kiểu dữ liệu, khóa và ràng buộc.
 - `008-simplify-to-30.sql`: chuyển dữ liệu 37 → 30 trong một transaction; có thể chạy lại.
+- `012-simplify-columns.sql`: chuyển schema30 từ 423 xuống 402 thuộc tính; backup trước nâng cấp, lưu giá trị cột cũ vào nhật ký, rollback toàn bộ nếu lỗi.
 - `TU-DIEN-DU-LIEU.md`: danh sách bảng và thuộc tính đang lưu.
 
 ## Thay đổi
@@ -60,3 +61,9 @@ Các thư mục 34-bang, 35-bang, 37-bang là tài liệu/migration lịch sử,
 Migration009-recipe-default-sugar.sql thêm CongThuc.PhanTramDuongMacDinh int NOT NULL DEFAULT50, CHECK0/25/50/75/100; không thêm bảng. Bootstrap kiểm manifest30 cũ, sao lưu native COPY_ONLY/CHECKSUM và RESTORE VERIFYONLY trước nâng cấp rồi kiểm manifest mới. Database mới tạo thẳng schema hiện hành; nâng lại không thay dữ liệu. TyLeHaoHut giữ cho lịch sử, công thức mới/sửa dùng0; đơn mới trừ lượng thực dùng lúc bắt đầu pha, hoàn thành không trừ thêm.
 
 Database thật đã nâng cấp và kiểm đúng30 bảng/64FK. Đối chiếu số dòng/checksum dữ liệu cả30 bảng trước/sau (bỏ rowversion và cột mới) không có khác biệt. Bản sao lưu tại artifacts/database/recipe-defaults-before.bak; đối chiếu tại recipe-defaults-before.txt và recipe-defaults-after.txt cùng thư mục. Không reset khách hàng, đơn hoặc lịch sử.
+
+## Tinh gọn thuộc tính — 21/11/2026
+
+Giữ 30 bảng; bỏ 21 thuộc tính và FK tự tham chiếu `DonHang.MaDonLienQuan`. Danh sách chính xác ở `COLUMN-SIMPLIFICATION.md`. Bootstrap kiểm schema cũ, backup native COPY_ONLY/CHECKSUM và RESTORE VERIFYONLY trước migration 012; backup nằm trong SQL container với tên `*_beforeColumnSimplification_*.bak`. Không chạy schema rỗng trên dữ liệu hiện hữu.
+
+DTO cũ của nguyên liệu/công thức/phiếu kho còn trường tương thích: tồn an toàn và hao hụt trả 0, mốc/số liệu kiểm kê cũ trả null. Chúng không còn là cột SQL. Giá trị trước nâng cấp được lưu trong NhatKyHeThong với HanhDong=SCHEMA_COLUMNS_ARCHIVE, MaDoiTuong=012, tra theo LoaiDoiTuong và khóa bản ghi trong DuLieuTruocJson. Lịch sử hóa đơn JSON, giá/định mức đơn, tiền, tồn và khóa chống gửi trùng được giữ.

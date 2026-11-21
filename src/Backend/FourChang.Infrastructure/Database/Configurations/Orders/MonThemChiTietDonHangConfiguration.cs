@@ -24,9 +24,6 @@ public sealed class MonThemChiTietDonHangConfiguration : IEntityTypeConfiguratio
         b.Property(x => x.TenMonThemDaChot).HasColumnType("nvarchar(100)").IsRequired();
         b.Property(x => x.SoPhanMoiLy).HasColumnType("int").IsRequired();
         b.Property(x => x.GiaMoiPhanDaChot).HasColumnType("decimal(18,0)").IsRequired();
-        b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
-        b.Property(x => x.ThoiDiemCapNhat).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
-        b.Property(x => x.PhienBanDuLieu).HasColumnType("rowversion").IsRequired().IsRowVersion();
         b.HasOne<ChiTietDonHang>().WithMany().HasForeignKey("MaChiTietDonHang").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<MonThem>().WithMany().HasForeignKey("MaMonThem").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<CongThuc>().WithMany().HasForeignKey("MaCongThuc").OnDelete(DeleteBehavior.NoAction);

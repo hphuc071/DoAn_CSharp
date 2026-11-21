@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Tests.Shared;
 using static FourChang.Tests.Shared.TestData;
@@ -110,7 +110,7 @@ public sealed class RecipeAdministrationTests(AdminFeatureFixture fixture)
     public async Task DonCuGiuSnapshot_DonMoiNhanCongThucMoi()
     {
         // BR-03 mới không trừ tồn an toàn; đơn mới vẫn đặt được khi tồn thực tế đủ.
-        await fixture.Api.Sql("UPDATE dbo.NguyenLieu SET TonAnToan=1000000,NguongCanhBao=1000000");
+        await fixture.Api.Sql("UPDATE dbo.NguyenLieu SET NguongCanhBao=1000000");
         var catalog = (await fixture.Api.Send("GET", "/api/catalog")).Json;
         var available = catalog["mon"]!.AsArray().SelectMany(x => x!["cauHinh"]!.AsArray()).Where(x => x!.Flag("conHang")).Select(x => x!.Number("maCauHinhMon")).ToHashSet();
         var source = (await fixture.Recipes()).First(x => x.TrangThai == "ACTIVE" && x.MaCauHinhMon is { } id && available.Contains(id));

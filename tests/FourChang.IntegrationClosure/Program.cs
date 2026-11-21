@@ -116,7 +116,7 @@ static class Closure
   foreach(var label in new[]{"admin","revoked","expired"}) {
    var token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));tokens[label]=token;
    db.PhienDangNhap.Add(new(){MaKhachHang=label=="admin"?null:label=="b"?f.OtherCustomerId:f.CustomerId,
-    MaQuanLy=label=="admin"?admin.MaQuanLy:null,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien="FULL",LoaiUngDung="WEB",
+    MaQuanLy=label=="admin"?admin.MaQuanLy:null,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien="FULL",
     ThoiDiemTao=DateTime.UtcNow.AddHours(-2),HetHanLuc=label=="expired"?DateTime.UtcNow.AddHours(-1):DateTime.UtcNow.AddHours(1),
     ThuHoiLuc=label=="revoked"?DateTime.UtcNow:null});
   }

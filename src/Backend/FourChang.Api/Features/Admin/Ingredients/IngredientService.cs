@@ -1,4 +1,4 @@
-﻿using FourChang.Domain.Shared;
+using FourChang.Domain.Shared;
 using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
@@ -21,7 +21,7 @@ public sealed class IngredientService(CafeDbContext db)
         var ingredients = await db.NguyenLieu.AsNoTracking().OrderBy(x => x.MaNguyenLieu).ToListAsync();
         var result = new List<IngredientView>();
         foreach (var item in ingredients)
-            result.Add(new(item.MaNguyenLieu, item.TenNguyenLieu, item.MaDonViCoSo, item.TonAnToan, item.NguongCanhBao,
+            result.Add(new(item.MaNguyenLieu, item.TenNguyenLieu, item.MaDonViCoSo, 0, item.NguongCanhBao,
                 item.MoTa, item.DangSuDung, item.PhienBanDuLieu,
                 Array.Empty<ConversionInput>(),
                 await References(item.MaNguyenLieu)));
@@ -54,9 +54,8 @@ public sealed class IngredientService(CafeDbContext db)
                 throw new AdminRule(409, "Cần xem và xác nhận ảnh hưởng hiện tại trước khi ngừng nguyên liệu.");
         }
         item.TenNguyenLieu = name; item.MaDonViCoSo = input.MaDonViCoSo;
-        // Cột cũ vẫn tồn tại để tương thích schema; UC mới chỉ quản trị một ngưỡng cảnh báo.
-        // Đặt bằng 0 trong thao tác lưu hồ sơ, không cập nhật hàng loạt hay thay đổi số dư kho.
-        item.TonAnToan = 0; item.NguongCanhBao = input.NguongCanhBao;
+        // Schema tinh gọn chỉ lưu ngưỡng cảnh báo; TonAnToan trong DTO cũ không ghi xuống SQL.
+        item.NguongCanhBao = input.NguongCanhBao;
         item.MoTa = MenuValidation.Optional(input.MoTa, 500); item.DangSuDung = input.DangSuDung;
         if (id is null) db.NguyenLieu.Add(item);
         await db.SaveChangesAsync();
@@ -79,7 +78,7 @@ public sealed class IngredientService(CafeDbContext db)
                                       && (recipe.HieuLucDen == null || recipe.HieuLucDen > now)
                                   orderby recipe.MaCongThuc, line.LoaiDinhMuc
                                   select new { recipe.MaCongThuc, recipe.MaCauHinhMon, recipe.MaMonThem,
-                                      RecipeVersion = recipe.PhienBanDuLieu, LineVersion = line.PhienBanDuLieu }).ToListAsync();
+                                      RecipeVersion = recipe.PhienBanDuLieu, line.DinhMucCoSo, line.LoaiDinhMuc }).ToListAsync();
         var variantIds = dependencies.Where(x => x.MaCauHinhMon.HasValue).Select(x => x.MaCauHinhMon!.Value).Distinct().ToArray();
         var variants = await (from variant in db.CauHinhMon.AsNoTracking()
                               join dish in db.Mon.AsNoTracking() on variant.MaMon equals dish.MaMon

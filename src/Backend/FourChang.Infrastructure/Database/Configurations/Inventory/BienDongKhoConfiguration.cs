@@ -28,7 +28,6 @@ public sealed class BienDongKhoConfiguration : IEntityTypeConfiguration<BienDong
         b.Property(x => x.MaBienDongBiDao).HasColumnType("bigint");
         b.Property(x => x.PhatSinhLuc).HasColumnType("datetime2(3)").IsRequired();
         b.Property(x => x.GhiChu).HasColumnType("nvarchar(500)");
-        b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.HasIndex(new[] { "MaThaoTac", "MaNguyenLieu" }).IsUnique().HasDatabaseName("UQ_BienDongKho_1");
         b.HasOne<NguyenLieu>().WithMany().HasForeignKey("MaNguyenLieu").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<ChiTietPhieuKho>().WithMany().HasForeignKey("MaDongPhieuKho").OnDelete(DeleteBehavior.NoAction);

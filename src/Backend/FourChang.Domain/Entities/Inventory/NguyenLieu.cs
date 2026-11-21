@@ -8,7 +8,6 @@ public sealed class NguyenLieu
     public string TenNguyenLieu { get; set; } = string.Empty;
     public string DonViCoSo { get; set; } = "g";
     [NotMapped] public long MaDonViCoSo { get => CafeOptions.UnitId(DonViCoSo); set => DonViCoSo = CafeOptions.Unit(value); }
-    public decimal TonAnToan { get; set; }
     public decimal NguongCanhBao { get; set; }
     public string? MoTa { get; set; }
     public bool DangSuDung { get; set; }

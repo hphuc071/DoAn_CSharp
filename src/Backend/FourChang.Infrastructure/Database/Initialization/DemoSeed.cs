@@ -30,7 +30,7 @@ public static class DemoSeed
         var ml = (MaDonVi: 2L, Unit: "ml");
         await db.SaveChangesAsync();
         var ingredientNames = new[] { "Hạt cà phê", "Sữa tươi", "Đường", "Đá", "Trà đào nền", "Bột matcha", "Cold brew nền", "Kem cheese", "Trân châu" };
-        var ingredients = ingredientNames.Select((name, i) => new NguyenLieu { TenNguyenLieu = name, MaDonViCoSo = (i is 1 or 4 or 6) ? ml.MaDonVi : gram.MaDonVi, TonAnToan = 0, NguongCanhBao = 100, DangSuDung = true }).ToArray();
+        var ingredients = ingredientNames.Select((name, i) => new NguyenLieu { TenNguyenLieu = name, MaDonViCoSo = (i is 1 or 4 or 6) ? ml.MaDonVi : gram.MaDonVi, NguongCanhBao = 100, DangSuDung = true }).ToArray();
         db.NguyenLieu.AddRange(ingredients); await db.SaveChangesAsync();
         var document = new PhieuKho { SoPhieuKho = "PN-KHOI-TAO", LoaiPhieu = "RECEIPT", TrangThai = "DRAFT", MaQuanLyLap = 1, MaThaoTac = Guid.NewGuid(), LyDo = "Nhập dữ liệu mẫu phục vụ chạy thử" };
         db.PhieuKho.Add(document); await db.SaveChangesAsync();
@@ -76,7 +76,7 @@ public static class DemoSeed
                     await db.SaveChangesAsync(); recipe.TrangThai = "ACTIVE"; recipe.MaQuanLyDuyet = 1; recipe.HieuLucTu = DateTime.UtcNow; await db.SaveChangesAsync();
                 }
         }
-        for (var i = 1; i <= 10; i++) db.Ban.Add(new() { MaBanHienThi = $"B{i:00}", TenBan = $"Bàn {i:00}", TenKhuVuc = "Tầng trệt", SoChoNgoi = 4, DangSuDung = true });
+        for (var i = 1; i <= 10; i++) db.Ban.Add(new() { MaBanHienThi = $"B{i:00}", TenBan = $"Bàn {i:00}", DangSuDung = true });
         db.NhatKyHeThong.Add(new() { MaLienKetXuLy = Guid.NewGuid(), LoaiTacNhan = "SYSTEM", TenNguoiThucHienDaChot = "Khởi tạo database", HanhDong = "SEED_DATABASE", LoaiDoiTuong = "Database", KetQua = "SUCCEEDED", PhatSinhLuc = DateTime.UtcNow });
         await db.SaveChangesAsync(); await transaction.CommitAsync();
     }

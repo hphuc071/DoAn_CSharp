@@ -79,3 +79,18 @@
 * **Tuần 12 (Bảo vệ & Vấn đáp Đề tài):**  
   * Demo trọn vẹn kịch bản liên hoàn 3 màn hình (Admin – Web – POS) và vấn đáp cá nhân theo đúng các Use Case và bảng dữ liệu từng thành viên phụ trách.
 
+## Chạy đồ án local
+
+Mở Docker Desktop. Trong thư mục dự án, chuẩn bị database rồi mở cấu hình đồ án:
+
+```powershell
+.\ChuanBi-Database.ps1
+.\scripts\Enable-LocalDemo.ps1
+```
+
+Sau đó chạy `Chay-Backend.cmd`, `Chay-Web.cmd` và launcher Quản lý/Nhân viên tương ứng. Website mặc định http://localhost:15880; URL API lấy từ `.env`. Sau khi đổi cấu hình cần khởi động lại API/Web. Khách đăng nhập trước khi đặt món.
+
+Chế độ local mở tạo đơn Web, mang đi/tại bàn/giao hàng15.000đ, QR thanh toán mô phỏng và yêu cầu hủy theo quy trình duyệt. QR được ghi nhãn mô phỏng; không xác minh giao dịch ngân hàng thật. `.env` và mật khẩu không đưa lên Git. Các giá trị mặc định trong `.env.example` giữ tắt thao tác ghi cho tới khi chủ động chạy lệnh mở local.
+Tuần 1-3: Tìm hiểu, thống nhất các use case và công nghệ.
+Tuần 4: Thiết kế database và design mẫu.
+Tuần 5-7: Tiến hành làm giao diện và các chức năng.

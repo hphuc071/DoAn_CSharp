@@ -33,7 +33,9 @@ public static class DatabaseBootstrap
                 schema.CommandText = await ReadResourceAsync("FourChang.Schema30.sql");
                 await schema.ExecuteNonQueryAsync();
             }
-            else if (await HasSchema30(connection)) await ValidateAsync(connection, await HasStockSchedule(connection) ? "FourChang.Model30.json" : await HasStockDocumentDate(connection) ? "FourChang.Model30BeforeStockSchedule.json" : await HasRecipeDefaults(connection) ? "FourChang.Model30BeforeStockDate.json" : "FourChang.Model30BeforeRecipeDefaults.json");
+            else if (await HasSchema30(connection)) await ValidateAsync(connection, await HasStockSchedule(connection) ?
+                (await HasSimplifiedColumns(connection) ? "FourChang.Model30.json" : "FourChang.Model30BeforeColumnSimplification.json") :
+                await HasStockDocumentDate(connection) ? "FourChang.Model30BeforeStockSchedule.json" : await HasRecipeDefaults(connection) ? "FourChang.Model30BeforeStockDate.json" : "FourChang.Model30BeforeRecipeDefaults.json");
             else if (!existing.Contains("ThietBiPOS"))
             {
                 // Chỉ nâng cấp từ schema 34 bảng đã xác minh; không tự sửa database lạ hoặc xóa sysdiagrams.
@@ -142,6 +144,21 @@ public static class DatabaseBootstrap
                 await using var patch = connection.CreateCommand();
                 patch.CommandText = await ReadResourceAsync("FourChang.StockSchedule.sql"); await patch.ExecuteNonQueryAsync();
             }
+            if (!await HasSimplifiedColumns(connection))
+            {
+                await ValidateAsync(connection, "FourChang.Model30BeforeColumnSimplification.json");
+                var path = $"/var/opt/mssql/data/{database}_beforeColumnSimplification_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}.bak";
+                await using var backup = connection.CreateCommand();
+                backup.CommandTimeout = 180;
+                backup.CommandText = $"BACKUP DATABASE [{database}] TO DISK=@path WITH COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=@path WITH CHECKSUM;";
+                backup.Parameters.AddWithValue("@path", path);
+                await backup.ExecuteNonQueryAsync();
+                Console.WriteLine("Backup trước tinh gọn thuộc tính đã xác minh: " + path);
+                await using var simplify = connection.CreateCommand();
+                simplify.CommandTimeout = 180;
+                simplify.CommandText = await ReadResourceAsync("FourChang.SimplifyColumns.sql");
+                await simplify.ExecuteNonQueryAsync();
+            }
             await ValidateAsync(connection);
         }
         await CreateApplicationLoginAsync();
@@ -151,6 +168,14 @@ public static class DatabaseBootstrap
         await check.OpenAsync();
         await ValidateAsync(check);
     }
+    /// <summary>Phân biệt schema 402 cột; manifest đầy đủ vẫn được kiểm trước và sau nâng cấp.</summary>
+    private static async Task<bool> HasSimplifiedColumns(SqlConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT CASE WHEN COL_LENGTH(N'dbo.PhienDangNhap',N'LoaiUngDung') IS NULL THEN 1 ELSE 0 END";
+        return Convert.ToInt32(await command.ExecuteScalarAsync()) == 1;
+    }
+
     /// <summary>Nhận diện lịch ghi sổ trước khi kiểm tra manifest đầy đủ; không suy từ số bảng.</summary>
     private static async Task<bool> HasStockSchedule(SqlConnection connection)
     {

@@ -22,10 +22,7 @@ public sealed class PhienDangNhapConfiguration : IEntityTypeConfiguration<PhienD
         b.Property(x => x.MaQuanLy).HasColumnType("bigint");
         b.Property(x => x.MaLamMoiDaBam).HasColumnType("binary(32)").IsRequired();
         b.Property(x => x.PhamViPhien).HasColumnType("varchar(20)").IsRequired();
-        b.Property(x => x.LoaiUngDung).HasColumnType("varchar(15)").IsRequired();
-        b.Property(x => x.ThongTinThietBi).HasColumnType("nvarchar(300)");
         b.Property(x => x.HetHanLuc).HasColumnType("datetime2(3)").IsRequired();
-        b.Property(x => x.HoatDongLanCuoiLuc).HasColumnType("datetime2(3)");
         b.Property(x => x.ThuHoiLuc).HasColumnType("datetime2(3)");
         b.Property(x => x.LyDoThuHoi).HasColumnType("nvarchar(250)");
         b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");

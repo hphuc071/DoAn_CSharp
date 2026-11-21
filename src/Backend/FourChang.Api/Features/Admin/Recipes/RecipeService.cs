@@ -1,4 +1,4 @@
-﻿using FourChang.Domain.Shared;
+using FourChang.Domain.Shared;
 using System.Text.Json;
 using System.Security.Claims;
 using FourChang.Api.Features.Admin.Menu;
@@ -23,7 +23,7 @@ public sealed class RecipeService(CafeDbContext db)
         var toppings = await db.MonThem.AsNoTracking().ToDictionaryAsync(x => x.MaMonThem, x => x.TenMonThem);
         var lines = await (from l in db.ChiTietCongThuc.AsNoTracking()
                            join n in db.NguyenLieu.AsNoTracking() on l.MaNguyenLieu equals n.MaNguyenLieu
-                           select new { l.MaCongThuc, Line = new RecipeLineView(l.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, l.DinhMucCoSo, l.LoaiDinhMuc, l.TyLeHaoHut) }).ToListAsync();
+                           select new { l.MaCongThuc, Line = new RecipeLineView(l.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, l.DinhMucCoSo, l.LoaiDinhMuc, 0) }).ToListAsync();
         return recipes.Select(r => new RecipeView(r.MaCongThuc, r.MaCauHinhMon, r.MaMonThem, r.SoPhienBan, r.TenCongThuc,
             r.TrangThai, r.HieuLucTu, r.HieuLucDen, r.GhiChu, r.PhienBanDuLieu, lines.Where(l => l.MaCongThuc == r.MaCongThuc).Select(l => l.Line).ToList(),
             r.MaCauHinhMon is { } id ? variants.GetValueOrDefault(id)?.TenMon : toppings.GetValueOrDefault(r.MaMonThem ?? 0),
@@ -134,7 +134,7 @@ public sealed class RecipeService(CafeDbContext db)
                 throw new AdminRule(400, "Nhập định mức trực tiếp theo Gam/Mililit của nguyên liệu, không sử dụng đơn vị quy đổi.");
             var amount = line.DinhMuc;
             if (amount <= 0 || amount > 99999999999999.9999m || amount != decimal.Round(amount, 4)) throw new AdminRule(400, "Định mức sau quy đổi vượt độ chính xác 4 số lẻ; hãy nhập theo đơn vị cơ sở.");
-            result.Add(new() { MaNguyenLieu = line.MaNguyenLieu, LoaiDinhMuc = line.LoaiDinhMuc, DinhMucCoSo = amount, TyLeHaoHut = line.TyLeHaoHut });
+            result.Add(new() { MaNguyenLieu = line.MaNguyenLieu, LoaiDinhMuc = line.LoaiDinhMuc, DinhMucCoSo = amount });
         }
         return result;
     }

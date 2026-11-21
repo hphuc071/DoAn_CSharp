@@ -58,10 +58,7 @@ CREATE TABLE dbo.[PhienDangNhap] (
  [MaQuanLy] bigint NULL,
  [MaLamMoiDaBam] binary(32) NOT NULL,
  [PhamViPhien] varchar(20) NOT NULL,
- [LoaiUngDung] varchar(15) NOT NULL,
- [ThongTinThietBi] nvarchar(300) NULL,
  [HetHanLuc] datetime2(3) NOT NULL,
- [HoatDongLanCuoiLuc] datetime2(3) NULL,
  [ThuHoiLuc] datetime2(3) NULL,
  [LyDoThuHoi] nvarchar(250) NULL,
  [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -199,7 +196,6 @@ CREATE TABLE dbo.[NguyenLieu] (
  [MaNguyenLieu] bigint IDENTITY(1,1) NOT NULL,
  [TenNguyenLieu] nvarchar(150) NOT NULL,
  [DonViCoSo] varchar(2) NOT NULL,
- [TonAnToan] decimal(18,4) NOT NULL,
  [NguongCanhBao] decimal(18,4) NOT NULL,
  [MoTa] nvarchar(500) NULL,
  [DangSuDung] bit NOT NULL,
@@ -208,7 +204,7 @@ CREATE TABLE dbo.[NguyenLieu] (
  [PhienBanDuLieu] rowversion NOT NULL,
  CONSTRAINT [PK_NguyenLieu] PRIMARY KEY ([MaNguyenLieu]),
  CONSTRAINT [UQ_NguyenLieu_1] UNIQUE ([TenNguyenLieu]),
- CONSTRAINT [CK_NguyenLieu_1] CHECK (TonAnToan >= 0 AND NguongCanhBao >= TonAnToan),
+ CONSTRAINT [CK_NguyenLieu_1] CHECK (NguongCanhBao >= 0),
  CONSTRAINT [CK_NguyenLieu_2] CHECK (DonViCoSo IN ('g','ml'))
 );
 
@@ -250,29 +246,21 @@ CREATE TABLE dbo.[ChiTietCongThuc] (
  [MaNguyenLieu] bigint NOT NULL,
  [LoaiDinhMuc] varchar(10) NOT NULL,
  [DinhMucCoSo] decimal(18,4) NOT NULL,
- [TyLeHaoHut] decimal(9,6) NOT NULL,
- [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
- [ThoiDiemCapNhat] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
- [PhienBanDuLieu] rowversion NOT NULL,
  CONSTRAINT [PK_ChiTietCongThuc] PRIMARY KEY ([MaCongThuc],[MaNguyenLieu],[LoaiDinhMuc]),
  CONSTRAINT [CK_ChiTietCongThuc_1] CHECK (LoaiDinhMuc IN ('FIXED','SUGAR','ICE')),
- CONSTRAINT [CK_ChiTietCongThuc_2] CHECK (DinhMucCoSo > 0),
- CONSTRAINT [CK_ChiTietCongThuc_3] CHECK (TyLeHaoHut >= 0 AND TyLeHaoHut < 1)
+ CONSTRAINT [CK_ChiTietCongThuc_2] CHECK (DinhMucCoSo > 0)
 );
 
 CREATE TABLE dbo.[Ban] (
  [MaBan] bigint IDENTITY(1,1) NOT NULL,
  [MaBanHienThi] varchar(20) NOT NULL,
  [TenBan] nvarchar(100) NOT NULL,
- [TenKhuVuc] nvarchar(100) NULL,
- [SoChoNgoi] int NULL,
  [DangSuDung] bit NOT NULL,
  [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
  [ThoiDiemCapNhat] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
  [PhienBanDuLieu] rowversion NOT NULL,
  CONSTRAINT [PK_Ban] PRIMARY KEY ([MaBan]),
- CONSTRAINT [UQ_Ban_1] UNIQUE ([MaBanHienThi]),
- CONSTRAINT [CK_Ban_1] CHECK (SoChoNgoi IS NULL OR SoChoNgoi > 0)
+ CONSTRAINT [UQ_Ban_1] UNIQUE ([MaBanHienThi])
 );
 
 CREATE TABLE dbo.[DonHang] (
@@ -280,7 +268,6 @@ CREATE TABLE dbo.[DonHang] (
  [MaDonHienThi] varchar(30) NOT NULL,
  [MaKhachHang] bigint NULL,
  [MaCaLamViec] bigint NULL,
- [MaDonLienQuan] bigint NULL,
  [KenhDatHang] varchar(10) NOT NULL,
  [HinhThucNhanMon] varchar(15) NOT NULL,
  [MaBan] bigint NULL,
@@ -347,9 +334,6 @@ CREATE TABLE dbo.[MonThemChiTietDonHang] (
  [TenMonThemDaChot] nvarchar(100) NOT NULL,
  [SoPhanMoiLy] int NOT NULL,
  [GiaMoiPhanDaChot] decimal(18,0) NOT NULL,
- [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
- [ThoiDiemCapNhat] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
- [PhienBanDuLieu] rowversion NOT NULL,
  CONSTRAINT [PK_MonThemChiTietDonHang] PRIMARY KEY ([MaChiTietDonHang],[MaMonThem]),
  CONSTRAINT [CK_MonThemChiTietDonHang_1] CHECK (SoPhanMoiLy > 0),
  CONSTRAINT [CK_MonThemChiTietDonHang_2] CHECK (GiaMoiPhanDaChot >= 0)
@@ -529,7 +513,6 @@ CREATE TABLE dbo.[HoaDon] (
  [MaHoaDonGoc] bigint NULL,
  [MaHuyMon] bigint NULL,
  [TenNguoiMua] nvarchar(150) NULL,
- [MaSoThueNguoiMua] varchar(30) NULL,
  [SoTien] decimal(18,0) NOT NULL,
  [NoiDungHoaDonDaChotJson] nvarchar(max) NOT NULL,
  [TrangThai] varchar(15) NOT NULL,
@@ -562,7 +545,6 @@ CREATE TABLE dbo.[PhieuKho] (
  [TenNhaCungCapDaChot] nvarchar(200) NULL,
  [MaMucDich] varchar(30) NULL,
  [LyDo] nvarchar(500) NULL,
- [MocKiemKe] datetime2(3) NULL,
  [MaPhieuBiDao] bigint NULL,
  [MaQuanLyLap] bigint NOT NULL,
  [MaQuanLyDuyet] bigint NULL,
@@ -588,9 +570,6 @@ CREATE TABLE dbo.[ChiTietPhieuKho] (
  [SoLuongTheoDonViNhap] decimal(18,4) NOT NULL,
  [ChenhLechDonViCoSo] decimal(18,4) NOT NULL,
  [DonGiaNhap] decimal(18,2) NULL,
- [TonSoDaChot] decimal(18,4) NULL,
- [SoLuongThucDem] decimal(18,4) NULL,
- [PhienBanTonKhoDaChot] binary(8) NULL,
  [GhiChu] nvarchar(500) NULL,
  [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
  [ThoiDiemCapNhat] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -598,9 +577,7 @@ CREATE TABLE dbo.[ChiTietPhieuKho] (
  CONSTRAINT [PK_ChiTietPhieuKho] PRIMARY KEY ([MaDongPhieuKho]),
  CONSTRAINT [UQ_ChiTietPhieuKho_1] UNIQUE ([MaPhieuKho],[MaNguyenLieu]),
  CONSTRAINT [CK_ChiTietPhieuKho_1] CHECK (SoLuongTheoDonViNhap >= 0),
- CONSTRAINT [CK_ChiTietPhieuKho_2] CHECK (DonGiaNhap IS NULL OR DonGiaNhap >= 0),
- CONSTRAINT [CK_ChiTietPhieuKho_3] CHECK (TonSoDaChot IS NULL OR TonSoDaChot >= 0),
- CONSTRAINT [CK_ChiTietPhieuKho_4] CHECK (SoLuongThucDem IS NULL OR SoLuongThucDem >= 0)
+ CONSTRAINT [CK_ChiTietPhieuKho_2] CHECK (DonGiaNhap IS NULL OR DonGiaNhap >= 0)
 );
 
 CREATE TABLE dbo.[TonKho] (
@@ -625,7 +602,6 @@ CREATE TABLE dbo.[BienDongKho] (
  [MaBienDongBiDao] bigint NULL,
  [PhatSinhLuc] datetime2(3) NOT NULL,
  [GhiChu] nvarchar(500) NULL,
- [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
  CONSTRAINT [PK_BienDongKho] PRIMARY KEY ([MaBienDongKho]),
  CONSTRAINT [UQ_BienDongKho_1] UNIQUE ([MaThaoTac],[MaNguyenLieu]),
  CONSTRAINT [CK_BienDongKho_1] CHECK (SoLuongThayDoi <> 0),
@@ -653,7 +629,6 @@ CREATE TABLE dbo.[NhatKyHeThong] (
  [MaBamYeuCau] binary(32) NULL,
  [KetQuaDaChotJson] nvarchar(max) NULL,
  [PhatSinhLuc] datetime2(3) NOT NULL,
- [ThoiDiemTao] datetime2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
  CONSTRAINT [PK_NhatKyHeThong] PRIMARY KEY ([MaNhatKy]),
  CONSTRAINT [CK_NhatKyHeThong_1] CHECK ((LoaiTacNhan = 'CUSTOMER' AND MaKhachHang IS NOT NULL AND MaQuanLy IS NULL AND MaCaLamViec IS NULL) OR (LoaiTacNhan = 'ADMIN' AND MaQuanLy IS NOT NULL AND MaKhachHang IS NULL AND MaCaLamViec IS NULL) OR (LoaiTacNhan = 'STAFF' AND MaCaLamViec IS NOT NULL AND MaKhachHang IS NULL AND MaQuanLy IS NULL) OR (LoaiTacNhan = 'SYSTEM' AND MaKhachHang IS NULL AND MaQuanLy IS NULL AND MaCaLamViec IS NULL)),
  CONSTRAINT [CK_NhatKyHeThong_2] CHECK (DuLieuTruocJson IS NULL OR ISJSON(DuLieuTruocJson) = 1),
@@ -765,9 +740,7 @@ ALTER TABLE dbo.[DonHang] WITH CHECK ADD CONSTRAINT [FK_DonHang_15] FOREIGN KEY 
 
 CREATE INDEX [IX_FK_DonHang_15] ON dbo.[DonHang] ([MaCaLamViec]);
 
-ALTER TABLE dbo.[DonHang] WITH CHECK ADD CONSTRAINT [FK_DonHang_16] FOREIGN KEY ([MaDonLienQuan]) REFERENCES dbo.[DonHang] ([MaDonHang]);
 
-CREATE INDEX [IX_FK_DonHang_16] ON dbo.[DonHang] ([MaDonLienQuan]);
 
 ALTER TABLE dbo.[DonHang] WITH CHECK ADD CONSTRAINT [FK_DonHang_17] FOREIGN KEY ([MaBan]) REFERENCES dbo.[Ban] ([MaBan]);
 

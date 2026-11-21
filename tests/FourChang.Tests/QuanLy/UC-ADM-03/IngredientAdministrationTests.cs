@@ -1,4 +1,4 @@
-﻿using FourChang.Presentation.Shared.Contracts.Admin;
+using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Tests.Shared;
 
 namespace FourChang.Tests.Admin;
@@ -103,7 +103,7 @@ public sealed class IngredientAdministrationTests(AdminFeatureFixture fixture)
         var id = (await fixture.Send("POST", "/api/admin/ingredients", create)).Number("ma");
         var item = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == id);
         Assert.Equal(0, item.TonAnToan); Assert.Equal(12.5m, item.NguongCanhBao);
-        await fixture.Api.Sql($"UPDATE dbo.NguyenLieu SET TonAnToan=10 WHERE MaNguyenLieu={id}");
+        Assert.Equal("0", await fixture.Api.Sql("SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.NguyenLieu') AND name='TonAnToan'"));
         item = (await fixture.Ingredients()).NguyenLieu.Single(n => n.MaNguyenLieu == id);
         var edit = create with { NguongCanhBao = 0, PhienBanDuLieu = item.PhienBanDuLieu, MaThaoTac = Guid.NewGuid() };
         await fixture.Send("PUT", $"/api/admin/ingredients/{id}", edit);

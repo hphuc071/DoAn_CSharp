@@ -33,7 +33,6 @@ public sealed class HoaDonConfiguration : IEntityTypeConfiguration<HoaDon>
         b.Property(x => x.MaHoaDonGoc).HasColumnType("bigint");
         b.Property(x => x.MaHuyMon).HasColumnType("bigint");
         b.Property(x => x.TenNguoiMua).HasColumnType("nvarchar(150)");
-        b.Property(x => x.MaSoThueNguoiMua).HasColumnType("varchar(30)");
         b.Property(x => x.SoTien).HasColumnType("decimal(18,0)").IsRequired();
         b.Property(x => x.NoiDungHoaDonDaChotJson).HasColumnType("nvarchar(max)").IsRequired();
         b.Property(x => x.TrangThai).HasColumnType("varchar(15)").IsRequired();

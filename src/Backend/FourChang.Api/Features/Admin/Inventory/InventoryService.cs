@@ -22,7 +22,7 @@ public sealed class InventoryService(CafeDbContext db)
                               n.MaNguyenLieu,
                               n.TenNguyenLieu,
                               KyHieu = n.DonViCoSo,
-                              n.TonAnToan,
+
                               n.NguongCanhBao,
                               OnHand = t == null ? (decimal?)null : t.TonThucTe,
                               Held = t == null ? (decimal?)null : t.TongGiuCho,
@@ -33,7 +33,7 @@ public sealed class InventoryService(CafeDbContext db)
         {
             var available = x.OnHand - x.Held;
             var state = available is null ? "UNKNOWN" : available <= 0 ? "OUT" : x.OnHand - x.Held <= x.NguongCanhBao ? "LOW" : "AVAILABLE";
-            return new StockView(x.MaNguyenLieu, x.TenNguyenLieu, x.KyHieu, x.OnHand, x.Held, x.TonAnToan, x.NguongCanhBao, available, state, x.At, x.Version);
+            return new StockView(x.MaNguyenLieu, x.TenNguyenLieu, x.KyHieu, x.OnHand, x.Held, 0, x.NguongCanhBao, available, state, x.At, x.Version);
         }).Where(x => string.IsNullOrWhiteSpace(search) || x.MaNguyenLieu.ToString() == search.Trim() || x.TenNguyenLieu.Contains(search.Trim(), StringComparison.CurrentCultureIgnoreCase))
           .Where(x => string.IsNullOrWhiteSpace(status) || x.CanhBao == status).ToList();
         if (!string.IsNullOrEmpty(status) && status is not ("UNKNOWN" or "OUT" or "LOW" or "AVAILABLE")) throw new AdminRule(400, "Mức cảnh báo không hợp lệ.");

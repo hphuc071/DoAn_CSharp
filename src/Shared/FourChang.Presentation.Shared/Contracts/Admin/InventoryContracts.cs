@@ -16,7 +16,7 @@ public sealed record UnitInput(string KyHieu, string TenDonVi, bool DangSuDung, 
 public sealed record AdminDeleteInput(byte[] PhienBanDuLieu, Guid MaThaoTac);
 public sealed record AdminSaveReceipt(long Ma, byte[]? PhienBanDuLieu, bool DaXoa = false);
 
-/// <summary>Dòng nhập BOM có đơn vị; máy chủ đổi về cơ sở trước khi lưu, không suy từ ghi chú.</summary>
+/// <summary>Dòng BOM nhập g/ml. TyLeHaoHut chỉ giữ chữ ký cũ, bắt buộc 0 và không lưu SQL.</summary>
 public sealed record RecipeLineInput(long MaNguyenLieu, long MaDonVi, decimal DinhMuc, string LoaiDinhMuc, decimal TyLeHaoHut);
 public sealed record RecipeLineView(long MaNguyenLieu, string TenNguyenLieu, string DonViCoSo, decimal DinhMucCoSo, string LoaiDinhMuc, decimal TyLeHaoHut);
 public sealed record RecipeView(long MaCongThuc, long? MaCauHinhMon, long? MaMonThem, int SoPhienBan,

@@ -9,9 +9,6 @@ public sealed class ChiTietPhieuKho
     public decimal SoLuongTheoDonViNhap { get; set; }
     public decimal ChenhLechDonViCoSo { get; set; }
     public decimal? DonGiaNhap { get; set; }
-    public decimal? TonSoDaChot { get; set; }
-    public decimal? SoLuongThucDem { get; set; }
-    public byte[]? PhienBanTonKhoDaChot { get; set; }
     public string? GhiChu { get; set; }
     public DateTime ThoiDiemTao { get; set; }
     public DateTime ThoiDiemCapNhat { get; set; }

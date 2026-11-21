@@ -29,7 +29,6 @@ public sealed class DonHangConfiguration : IEntityTypeConfiguration<DonHang>
         b.Property(x => x.MaDonHienThi).HasColumnType("varchar(30)").IsRequired();
         b.Property(x => x.MaKhachHang).HasColumnType("bigint");
         b.Property(x => x.MaCaLamViec).HasColumnType("bigint");
-        b.Property(x => x.MaDonLienQuan).HasColumnType("bigint");
         b.Property(x => x.KenhDatHang).HasColumnType("varchar(10)").IsRequired();
         b.Property(x => x.HinhThucNhanMon).HasColumnType("varchar(15)").IsRequired();
         b.Property(x => x.MaBan).HasColumnType("bigint");
@@ -52,7 +51,6 @@ public sealed class DonHangConfiguration : IEntityTypeConfiguration<DonHang>
         b.HasIndex(new[] { "MaDonHienThi" }).IsUnique().HasDatabaseName("UQ_DonHang_1");
         b.HasOne<TaiKhoanKhachHang>().WithMany().HasForeignKey("MaKhachHang").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<CaLamViec>().WithMany().HasForeignKey("MaCaLamViec").OnDelete(DeleteBehavior.NoAction);
-        b.HasOne<DonHang>().WithMany().HasForeignKey("MaDonLienQuan").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<Ban>().WithMany().HasForeignKey("MaBan").OnDelete(DeleteBehavior.NoAction);
     }
 }

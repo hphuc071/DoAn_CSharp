@@ -20,12 +20,12 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
         var lines = await (from l in db.ChiTietPhieuKho.AsNoTracking() join n in db.NguyenLieu.AsNoTracking()
                            on l.MaNguyenLieu equals n.MaNguyenLieu select new { l, n.TenNguyenLieu }).ToListAsync();
         return headers.Select(p => new StockDocumentView(p.MaPhieuKho, p.SoPhieuKho, p.LoaiPhieu, p.TrangThai,
-            p.TenNhaCungCapDaChot, p.MaMucDich, p.LyDo, p.MocKiemKe, p.MaPhieuBiDao, p.MaQuanLyLap,
+            p.TenNhaCungCapDaChot, p.MaMucDich, p.LyDo, null, p.MaPhieuBiDao, p.MaQuanLyLap,
             p.MaQuanLyDuyet, p.ThoiDiemTao, p.GhiSoLuc, p.PhienBanDuLieu,
             lines.Where(x => x.l.MaPhieuKho == p.MaPhieuKho).Select(x => new StockDocumentLineView(x.l.MaDongPhieuKho,
                 x.l.MaNguyenLieu, x.TenNguyenLieu, x.l.DonViNhapDaChot, x.l.SoLuongTheoDonViNhap,
-                x.l.ChenhLechDonViCoSo, x.l.DonGiaNhap, x.l.TonSoDaChot, x.l.SoLuongThucDem,
-                x.l.PhienBanTonKhoDaChot, x.l.GhiChu)).ToList(), p.NgayThucHien, p.LoiXuLy)).ToList();
+                x.l.ChenhLechDonViCoSo, x.l.DonGiaNhap, null, null,
+                null, x.l.GhiChu)).ToList(), p.NgayThucHien, p.LoiXuLy)).ToList();
     }
 
     /// <summary>Tạo/sửa nháp nhập hoặc xuất với đơn vị g/ml; không cộng trừ bất cứ nguyên liệu nào.</summary>
@@ -55,7 +55,6 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
             }
             header.LoaiPhieu = input.LoaiPhieu; header.LyDo = reason.Trim(); header.NgayThucHien = date; header.TenNhaCungCapDaChot = input.Nguon?.Trim();
             header.MaMucDich = input.MaMucDich; header.ThoiDiemCapNhat = now;
-            header.MocKiemKe = null;
             header.TrangThai = "DRAFT"; header.LoiXuLy = null; header.MaQuanLyDuyet = null;
             if (id is null) db.PhieuKho.Add(header);
             await db.SaveChangesAsync();
@@ -66,14 +65,11 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
                 var unit = n.DonViCoSo;
                 if (!IngredientUnits.IsSupported(unit)) throw Bad("Chỉ sử dụng Gam hoặc Mililit cơ sở.");
                 if (line.SoLuong < 0 || line.SoLuong > 99999999999999m || decimal.Round(line.SoLuong, 4) != line.SoLuong ||
-                    (header.MocKiemKe is null && line.SoLuong == 0) || line.DonGiaNhap < 0 || (line.GhiChu?.Length ?? 0) > 500)
-                    throw Bad("Số lượng cần dương (thực đếm cho phép 0), tối đa 4 số lẻ; giá nhập không âm.");
+                    line.SoLuong == 0 || line.DonGiaNhap < 0 || (line.GhiChu?.Length ?? 0) > 500)
+                    throw Bad("Số lượng cần dương, tối đa 4 số lẻ; giá nhập không âm.");
                 db.ChiTietPhieuKho.Add(new ChiTietPhieuKho { MaPhieuKho = header.MaPhieuKho, MaNguyenLieu = n.MaNguyenLieu,
                     DonViNhapDaChot = unit,
                     SoLuongTheoDonViNhap = line.SoLuong, DonGiaNhap = line.DonGiaNhap, GhiChu = line.GhiChu,
-                    TonSoDaChot = null,
-                    SoLuongThucDem = null,
-                    PhienBanTonKhoDaChot = null,
                     ThoiDiemTao = now, ThoiDiemCapNhat = now });
             }
             await db.SaveChangesAsync();
@@ -195,7 +191,7 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
         stock.TonThucTe += delta; stock.ThoiDiemCapNhat = DateTime.UtcNow;
         db.BienDongKho.Add(new BienDongKho { MaNguyenLieu = line.MaNguyenLieu, MaDongPhieuKho = line.MaDongPhieuKho == 0 ? null : line.MaDongPhieuKho,
             LoaiBienDong = header.LoaiPhieu, SoLuongThayDoi = delta, MaThaoTac = operation, MaBienDongBiDao = reversed,
-            PhatSinhLuc = DateTime.UtcNow, ThoiDiemTao = DateTime.UtcNow, GhiChu = header.LyDo });
+            PhatSinhLuc = DateTime.UtcNow, GhiChu = header.LyDo });
         return Task.CompletedTask;
     }
 

@@ -39,7 +39,6 @@ public sealed class NhatKyHeThongConfiguration : IEntityTypeConfiguration<NhatKy
         b.Property(x => x.MaBamYeuCau).HasColumnType("binary(32)");
         b.Property(x => x.KetQuaDaChotJson).HasColumnType("nvarchar(max)");
         b.Property(x => x.PhatSinhLuc).HasColumnType("datetime2(3)").IsRequired();
-        b.Property(x => x.ThoiDiemTao).HasColumnType("datetime2(3)").IsRequired().HasDefaultValueSql("SYSUTCDATETIME()");
         b.HasIndex(new[] { "MaThaoTac" }).IsUnique().HasDatabaseName("UX_NhatKy_ThaoTac").HasFilter("MaThaoTac IS NOT NULL");
         b.HasOne<TaiKhoanKhachHang>().WithMany().HasForeignKey("MaKhachHang").OnDelete(DeleteBehavior.NoAction);
         b.HasOne<TaiKhoanQuanLy>().WithMany().HasForeignKey("MaQuanLy").OnDelete(DeleteBehavior.NoAction);

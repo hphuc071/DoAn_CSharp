@@ -7,6 +7,23 @@ namespace FourChang.Tests;
 // including persistent-profile browser restarts; no API or SQL is started.
 public sealed partial class CheckoutBrowserTests
 {
+    [Theory]
+    [InlineData("41")]
+    [InlineData("")]
+    public async Task DisabledCheckout_DoesNotMisreportLoginOrRemoveCart(string customerId)
+    {
+        var page = await Open(seedCart: true, creationEnabled: false, customerId: customerId);
+        var cart = await page.EvaluateAsync<string>("localStorage.getItem('fourchang.cart-draft.v1')");
+        await Assertions.Expect(page.Locator("#checkout-disabled")).ToBeVisibleAsync();
+        await Assertions.Expect(page.Locator("#checkout-login")).ToBeHiddenAsync();
+        await Assertions.Expect(page.Locator("#checkout-order-status")).ToHaveTextAsync("");
+        await Assertions.Expect(page.Locator("#checkout-proceed")).ToBeDisabledAsync();
+        await Assertions.Expect(page.Locator("#checkout-proceed")).ToHaveTextAsync("Tạm ngừng nhận đơn");
+        await page.EvaluateAsync("() => { const b=document.getElementById('checkout-proceed'); b.disabled=false; b.click(); }");
+        Assert.Empty(bodies);
+        Assert.Equal(cart, await page.EvaluateAsync<string>("localStorage.getItem('fourchang.cart-draft.v1')"));
+    }
+
     private sealed class CommittedOrder
     {
         public string? OriginalCommand { get; private set; }

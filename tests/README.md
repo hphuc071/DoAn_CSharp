@@ -1,6 +1,6 @@
 # Kiểm thử 4CHANG
 
-Project xUnit chính là tests/FourChang.Tests/FourChang.Tests.csproj. Mã test dùng chung các fixture API/SQL, Playwright và worker WinForms. Database hiện hành có 30 bảng và 64 khóa ngoại.
+Project xUnit chính là tests/FourChang.Tests/FourChang.Tests.csproj. Mã test dùng chung các fixture API/SQL, Playwright và worker WinForms. Database hiện hành có 30 bảng, 402 thuộc tính và 63 khóa ngoại.
 
 Danh mục tests/test-manifest.json có 21 UC gồm 8 UC khách hàng, 5 UC nhân viên và 8 UC quản lý. Trạng thái DaCoTest xác nhận có mã kiểm thử; kết quả chạy nằm trong TRX.
 

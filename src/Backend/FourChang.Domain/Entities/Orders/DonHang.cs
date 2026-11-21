@@ -8,7 +8,6 @@ public sealed class DonHang
     public string MaDonHienThi { get; set; } = string.Empty;
     public long? MaKhachHang { get; set; }
     public long? MaCaLamViec { get; set; }
-    public long? MaDonLienQuan { get; set; }
     public string KenhDatHang { get; set; } = string.Empty;
     public string HinhThucNhanMon { get; set; } = string.Empty;
     public long? MaBan { get; set; }

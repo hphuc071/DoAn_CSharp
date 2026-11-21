@@ -110,7 +110,7 @@ static partial class ConsentRun
   await db.SaveChangesAsync(); // Topping dùng chung; giới hạn lưu trên MonThem.
   recipe.TrangThai="ACTIVE";recipe.MaQuanLyDuyet=admin.MaQuanLy;recipe.HieuLucTu=DateTime.UtcNow;
   var token=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));AdminToken=token;
-  db.Add(new PhienDangNhap{MaQuanLy=admin.MaQuanLy,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien="FULL",LoaiUngDung="WEB",HetHanLuc=DateTime.UtcNow.AddHours(1)});
+  db.Add(new PhienDangNhap{MaQuanLy=admin.MaQuanLy,MaLamMoiDaBam=Passwords.TokenHash(token),PhamViPhien="FULL",HetHanLuc=DateTime.UtcNow.AddHours(1)});
   // Historical-format receipt: old DTO SHA256 and expired deadline, no new consent column/hash.
   HistoricalKey=Guid.NewGuid();HistoricalPayload=Payload();var deadline=DateTime.UtcNow.AddHours(-1);
   var order=new DonHang{MaDonHienThi="UC06-HISTORICAL",MaKhachHang=f.CustomerId,KenhDatHang="WEB",HinhThucNhanMon="TAKEAWAY",TrangThai="PENDING_PAYMENT",HetHanLuc=deadline};

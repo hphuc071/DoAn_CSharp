@@ -175,6 +175,10 @@ public sealed class TestApi : IAsyncDisposable
         env["FOURCHANG_DATABASE"] = Database;
         env["ConnectionStrings__FourChang"] = null;
         env["ASPNETCORE_ENVIRONMENT"] = "Development";
+        // Cấu hình chạy quán không được tự bật writer trong fixture; mỗi test mở đúng capability cần dùng.
+        foreach (var key in new[] { "Checkout__OrderCreationEnabled", "Orders__CustomerCreationEnabled",
+            "Payments__SimulationEnabled", "Orders__SqlIntegrationValidated", "Orders__CancellationEnabled" })
+            env[key] = "false";
         env["Orders__FulfillmentSimulationEnabled"] = "false"; // Test chỉ mở mô phỏng khi runtime của chính test yêu cầu.
         env["FOURCHANG_LOCAL"] = "true";
         return env;

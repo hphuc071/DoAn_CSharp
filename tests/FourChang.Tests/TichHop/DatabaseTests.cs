@@ -9,14 +9,14 @@ public sealed class DatabaseTests
 {
 
     /// <summary>
-    /// Kiểm tra đúng 30 bảng, 64 khóa ngoại và chạy 17 nhóm ràng buộc SQL bằng mã C# hiện có.
+    /// Kiểm tra đúng 30 bảng, 63 khóa ngoại và chạy 17 nhóm ràng buộc SQL bằng mã C# hiện có.
     /// </summary>
     [Fact, Trait("Actor", "TichHop"), Trait("UseCase", "Database"), Trait("Layer", "Database")]
-    public async Task RangBuocDuLieu_30Bang_64KhoaNgoai()
+    public async Task RangBuocDuLieu_30Bang_63KhoaNgoai()
     {
         await using var api = await TestApi.Start("Database");
         Assert.Equal("30", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0"));
-        Assert.Equal("64", await api.Sql("SELECT COUNT(*) FROM sys.foreign_keys"));
+        Assert.Equal("63", await api.Sql("SELECT COUNT(*) FROM sys.foreign_keys"));
         var ready = (await api.Send("GET", "/health/ready")).Expect(200, "Backend sẵn sàng với schema hiện tại").Json;
         Assert.Equal(30, ready.Number("tables"));
         await api.RunApiCommand("--test-db");
@@ -30,7 +30,7 @@ public sealed class DatabaseTests
     {
         await using var api = await TestApi.Start("DatabaseUpgrade", legacy: true);
         Assert.Equal("30", await api.Sql("SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND name<>'sysdiagrams'"));
-        Assert.Equal("64", await api.Sql("SELECT COUNT(*) FROM sys.foreign_keys"));
+        Assert.Equal("63", await api.Sql("SELECT COUNT(*) FROM sys.foreign_keys"));
         var ready = (await api.Send("GET", "/health/ready")).Expect(200, "Backend sẵn sàng với schema hiện tại").Json;
         Assert.Equal(30, ready.Number("tables"));
         Assert.Equal("ERD đã lưu", await api.Sql("SELECT name FROM dbo.sysdiagrams WHERE diagram_id=1"));

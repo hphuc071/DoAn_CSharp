@@ -8,7 +8,4 @@ public sealed class MonThemChiTietDonHang
     public string TenMonThemDaChot { get; set; } = string.Empty;
     public int SoPhanMoiLy { get; set; }
     public decimal GiaMoiPhanDaChot { get; set; }
-    public DateTime ThoiDiemTao { get; set; }
-    public DateTime ThoiDiemCapNhat { get; set; }
-    public byte[] PhienBanDuLieu { get; set; } = [];
 }

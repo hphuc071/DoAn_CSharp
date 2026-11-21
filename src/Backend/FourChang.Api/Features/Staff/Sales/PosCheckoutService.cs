@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Features.Customer.Orders;
 using FourChang.Api.Security;
@@ -70,7 +70,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             .ToDictionary(r => r.MaMonThem!.Value);
         var ingredientsMap = await (
             from n in db.NguyenLieu.AsNoTracking()
-            select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, n.TonAnToan, n.DangSuDung }
+            select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, n.DangSuDung }
         ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
 
         var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
@@ -190,9 +190,7 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
                     MaCongThuc = topRecipe.MaCongThuc,
                     TenMonThemDaChot = mt.TenMonThem,
                     SoPhanMoiLy = top.SoPhanMoiLy,
-                    GiaMoiPhanDaChot = mt.GiaMoiPhan,
-                    ThoiDiemTao = now,
-                    ThoiDiemCapNhat = now
+                    GiaMoiPhanDaChot = mt.GiaMoiPhan
                 });
             }
             var itemReq = perItemIngredientRequirements[idx];

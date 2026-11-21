@@ -33,7 +33,7 @@ public sealed class SessionFixtureClockTests
             .AddInterceptors(interceptors).Options);
         var now = DateTime.UtcNow;
         db.PhienDangNhap.Add(new() { MaKhachHang = 99, MaLamMoiDaBam = new byte[32],
-            LoaiUngDung = "WEB", PhamViPhien = "FULL", ThoiDiemTao = now.AddHours(-2), HetHanLuc = now.AddHours(-1) });
+            PhamViPhien = "FULL", ThoiDiemTao = now.AddHours(-2), HetHanLuc = now.AddHours(-1) });
         await Assert.ThrowsAsync<StopBeforeSql>(() => db.SaveChangesAsync());
         Assert.Equal(correctedFixture, capture.Valid);
     }

@@ -28,7 +28,6 @@ public sealed class PhieuKhoConfiguration : IEntityTypeConfiguration<PhieuKho>
         b.Property(x => x.LyDo).HasColumnType("nvarchar(500)");
         b.Property(x => x.LoiXuLy).HasColumnType("nvarchar(500)");
         b.Property(x => x.NgayThucHien).HasColumnType("date");
-        b.Property(x => x.MocKiemKe).HasColumnType("datetime2(3)");
         b.Property(x => x.MaPhieuBiDao).HasColumnType("bigint");
         b.Property(x => x.MaQuanLyLap).HasColumnType("bigint").IsRequired();
         b.Property(x => x.MaQuanLyDuyet).HasColumnType("bigint");

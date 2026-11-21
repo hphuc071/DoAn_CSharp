@@ -13,7 +13,6 @@ public sealed class PhieuKho
     public DateOnly? NgayThucHien { get; set; }
     /// <summary>Lỗi nghiệp vụ khi phiếu hẹn ngày không ghi sổ được; chờ Admin sửa hoặc hủy.</summary>
     public string? LoiXuLy { get; set; }
-    public DateTime? MocKiemKe { get; set; }
     public long? MaPhieuBiDao { get; set; }
     public long MaQuanLyLap { get; set; }
     public long? MaQuanLyDuyet { get; set; }

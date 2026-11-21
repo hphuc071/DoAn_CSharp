@@ -35,7 +35,7 @@ static class SessionClockProbe
             .UseSqlServer("Server=forbidden.invalid;Database=NoDatabase;Integrated Security=true")
             .AddInterceptors(capture, monitor).Options);
         db.PhienDangNhap.Add(new() { MaKhachHang = 1, MaLamMoiDaBam = new byte[32],
-            PhamViPhien = "FULL", LoaiUngDung = "WEB", ThoiDiemTao = now.AddHours(-2), HetHanLuc = now.AddHours(-1) });
+            PhamViPhien = "FULL", ThoiDiemTao = now.AddHours(-2), HetHanLuc = now.AddHours(-1) });
         try { await db.SaveChangesAsync(); throw new InvalidOperationException("Probe did not abort."); }
         catch (Observation) { }
         var evidence = new { status = "PASS_ROOT_CAUSE_CODE_PROBE_NOT_SQL", monitor.Attempts,

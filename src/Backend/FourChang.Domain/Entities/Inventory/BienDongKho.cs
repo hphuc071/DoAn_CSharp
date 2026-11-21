@@ -12,5 +12,4 @@ public sealed class BienDongKho
     public long? MaBienDongBiDao { get; set; }
     public DateTime PhatSinhLuc { get; set; }
     public string? GhiChu { get; set; }
-    public DateTime ThoiDiemTao { get; set; }
 }

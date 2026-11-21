@@ -1,4 +1,4 @@
-﻿using System.Data;
+using System.Data;
 using System.Security.Claims;
 using FourChang.Domain.Entities.Payments;
 using FourChang.Domain.Entities.Inventory;
@@ -163,7 +163,7 @@ public static class CustomerOrdersEndpoints
             .ToDictionary(r => r.MaMonThem!.Value);
         var ingredientsMap = await (
             from n in db.NguyenLieu.AsNoTracking()
-            select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, n.TonAnToan, n.DangSuDung }
+            select new { n.MaNguyenLieu, n.TenNguyenLieu, n.DonViCoSo, n.DangSuDung }
         ).ToDictionaryAsync(x => x.MaNguyenLieu, ct);
 
         var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
@@ -309,9 +309,7 @@ public static class CustomerOrdersEndpoints
                     MaCongThuc = topRecipe.MaCongThuc,
                     TenMonThemDaChot = mt.TenMonThem,
                     SoPhanMoiLy = top.SoPhanMoiLy,
-                    GiaMoiPhanDaChot = mt.GiaMoiPhan,
-                    ThoiDiemTao = now,
-                    ThoiDiemCapNhat = now
+                    GiaMoiPhanDaChot = mt.GiaMoiPhan
                 });
             }
             var itemReq = perItemIngredientRequirements[idx];
