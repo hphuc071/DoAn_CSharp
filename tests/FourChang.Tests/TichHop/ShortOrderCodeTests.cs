@@ -40,13 +40,13 @@ public sealed class ShortOrderCodeIntegrationTests(AdminFeatureFixture fixture)
 {
     /// <summary>Đối chiếu mã giữa Admin, Web, bảng Staff, tìm theo alias cũ và tìm theo mã WEB-ID mới.</summary>
     [Fact, Trait("Feature", "ShortOrderCode")]
-    public async Task DonCu_HienThiMaNgan_TimDuocMaCuVaMoi_KhongSuaDatabase()
+    public async Task DonCu_DocDungMaDaLuu_KhongSuyMaTuKhoa_KiemTraChuDon()
     {
         var data = await OperationsScenarioSeed.Create(fixture);
         var oldCode = await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={data.Order}");
         var customer = await fixture.Api.NewCustomer(); var owner = await fixture.Api.Login(customer);
         await fixture.Api.Sql($"UPDATE dbo.DonHang SET KenhDatHang='WEB',MaKhachHang={customer.Id} WHERE MaDonHang={data.Order}");
-        var expected = "WEB-" + data.Order;
+        var expected = oldCode;
         var admin = (await fixture.Send("GET", $"/api/admin/orders/{data.Order}"))["don"]!;
         Assert.Equal(expected, admin.Text("maDon"));
         var web = (await fixture.Api.Send("GET", $"/api/customer/orders/{data.Order}", headers: owner)).Expect(200, "Khách đọc mã ngắn").Json;

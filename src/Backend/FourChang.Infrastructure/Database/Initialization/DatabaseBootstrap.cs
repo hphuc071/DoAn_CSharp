@@ -159,6 +159,7 @@ public static class DatabaseBootstrap
                 simplify.CommandText = await ReadResourceAsync("FourChang.SimplifyColumns.sql");
                 await simplify.ExecuteNonQueryAsync();
             }
+            await UpgradeDisplayCodesAsync(connection, database);
             await ValidateAsync(connection);
         }
         await CreateApplicationLoginAsync();
@@ -168,6 +169,35 @@ public static class DatabaseBootstrap
         await check.OpenAsync();
         await ValidateAsync(check);
     }
+    /// <summary>Đổi duy nhất mã hiển thị trên schema đã xác minh; backup trước, không seed dữ liệu.</summary>
+    public static async Task RenumberDisplayCodesAsync()
+    {
+        await using var connection = new SqlConnection(DatabaseSettings.ConnectionString(true));
+        await connection.OpenAsync();
+        await ValidateAsync(connection);
+        await UpgradeDisplayCodesAsync(connection, DatabaseSettings.DatabaseName);
+        await ValidateAsync(connection);
+    }
+
+    private static async Task UpgradeDisplayCodesAsync(SqlConnection connection, string database)
+    {
+        // Đánh lại mã chỉ một lần, có backup kiểm tra được; không đổi khóa hoặc số tiền.
+        await using (var marker = connection.CreateCommand())
+        {
+            marker.CommandText = "SELECT COUNT(*) FROM sys.sequences WHERE schema_id=SCHEMA_ID('dbo') AND name='DisplayCode_WEB'";
+            if (Convert.ToInt32(await marker.ExecuteScalarAsync()) == 0)
+            {
+                var path = $"/var/opt/mssql/data/{database}_beforeDisplayCodes_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}.bak";
+                await using var backup = connection.CreateCommand(); backup.CommandTimeout = 180;
+                backup.CommandText = $"BACKUP DATABASE [{database}] TO DISK=@path WITH COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=@path WITH CHECKSUM;";
+                backup.Parameters.AddWithValue("@path", path); await backup.ExecuteNonQueryAsync();
+                Console.WriteLine("Backup trước đổi mã hiển thị đã xác minh: " + path);
+                await using var codes = connection.CreateCommand(); codes.CommandTimeout = 180;
+                codes.CommandText = await ReadResourceAsync("FourChang.ShortDisplayCodes.sql"); await codes.ExecuteNonQueryAsync();
+            }
+        }
+    }
+
     /// <summary>Phân biệt schema 402 cột; manifest đầy đủ vẫn được kiểm trước và sau nâng cấp.</summary>
     private static async Task<bool> HasSimplifiedColumns(SqlConnection connection)
     {

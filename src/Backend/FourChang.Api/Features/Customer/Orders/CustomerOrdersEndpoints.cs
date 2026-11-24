@@ -27,7 +27,7 @@ public static class CustomerOrdersEndpoints
                 .Where(x => x.MaKhachHang == id)
                 .OrderByDescending(x => x.ThoiDiemTao)
                 .Take(100)
-                .Select(x => new { x.MaDonHang, MaDonHienThi = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.HinhThucNhanMon, x.TrangThai, x.ThoiDiemTao })
+                .Select(x => new { x.MaDonHang, MaDonHienThi = x.MaDonHienThi, x.HinhThucNhanMon, x.TrangThai, x.ThoiDiemTao })
                 .ToListAsync(ct));
         }).RequireAuthorization("Customer");
 
@@ -247,10 +247,10 @@ public static class CustomerOrdersEndpoints
         }
 
         // Mã tạm duy nhất chỉ tồn tại trong transaction để SQL cấp ID. Không trả mã tạm cho client.
-        var orderCode = "TMP-" + Guid.NewGuid().ToString("N")[..24];
+
         var order = new DonHang
         {
-            MaDonHienThi = orderCode,
+
             MaKhachHang = customerId,
             KenhDatHang = "WEB",
             HinhThucNhanMon = req.HinhThucNhanMon.ToUpperInvariant(),
@@ -271,8 +271,8 @@ public static class CustomerOrdersEndpoints
         };
         db.DonHang.Add(order);
         await db.SaveChangesAsync(ct);
-        // Khóa identity bảo vệ cạnh tranh; mã ngắn được lưu trước khi transaction/biên nhận được commit.
-        order.MaDonHienThi = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang);
+        // Sequence SQL đã cấp mã hiển thị trước khi lưu biên nhận.
+        // Mã hiển thị được cấp độc lập với identity khi lưu đơn.
         for (var idx = 0; idx < req.Items.Count; idx++)
         {
             var item = req.Items[idx];

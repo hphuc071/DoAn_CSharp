@@ -45,7 +45,7 @@ public sealed class StaffInvoiceQueryTests(AdminFeatureFixture fixture)
             Assert.Equal(104,data.Number("tongSo"));Assert.Equal(page==3?4:50,data["duLieu"]!.AsArray().Count);
         }
         var single=(await fixture.Api.Send("GET",$"/api/pos/invoices?search={prefix}-104",headers:staff)).Expect(200,"Tìm ngoài 100 bản ghi đầu").Json;
-        var invoice=Assert.Single(single["duLieu"]!.AsArray())!;var code=invoice.Text("maDon");Assert.StartsWith("POS-",code);
+        var invoice=Assert.Single(single["duLieu"]!.AsArray())!;var code=invoice.Text("maDon");Assert.Equal(prefix+"-104",code);
         var byOrder=(await fixture.Api.Send("GET",$"/api/pos/invoices?search={code}",headers:staff)).Expect(200,"Tìm mã đơn ngắn").Json;
         Assert.Equal(1,byOrder.Number("tongSo"));
         var byName=(await fixture.Api.Send("GET",$"/api/pos/invoices?search={Uri.EscapeDataString(prefix+" Khách kiểm thử")}",headers:staff)).Expect(200,"Tìm tên người nhận").Json;

@@ -24,7 +24,7 @@ public sealed class ReportAdministrationTests(AdminFeatureFixture fixture)
         var result=await Snapshot(Period(completed.Shift));
         Assert.Equal("REPORT_SIMPLE",result.Loai); Assert.Equal(1,result.ChiSo.HoanTat); Assert.Equal(completed.Total,result.ChiSo.DoanhThuThuan);
         Assert.Equal(new[]{"Đơn hoàn thành","Món bán chạy","Tiền đã hoàn"},result.Bang.Select(x=>x.Ten));
-        Assert.Single(result.Bang[0].Dong); Assert.Equal($"POS-{completed.Order}",result.Bang[0].Dong[0][0]);
+        Assert.Single(result.Bang[0].Dong); Assert.Equal(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={completed.Order}"),result.Bang[0].Dong[0][0]);
         Assert.Equal("2",Assert.Single(result.Bang[1].Dong)[1]); Assert.Empty(result.Bang[2].Dong);
         var empty=await Snapshot(Period(completed.Shift) with {TuLuc=DateTime.UtcNow.AddYears(-10),DenLuc=DateTime.UtcNow.AddYears(-9)});
         Assert.Equal(0,empty.ChiSo.HoanTat); Assert.Equal(0,empty.ChiSo.DoanhThuThuan); Assert.All(empty.Bang,x=>Assert.Empty(x.Dong));
@@ -44,7 +44,7 @@ public sealed class ReportAdministrationTests(AdminFeatureFixture fixture)
         Assert.NotEqual(data.Shift,shift);
         var report=await Snapshot(Period(shift));
         Assert.Equal(0,report.ChiSo.HoanTat); Assert.Equal(0,report.ChiSo.DoanhThuThuan); Assert.Equal(data.Total/2,report.ChiSo.HoanTienMat);
-        Assert.Equal($"POS-{data.Order}",Assert.Single(report.Bang[2].Dong)[0]);
+        Assert.Equal(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={data.Order}"),Assert.Single(report.Bang[2].Dong)[0]);
         Assert.Equal(0,(await Snapshot(Period(data.Shift))).ChiSo.HoanTienMat);
     }
 
@@ -78,7 +78,7 @@ public sealed class ReportAdministrationTests(AdminFeatureFixture fixture)
         foreach(var entry in zip.Entries.Where(x=>x.FullName.StartsWith("xl/worksheets/")))
         {using var stream=entry.Open(); Assert.Empty(XDocument.Load(stream).Descendants(ns+"f"));}
         using(var stream=zip.GetEntry("xl/worksheets/sheet3.xml")!.Open())
-        {var xml=XDocument.Load(stream).ToString();Assert.Contains($"POS-{data.Order}",xml);Assert.DoesNotContain($"POS-{later.Order}",xml);}
+        {var xml=XDocument.Load(stream).ToString();Assert.Contains(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={data.Order}"),xml);Assert.DoesNotContain(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={later.Order}"),xml);}
     }
 
     [Fact]

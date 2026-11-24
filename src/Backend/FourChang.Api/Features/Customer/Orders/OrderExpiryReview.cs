@@ -23,7 +23,7 @@ internal static class OrderExpiryReview
                 .Select(o => new
                 {
                     o.MaDonHang,
-                    MaDonHienThi = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(o.MaDonHang, "WEB"),
+                    MaDonHienThi = o.MaDonHienThi,
                     o.HetHanLuc
                 })
                 .ToListAsync(ct);

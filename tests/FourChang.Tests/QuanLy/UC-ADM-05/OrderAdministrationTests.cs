@@ -44,7 +44,7 @@ public sealed class OrderAdministrationTests(AdminFeatureFixture fixture)
         Assert.Equal(approve?"APPROVED":"REJECTED",result.Don.KetQuaHuy!.TrangThai);
         Assert.Equal("0",await fixture.Api.Sql($"SELECT COUNT(*) FROM dbo.LanChiHoanTien c JOIN dbo.HoSoHoanTien h ON h.MaHoanTien=c.MaHoanTien WHERE h.MaDonHang={s.Order}"));
         var outcome=approve?"APPROVED":"REJECTED";
-        var list=await fixture.Send("GET",$"/api/admin/orders?NhomDon=CANCELLATION&KetQuaHuy={outcome}&TimKiem=POS-{s.Order}&KichThuocTrang=1");
+        var list=await fixture.Send("GET",$"/api/admin/orders?NhomDon=CANCELLATION&KetQuaHuy={outcome}&TimKiem={Uri.EscapeDataString(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={s.Order}"))}&KichThuocTrang=1");
         Assert.Equal(1,list["tongSo"]!.GetValue<int>());
         Assert.Equal(s.Order,list["duLieu"]![0]!["maDonHang"]!.GetValue<long>());
     }

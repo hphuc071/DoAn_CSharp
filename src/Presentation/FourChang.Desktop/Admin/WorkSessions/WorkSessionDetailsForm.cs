@@ -29,7 +29,7 @@ public sealed class WorkSessionDetailsForm : Form
     /// <summary>Hiển thị thực đếm chưa nhập bằng chữ, không đổi NULL thành 0; nút nằm ngoài vùng cuộn.</summary>
     public WorkSessionDetailsForm(WorkSessionDetails details)
     {
-        data = details; Name = "WorkSessionDetails"; Text = $"Đối chiếu ca #{data.Ca.MaCaLamViec}";
+        data = details; Name = "WorkSessionDetails"; Text = $"Đối chiếu ca {data.Ca.MaCaHienThi}";
         ClientSize = new Size(1220, 850); MinimumSize = new Size(940, 650); StartPosition = FormStartPosition.CenterParent;
         BackColor = CafeTheme.Cream; Font = CafeTheme.Body(); AutoScaleMode = AutoScaleMode.Dpi;
         closeShift = Button("Chốt ca chờ đối chiếu", CloseShift, true); closeShift.Name = "AdminConfirmShift";
@@ -94,7 +94,7 @@ public sealed class WorkSessionDetailsForm : Form
         foreach (Control control in snapshot.Controls) control.Dispose(); snapshot.Controls.Clear();
         var ca = data.Ca;
         var status = ca.TrangThai switch { "OPEN" => "Đang làm", "CLOSED" => "Đã chốt", "HANDED_OVER" => "Đã bàn giao", _ => "Chờ đối chiếu / hỗ trợ" };
-        var header = OrderDetailsForm.Section("Thông tin ca làm việc", OrderDetailsForm.Value("Mã ca", ca.MaCaLamViec.ToString()),
+        var header = OrderDetailsForm.Section("Thông tin ca làm việc", OrderDetailsForm.Value("Mã ca", ca.MaCaHienThi),
             OrderDetailsForm.Value("Nhân viên", $"{ca.HoTen} · NV {ca.MaNhanVien}", 370), OrderDetailsForm.Value("Ca", ca.TenCa), OrderDetailsForm.Value("Trạng thái", status, 220),
             OrderDetailsForm.Value("Bắt đầu", ca.BatDauLuc.ToLocalTime().ToString("dd/MM/yyyy HH:mm"), 220),
             OrderDetailsForm.Value("Kết thúc", ca.KetThucLuc?.ToLocalTime().ToString("dd/MM/yyyy HH:mm") ?? "Chưa kết thúc", 220));

@@ -37,7 +37,7 @@ public sealed class WorkSessionsPage : UserControl
         state.Width = 210;
         employee.Name = "WorkSessionEmployeeFilter"; name.Name = "WorkSessionNameFilter";
         state.Name = "WorkSessionStateFilter"; from.Name = "WorkSessionFrom"; to.Name = "WorkSessionTo"; grid.Name = "WorkSessionsGrid";
-        foreach (var (property, caption, weight) in new[] { ("MaCaLamViec", "Mã ca", 75f), ("HoTen", "Nhân viên", 160f), ("TenCa", "Ca", 75f),
+        foreach (var (property, caption, weight) in new[] { ("MaCaHienThi", "Mã ca", 75f), ("HoTen", "Nhân viên", 160f), ("TenCa", "Ca", 75f),
             ("BatDauLuc", "Bắt đầu", 130f), ("KetThucLuc", "Kết thúc", 130f), ("TienMatThucDem", "Tiền kiểm đếm", 120f), ("TrangThai", "Trạng thái", 145f) })
             grid.Columns.Add(new DataGridViewTextBoxColumn { Name = property, DataPropertyName = property, HeaderText = caption, FillWeight = weight, SortMode = DataGridViewColumnSortMode.NotSortable });        grid.AutoGenerateColumns = false;
         grid.CellFormatting += (_, e) =>
@@ -59,7 +59,7 @@ public sealed class WorkSessionsPage : UserControl
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         foreach (DataGridViewColumn column in grid.Columns)
         {
-            column.MinimumWidth = column.DataPropertyName switch { "MaCaLamViec" => 70, "HoTen" => 150, "TenCa" => 75, "TrangThai" => 140, _ => 120 };
+            column.MinimumWidth = column.DataPropertyName switch { "MaCaHienThi" => 70, "HoTen" => 150, "TenCa" => 75, "TrangThai" => 140, _ => 120 };
             if (column.DataPropertyName is "BatDauLuc" or "KetThucLuc" or "HoTen") column.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             if (column.DataPropertyName == "TienMatThucDem") column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         }

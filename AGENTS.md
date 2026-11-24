@@ -292,3 +292,18 @@ Cập nhật: 14/11/2026. Đây là ghi nhớ và hướng dẫn cho agent; code
 ## Đợt đưa thay đổi lên GitHub — 21/11/2026
 - Người dùng yêu cầu commit/push toàn bộ phần tinh gọn schema và mở luồng local đã hoàn thiện lên main. Fetch phát hiện origin/main có3commit mới (1cb8d51), chỉ README thay đổi; cần giữ nguyên nội dung nhóm và ghép mục Chạy đồ án local.
 - Phạm vi commit: source/SQL/model migration012, bản schema423 phục vụ nâng cấp, script Enable-LocalDemo, test và tài liệu. Đã kiểm không có credential local trong68tệp thay đổi/mới; .env, backup, database thật và artifacts test đều bị ignore. Bằng chứng kiểm thử vẫn734/734 toàn bộ sau schema +79/79 kiểm tập trung sau checkout; không chạy lại test chỉ để commit.
+
+## Mã hiển thị bắt đầu từ 1 — 24/11/2026
+- Mã công khai tách khỏi PK: sequence SQL riêng WEB/POS/HD/DC/PN/PX/PK/CA/HT, NO CACHE; không cam kết không có khoảng trống khi rollback. API đọc mã đã lưu, không dựng lại từ ID; tìm kiếm không suy số mã thành PK. Đổi loại phiếu nháp cấp lại đúng tiền tố. Ca trên màn hình dùng MaCaHienThi.
+- 013-short-display-codes.sql đánh lại dữ liệu hiện có theo PK trong mỗi tiền tố, giữ khóa, tiền/kho/tham chiếu ngân hàng/snapshot; lưu ánh xạ cũ/mới vào audit. Backup+VERIFYONLY trước nâng. CLI --renumber-display-codes chỉ đổi mã trên schema402, không seed. Schema tạo mới có9sequence, không thêm bảng/cột.
+- Build solution0warning/error. Regression63/64 đạt; test còn lại giả định mã=PK đã cập nhật. Lượt cuối display-codes-final.trx16/16 đạt, gồm migration idempotent, PK60000+/mã1,8tạo đồng thời, tìm kiếm và Web payment. Không tuyên bố chạy lại toàn bộ bộ test.
+- Database thật trên máy hiện423cột, còn21cột cũ; code pull yêu cầu402. Lệnh áp dụng dừng ở ValidateAsync trước mọi ghi/backup, dữ liệu quán chưa đổi. Đã hỏi người dùng chọn đồng bộ schema rồi đổi mã hoặc chỉ giữ thay đổi code. KHÔNG tự nâng database khi chưa nhận trả lời. Docker hiện đã khởi động; chưa khởi động Backend vì schema lệch. Đối chiếu chỉ đọc31bảng (30nghiệp vụ+sysdiagrams) và mã cũ trong artifacts/display-codes-live.
+
+## Đã áp dụng database và mã hiển thị — 24/11/2026
+- Người dùng đã cho phép sao lưu/đồng bộ database/đổi mã/khởi động lại. Đã dừng đúng API PID38060, xác minh schema423, backup native+CHECKSUM+VERIFYONLY rồi chạy012→402 và013→mã từ1. Không chạy seed, không xóa/đánh lại PK/FK.
+- Hash dữ liệu giữ lại31bảng (30nghiệp vụ+sysdiagrams) trước/sau khớp, loại trừ đúng cột đã bỏ/mã/rowversion và audit mới của migration; CHECKCONSTRAINTS đạt,9sequence và0trigger bị tắt. Snapshot hóa đơn/tham chiếu ngân hàng/tiền/kho giữ nguyên. Giá trị cột bỏ lưu SCHEMA_COLUMNS_ARCHIVE; ánh xạ mã lưu DISPLAY_CODES_RENUMBERED.
+- Backup trước toàn bộ thay đổi đã chép ra artifacts/display-codes-live/FourChangDb-before-update.bak; SHA256, before/after và mã mới cùng thư mục. Backend build0warning/error và đã khởi động lại bằng Start-LocalBackend.ps1. Không cần hỏi lại quyền nâng database cho công việc này.
+
+## STT danh sách món — 24/11/2026
+- Chỉ tab Món: sắp theo ThuTuHienThi rồi MaMon; cột STT1..N thay khóa thô. DataGridViewRow.Tag giữ MaMon thật để sửa đúng sau lọc. Không đổi database hoặc mã các tab khác.
+- Smoke UI dữ liệu thử có MaMon60002: STT1–7/sửa đúng khóa/lọc đúng đạt, đã xem ảnh. Admin build thư mục artifacts/menu-stt-app đạt0warning/error; bản bin chuẩn đang bị app Quản lý PID38000 giữ DLL. Người dùng cần đóng Quản lý rồi chạy Chay-QuanLy.cmd để build/nạp DLL mới. Không tự đóng app người dùng.

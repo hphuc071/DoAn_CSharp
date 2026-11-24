@@ -76,8 +76,8 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         var refundKeys = ownRefunds.Select(x => x.MaHoanTien).Distinct().ToArray();
         var refundOrders = await db.HoSoHoanTien.AsNoTracking().Where(x => refundKeys.Contains(x.MaHoanTien)).ToDictionaryAsync(x => x.MaHoanTien, x => x.MaDonHang);
         var transactionOrders = ownPayments.Select(x => x.MaDonHang).Concat(refundOrders.Values).Distinct().ToArray();
-        var orderChannels = await db.DonHang.AsNoTracking().Where(x => transactionOrders.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang, x => x.KenhDatHang);
-        string? Code(long? order) => order is { } key && orderChannels.TryGetValue(key, out var channel) ? FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(key, channel) : null;
+        var orderChannels = await db.DonHang.AsNoTracking().Where(x => transactionOrders.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang, x => x.MaDonHienThi);
+        string? Code(long? order) => order is { } key && orderChannels.TryGetValue(key, out var channel) ? channel : null;
         var transactions = ownPayments.Select(x => new ShiftTransaction("Thu", x.MaThanhToan, x.MaDonHang, x.MaThanhToanHienThi,
             x.PhuongThuc, x.SoTienDaXacMinh, x.TrangThai, Code(x.MaDonHang))).Concat(ownRefunds.Select(x => new ShiftTransaction("Hoàn", x.MaLanChiHoan,
             refundOrders.GetValueOrDefault(x.MaHoanTien), x.MaHoanTien.ToString(), x.PhuongThuc, x.SoTien, x.TrangThai, Code(refundOrders.GetValueOrDefault(x.MaHoanTien))))).ToList();        var unresolved = payments.Where(x => x.TrangThai is "PENDING" or "PARTIAL" or "RECONCILING")
@@ -85,7 +85,7 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
                 .Select(x => "REFUND:" + x.MaLanChiHoan)).Order().ToList();
         var orders = await db.DonHang.AsNoTracking().Where(x => x.MaCaLamViec != null && ids.Contains(x.MaCaLamViec.Value) &&
             x.TrangThai != "COMPLETED" && x.TrangThai != "CANCELLED" && x.TrangThai != "EXPIRED" && x.TrangThai != "DELIVERY_FAILED" && x.TrangThai != "REJECTED")
-            .OrderBy(x => x.MaDonHang).Select(x => new ShiftOrder(x.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TrangThai, x.MaCaLamViec)).ToListAsync();
+            .OrderBy(x => x.MaDonHang).Select(x => new ShiftOrder(x.MaDonHang, x.MaDonHienThi, x.TrangThai, x.MaCaLamViec)).ToListAsync();
         var objectId = shift.MaCaLamViec.ToString();
         var audits = await db.NhatKyHeThong.AsNoTracking().Where(x => x.MaCaLamViec == shift.MaCaLamViec || x.LoaiDoiTuong == "CaLamViec" && x.MaDoiTuong == objectId)
             .OrderByDescending(x => x.MaNhatKy).Select(x => new ShiftAudit(x.PhatSinhLuc, x.TenNguoiThucHienDaChot, x.HanhDong, x.LyDo)).ToListAsync();
@@ -97,7 +97,7 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         var finished = await HandoverLink.CompletedByShift(db, db.DonHang.AsNoTracking(), shift.MaCaLamViec).ToListAsync();
         var completedOrders = new List<ShiftCompletedOrder>();
         foreach (var order in finished.OrderByDescending(x => x.HoanTatLuc).ThenByDescending(x => x.MaDonHang))
-            completedOrders.Add(new(order.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang),
+            completedOrders.Add(new(order.MaDonHang, order.MaDonHienThi,
                 order.HoanTatLuc, (await financials.Read(order)).NghiaVu, order.MaCaLamViec));
         var completedTotal = completedOrders.Sum(x => x.SoTien);
         return new(await View(shift), cashIn, cashOut, expected, shift.TienMatThucDem is { } counted ? counted - expected : null,

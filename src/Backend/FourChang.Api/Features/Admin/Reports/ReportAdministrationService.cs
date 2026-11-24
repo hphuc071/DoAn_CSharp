@@ -52,7 +52,7 @@ public sealed class ReportAdministrationService(CafeDbContext db, ReportPermissi
             join o in refundOrders on r.MaDonHang equals o.MaDonHang
             where a.TrangThai == "SUCCEEDED" && a.CoKetQuaLuc >= start && a.CoKetQuaLuc < end && (filter.MaCa == null || a.MaCaLamViec == filter.MaCa)
             orderby a.CoKetQuaLuc descending, a.MaLanChiHoan descending
-            select new { o.MaDonHang, o.KenhDatHang, r.TenNguoiNhan, a.SoTien, a.PhuongThuc, a.CoKetQuaLuc }).ToListAsync();
+            select new { o.MaDonHang, o.MaDonHienThi, r.TenNguoiNhan, a.SoTien, a.PhuongThuc, a.CoKetQuaLuc }).ToListAsync();
         var cashRefund = paidRefunds.Where(x => x.PhuongThuc == "CASH").Sum(x => x.SoTien);
         var bankRefund = paidRefunds.Where(x => x.PhuongThuc == "BANK_TRANSFER").Sum(x => x.SoTien);
         var variantIds = lines.Select(x => x.MaCauHinhMon).Distinct().ToArray();
@@ -63,11 +63,11 @@ public sealed class ReportAdministrationService(CafeDbContext db, ReportPermissi
         var tables = new List<ReportTable>
         {
             new("Đơn hoàn thành", [new("Mã đơn"), new("Khách hàng"), new("Tổng tiền", "number"), new("Hoàn thành lúc", "datetime")],
-                completed.Select(x => (IReadOnlyList<string?>)new string?[] { FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TenNguoiNhan ?? "Khách tại quầy", N(Total(x.MaDonHang, x.PhiGiaoHangHienTai)), x.HoanTatLuc?.ToString("O") }).ToList()),
+                completed.Select(x => (IReadOnlyList<string?>)new string?[] { x.MaDonHienThi, x.TenNguoiNhan ?? "Khách tại quầy", N(Total(x.MaDonHang, x.PhiGiaoHangHienTai)), x.HoanTatLuc?.ToString("O") }).ToList()),
             new("Món bán chạy", [new("Tên món"), new("Số ly", "number"), new("Tiền món", "number")],
                 bestsellers.Select(x => (IReadOnlyList<string?>)new string?[] { x.Name, N(x.Quantity), N(x.Amount) }).ToList()),
             new("Tiền đã hoàn", [new("Mã đơn"), new("Người nhận"), new("Phương thức"), new("Số tiền", "number"), new("Trả tiền lúc", "datetime")],
-                paidRefunds.Select(x => (IReadOnlyList<string?>)new string?[] { FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, x.KenhDatHang), x.TenNguoiNhan, x.PhuongThuc == "CASH" ? "Tiền mặt" : "Chuyển khoản", N(x.SoTien), x.CoKetQuaLuc?.ToString("O") }).ToList())
+                paidRefunds.Select(x => (IReadOnlyList<string?>)new string?[] { x.MaDonHienThi, x.TenNguoiNhan, x.PhuongThuc == "CASH" ? "Tiền mặt" : "Chuyển khoản", N(x.SoTien), x.CoKetQuaLuc?.ToString("O") }).ToList())
         };
         // Các trường KPI cũ còn trong hợp đồng để đọc snapshot lịch sử; báo cáo mới không sử dụng các phân tích đã bỏ.
         var kpis = new ReportKpis(goods, shippingTotal, reduction, goods + shippingTotal - reduction, 0, 0, cashRefund, bankRefund, 0, 0, completed.Count, 0, 0, 0, 0, null);

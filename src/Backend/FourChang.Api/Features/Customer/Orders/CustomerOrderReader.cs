@@ -93,7 +93,7 @@ public sealed class CustomerOrderReader(CafeDbContext db, IConfiguration? config
 
     private static DateTime? Utc(DateTime? value) => value is { } time ? DateTime.SpecifyKind(time, DateTimeKind.Utc) : null;
     private static CustomerOrderSummary Summary(DonHang order) => new(order.MaDonHang,
-        FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), order.TrangThai, order.HinhThucNhanMon,
+        order.MaDonHienThi, order.TrangThai, order.HinhThucNhanMon,
         DateTime.SpecifyKind(order.ThoiDiemTao, DateTimeKind.Utc),
         DateTime.SpecifyKind(order.ThoiDiemCapNhat, DateTimeKind.Utc));
 }

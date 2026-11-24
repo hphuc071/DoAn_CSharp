@@ -26,13 +26,13 @@ public sealed class RefundAdministrationService(CafeDbContext db, OrderFinancial
         var ids = rows.Select(x => x.MaHoanTien).ToArray();
         var attempts = await db.LanChiHoanTien.AsNoTracking().Where(x => ids.Contains(x.MaHoanTien)).ToListAsync();
         var orderIds = rows.Select(x => x.MaDonHang).Distinct().ToArray();
-        var channels = await db.DonHang.AsNoTracking().Where(x => orderIds.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang, x => x.KenhDatHang);
+        var channels = await db.DonHang.AsNoTracking().Where(x => orderIds.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang, x => x.MaDonHienThi);
         var shiftIds = attempts.Where(x => x.MaCaLamViec != null).Select(x => x.MaCaLamViec!.Value).Distinct().ToArray();
         var staff = await (from c in db.CaLamViec.AsNoTracking() join n in db.NhanVien.AsNoTracking() on c.MaNhanVien equals n.MaNhanVien
             where shiftIds.Contains(c.MaCaLamViec) select new { c.MaCaLamViec, n.HoTen }).ToDictionaryAsync(x => x.MaCaLamViec, x => x.HoTen);
         var result = rows.Select(x => View(x, attempts.Where(a => a.MaHoanTien == x.MaHoanTien)) with
         {
-            MaDon = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, channels[x.MaDonHang]),
+            MaDon = channels[x.MaDonHang],
             TaoLuc = x.ThoiDiemTao,
             LanChi = attempts.Where(a => a.MaHoanTien == x.MaHoanTien).OrderBy(a => a.SoThuTuLanChi)
                 .Select(a => new RefundAttemptView(a.MaLanChiHoan, a.SoThuTuLanChi, a.SoTien, a.PhuongThuc, a.TrangThai,
@@ -73,7 +73,7 @@ public sealed class RefundAdministrationService(CafeDbContext db, OrderFinancial
             if (input.PhuongThuc is not ("CASH" or "BANK_TRANSFER") || (order.KenhDatHang == "WEB" && input.PhuongThuc != "BANK_TRANSFER")) throw Bad("Hoàn tiền mặt cho đơn Web phải đi qua luồng duyệt hủy và hoàn tại quầy.");
             if (string.IsNullOrWhiteSpace(input.NguoiNhan) || input.NguoiNhan.Length > 120) throw Bad("Nhập người nhận tối đa 120 ký tự.");
             if (input.PhuongThuc == "BANK_TRANSFER" && (string.IsNullOrWhiteSpace(input.TaiKhoan) || input.TaiKhoan.Length > 50 || input.TaiKhoan.Any(char.IsControl) || string.IsNullOrWhiteSpace(input.NganHang) || input.NganHang.Length > 100)) throw Bad("Nhập thông tin ngân hàng/người nhận hợp lệ.");
-            var record = id is null ? new HoSoHoanTien { MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"), MaQuanLyYeuCau = Actor(context), TrangThai = "REQUESTED" }
+            var record = id is null ? new HoSoHoanTien { MaQuanLyYeuCau = Actor(context), TrangThai = "REQUESTED" }
                 : await Find(id.Value);
             var before = id is null ? null : JsonSerializer.Serialize(View(record, []));
             if (id is not null)

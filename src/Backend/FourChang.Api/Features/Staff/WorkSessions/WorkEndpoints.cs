@@ -90,7 +90,7 @@ public static class WorkEndpoints
             var source = await HandoverLink.SourceForOpen(db, employee.MaNhanVien, machine);
             var shift = new CaLamViec
             {
-                MaCaHienThi = "CA-" + Guid.NewGuid().ToString("N")[..20], MaNhanVien = employee.MaNhanVien,
+                MaNhanVien = employee.MaNhanVien,
                 TenCa = input.TenCa, MaMay = machine, BatDauLuc = now, TrangThai = "OPEN",
                 TienMatDauCa = input.TienMatDauCa, MaCaBanGiaoTruoc = source
             };

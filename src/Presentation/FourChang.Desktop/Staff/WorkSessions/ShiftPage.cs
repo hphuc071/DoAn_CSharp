@@ -76,7 +76,7 @@ public sealed class ShiftPage : UserControl
             if (current.Ca.KetThucLuc is null) ShiftSessionFile.Save(context.Phien); else ShiftSessionFile.Clear();
             data = current; connected = true;
             completedTotal.Text=$"{current.TongTienDonHoanThanh:N0}đ"; completedCount.Text=current.SoDonHoanThanh.ToString();
-            summary.Text = $"{current.Ca.HoTen} · Mã NV {current.Ca.MaNhanVien} · Ca #{current.Ca.MaCaLamViec} · {current.Ca.TenCa}";
+            summary.Text = $"{current.Ca.HoTen} · Mã NV {current.Ca.MaNhanVien} · {current.Ca.MaCaHienThi} · {current.Ca.TenCa}";
             balances.Text = $"{current.DonDangXuLy.Count} đơn đang xử lý · {current.KhoanChuaRo.Count} khoản cần đối chiếu";
             message.ForeColor = CafeTheme.Muted;
             message.Text = current.Ca.KetThucLuc is not null ? "Ca đã kết thúc; không nhận lệnh mới. Có thể mở ca mới."

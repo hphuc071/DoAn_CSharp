@@ -198,7 +198,7 @@ public sealed class WorkSessionAdministrationTests(AdminFeatureFixture fixture)
         }
         var target=await WorkforceScenarios.Detail(fixture,targetId); var old=await WorkforceScenarios.Detail(fixture,sourceId);
         Assert.Equal(1,target.Number("soDonHoanThanh")); Assert.Equal(order.Total,target["tongTienDonHoanThanh"]!.GetValue<decimal>());
-        Assert.Equal($"POS-{order.Order}",Assert.Single(target["donHoanThanh"]!.AsArray())!.Text("maDon"));
+        Assert.Equal(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={order.Order}"),Assert.Single(target["donHoanThanh"]!.AsArray())!.Text("maDon"));
         Assert.Equal(0,target.Number("thuTienMat")); Assert.Equal(0,target.Number("tienMatDuKienHienTai")); Assert.Equal(0,old.Number("soDonHoanThanh"));
         Assert.Equal(order.Total,old["thuTienMat"]!.GetValue<decimal>());
         Assert.Equal(sourceId.ToString(),await fixture.Api.Sql($"SELECT MaCaLamViec FROM dbo.ThanhToan WHERE MaThanhToan={order.Payment}"));

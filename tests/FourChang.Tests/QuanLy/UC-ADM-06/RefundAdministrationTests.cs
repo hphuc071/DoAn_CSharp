@@ -16,7 +16,7 @@ public sealed class RefundAdministrationTests(AdminFeatureFixture fixture)
         var staff=await OperationsScenarioSeed.RequestAndApprove(fixture,s);
         var before=(await All()).Single(x=>x.MaDonHang==s.Order);
         Assert.Equal("WAITING",before.TrangThaiTheoDoi); Assert.Equal(0,before.DaHoan);
-        Assert.Equal(s.Total/2,before.ConHoan); Assert.Equal($"POS-{s.Order}",before.MaDon);
+        Assert.Equal(s.Total/2,before.ConHoan); Assert.Equal(await fixture.Api.Sql($"SELECT MaDonHienThi FROM dbo.DonHang WHERE MaDonHang={s.Order}"),before.MaDon);
         var payable=(await fixture.Api.Send("GET",$"/api/pos/orders/{s.Order}/counter-refunds",headers:staff)).Expect(200,"Khoản được duyệt").Json.AsArray().Single()!;
         var command=Body(("NguoiNhan",payable.Text("nguoiNhan")),("ChungCu","Khách ký nhận tại quầy"),("DaGiaoTienVaKhachDaNhan",true),("PhienBanDuLieu",payable.Text("phienBanDuLieu")),("MaThaoTac",NewId()));
         (await fixture.Api.Send("POST",$"/api/pos/orders/counter-refunds/{before.MaHoanTien}",command,staff)).Expect(200,"Staff trả tiền");

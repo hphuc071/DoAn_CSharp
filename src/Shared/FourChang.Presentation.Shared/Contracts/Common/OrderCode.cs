@@ -2,10 +2,10 @@ using System.Globalization;
 
 namespace FourChang.Presentation.Shared.Contracts.Common;
 
-/// <summary>Một quy ước mã đơn cho Web/POS/API: dùng khóa có sẵn, không đếm MAX+1 hoặc thêm số 0 đệm.</summary>
+/// <summary>Định dạng và kiểm tra mã công khai. Số hiển thị độc lập với khóa database; API đọc MaDonHienThi đã lưu.</summary>
 public static class OrderCode
 {
-    /// <summary>Định dạng mã công khai sau khi đã có ID; ID tăng chung nên không cam kết số liên tục riêng từng kênh.</summary>
+    /// <summary>Định dạng một số hiển thị đã cấp; không dùng hàm này để suy mã công khai từ khóa database.</summary>
     public static string Format(long id, string channel)
     {
         if (id <= 0) throw new ArgumentOutOfRangeException(nameof(id));

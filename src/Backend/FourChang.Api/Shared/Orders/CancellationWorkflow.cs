@@ -126,7 +126,7 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
         var customer = await db.TaiKhoanKhachHang.SingleAsync(x => x.MaKhachHang == order.MaKhachHang);
         foreach (var payment in await db.ThanhToan.Where(x => x.MaDonHang == order.MaDonHang && x.SoTienDaXacMinh > 0).ToListAsync())
         {
-            db.HoSoHoanTien.Add(new() { MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"), MaDonHang = order.MaDonHang,
+            db.HoSoHoanTien.Add(new() { MaDonHang = order.MaDonHang,
                 MaThanhToan = payment.MaThanhToan, MaHuyMon = requests[0].MaHuyMon, LoaiNguon = "CANCELLATION",
                 LyDoHoan = requests[0].LyDoHuy, ChungCuYeuCau = "Yêu cầu khách / nhóm " + requests[0].MaNhomHuy,
                 SoTienYeuCau = payment.SoTienDaXacMinh, SoTienDuocDuyet = payment.SoTienDaXacMinh,

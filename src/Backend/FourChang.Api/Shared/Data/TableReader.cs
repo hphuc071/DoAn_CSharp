@@ -18,7 +18,7 @@ public static class TableReader
             var codeColumn = Array.FindIndex(columns, p => p.Name == "MaDonHienThi");
             for (var index = 0; index < records.Count; index++)
                 if (records[index] is FourChang.Domain.Entities.Orders.DonHang order && codeColumn >= 0)
-                    rows[index][codeColumn] = OrderCode.Format(order.MaDonHang, order.KenhDatHang);
+                    rows[index][codeColumn] = order.MaDonHienThi;
         }
         return new(columns.Select(p=>p.Name).ToArray(),rows);
     }

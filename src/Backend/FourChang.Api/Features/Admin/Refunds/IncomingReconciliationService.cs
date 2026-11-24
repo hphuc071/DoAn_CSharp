@@ -58,7 +58,7 @@ public sealed class IncomingReconciliationService(CafeDbContext db, OrderFinanci
             var balance = await financials.Read(order);
             var requested = await db.HoSoHoanTien.Where(x => x.MaDonHang == order.MaDonHang && x.TrangThai == "REQUESTED").SumAsync(x => (decimal?)x.SoTienYeuCau) ?? 0;
             var needed = Math.Max(0, balance.PhaiHoan - balance.DangGiuHanMuc - requested);
-            if (needed > 0) db.HoSoHoanTien.Add(new() { MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"), MaDonHang = order.MaDonHang, MaThanhToan = payment.MaThanhToan,
+            if (needed > 0) db.HoSoHoanTien.Add(new() { MaDonHang = order.MaDonHang, MaThanhToan = payment.MaThanhToan,
                 LoaiNguon = order.TrangThai == "EXPIRED" ? "LATE_PAYMENT" : "OVERPAYMENT", SoTienYeuCau = Math.Min(needed, payment.SoTienDaXacMinh),
                 LyDoHoan = input.LyDo, ChungCuYeuCau = input.ChungCuSaoKe, PhuongThucHoan = "BANK_TRANSFER", TrangThai = "REQUESTED", MaQuanLyYeuCau = payment.MaQuanLyXacMinh });
             order.ThoiDiemCapNhat = DateTime.UtcNow;

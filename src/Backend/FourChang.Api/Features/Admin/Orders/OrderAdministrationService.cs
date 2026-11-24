@@ -63,8 +63,7 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
         if (!string.IsNullOrWhiteSpace(filter.TimKiem))
         {
             var text = filter.TimKiem.Trim();
-            var shortCode = FourChang.Presentation.Shared.Contracts.Common.OrderCode.TryParse(text, out var channel, out var id);
-            query = query.Where(x => shortCode && x.MaDonHang == id && x.KenhDatHang == channel || x.MaDonHienThi.Contains(text) || x.TenNguoiNhan != null && x.TenNguoiNhan.Contains(text));
+            query = query.Where(x => x.MaDonHienThi.Contains(text) || x.TenNguoiNhan != null && x.TenNguoiNhan.Contains(text));
         }
         var total = await query.CountAsync();
         var data = await query.OrderByDescending(x => x.MaDonHang).Skip((filter.Trang - 1) * filter.KichThuocTrang).Take(filter.KichThuocTrang).ToListAsync();
@@ -139,7 +138,7 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
             order.TrangThai == "PENDING_CONFIRMATION" && waitingLimit is { } limit && DateTime.UtcNow - order.ThoiDiemTao > TimeSpan.FromMinutes(limit) ? "Chờ xác nhận lâu" : "";
         var pending = await CancellationWorkflow.Pending(db, order.MaDonHang);
         if (pending is not null) warning = pending.TrangThai == "REQUESTED" ? "Khách yêu cầu hủy · chờ Nhân viên chuyển" : "Yêu cầu hủy · chờ Quản lý duyệt";
-        return new(order.MaDonHang, FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang), order.KenhDatHang, order.HinhThucNhanMon, order.TrangThai, order.MaKhachHang,
+        return new(order.MaDonHang, order.MaDonHienThi, order.KenhDatHang, order.HinhThucNhanMon, order.TrangThai, order.MaKhachHang,
             order.MaCaLamViec, employee?.HoTen, shift?.MaMay, order.ThoiDiemTao, order.HoanTatLuc, Math.Max(0, balance.NghiaVu - order.PhiGiaoHangHienTai),
             order.PhiGiaoHangHienTai, balance, order.PhienBanDuLieu, warning, pending, null,
             pending is null ? await CancellationWorkflow.LatestDecision(db, order.MaDonHang) : null,

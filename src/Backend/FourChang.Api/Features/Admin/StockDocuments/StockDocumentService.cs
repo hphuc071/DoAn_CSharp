@@ -43,7 +43,7 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
                 throw Bad("Chọn mục đích: hỏng, hết hạn hoặc sử dụng nội bộ; không xuất tiêu hao đơn thủ công.");
             if ((input.Nguon?.Length ?? 0) > 200) throw Bad("Nguồn nhập tối đa 200 ký tự.");
             var now = DateTime.UtcNow;
-            var header = id is null ? new PhieuKho { SoPhieuKho = "PK-" + Guid.NewGuid().ToString("N"), TrangThai = "DRAFT",
+            var header = id is null ? new PhieuKho { TrangThai = "DRAFT",
                 MaThaoTac = input.MaThaoTac, MaQuanLyLap = Actor(context), ThoiDiemTao = now } : await Find(id.Value);
             var before = id is null ? null : JsonSerializer.Serialize(header);
             if (id is not null)

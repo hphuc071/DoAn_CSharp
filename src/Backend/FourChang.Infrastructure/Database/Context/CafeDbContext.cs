@@ -44,9 +44,10 @@ public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbC
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CafeDbContext).Assembly);
+        foreach (var prefix in DisplayCodeAllocator.Prefixes) modelBuilder.HasSequence<long>("DisplayCode_" + prefix, "dbo").StartsAt(1).IncrementsBy(1);
     }
     /// <summary>Gắn thời điểm tạo/cập nhật phía máy chủ trước khi lưu; không tin thời điểm do client gửi.</summary>
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         foreach (var entry in ChangeTracker.Entries().Where(e => e.State is EntityState.Added or EntityState.Modified))
@@ -56,6 +57,7 @@ public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbC
             if (entry.Metadata.FindProperty("ThoiDiemCapNhat") is not null)
                 entry.Property("ThoiDiemCapNhat").CurrentValue = now;
         }
-        return base.SaveChangesAsync(cancellationToken);
+        await DisplayCodeAllocator.AssignAsync(this, cancellationToken);
+        return await base.SaveChangesAsync(cancellationToken);
     }
 }

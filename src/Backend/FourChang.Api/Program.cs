@@ -32,6 +32,7 @@ using Microsoft.EntityFrameworkCore;
 LocalEnvironment.Load();
 try
 {
+    if (args.Contains("--renumber-display-codes")) { await DatabaseBootstrap.RenumberDisplayCodesAsync(); Console.WriteLine("DISPLAY CODES OK: mã hiển thị đã được cập nhật; khóa và dữ liệu nghiệp vụ giữ nguyên."); return; }
     if (args.Contains("--init-db")) { await DatabaseBootstrap.InitializeAsync(); Console.WriteLine("DATABASE OK: đúng 30 bảng, dữ liệu khởi tạo và tài khoản ứng dụng đã sẵn sàng."); return; }
     if (args.Contains("--seed-customers"))
     {

@@ -51,7 +51,7 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
                     foreach (var payment in await db.ThanhToan.Where(x => x.MaDonHang == id).ToListAsync())
                     {
                         if (payment.SoTienDaXacMinh > 0 && !await db.HoSoHoanTien.AnyAsync(x => x.MaThanhToan == payment.MaThanhToan && x.TrangThai != "REJECTED"))
-                            db.HoSoHoanTien.Add(new() { MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"), MaDonHang = id, MaThanhToan = payment.MaThanhToan,
+                            db.HoSoHoanTien.Add(new() { MaDonHang = id, MaThanhToan = payment.MaThanhToan,
                                 LoaiNguon = "OVERPAYMENT", SoTienYeuCau = payment.SoTienDaXacMinh, PhuongThucHoan = "BANK_TRANSFER", TrangThai = "REQUESTED",
                                 MaQuanLyYeuCau = actor, LyDoHoan = "Đơn hết hạn chờ thanh toán", ChungCuYeuCau = input.ChungCu });
                         payment.TrangThai = "EXPIRED";
@@ -160,7 +160,7 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             var obligations = await db.HoSoHoanTien.Where(x => x.MaThanhToan == payment.MaThanhToan && x.TrangThai != "REJECTED").SumAsync(x => (decimal?)x.SoTienYeuCau) ?? 0;
             var amount = Math.Min(needed, Math.Max(0, payment.SoTienDaXacMinh - obligations));
             if (amount == 0) continue;
-            db.HoSoHoanTien.Add(new() { MaHoanTienHienThi = "HT-" + Guid.NewGuid().ToString("N"), MaDonHang = order.MaDonHang,
+            db.HoSoHoanTien.Add(new() { MaDonHang = order.MaDonHang,
                 MaThanhToan = payment.MaThanhToan, MaHuyMon = cancellation.MaHuyMon, SoTienYeuCau = amount,
                 PhuongThucHoan = payment.PhuongThuc, LoaiNguon = "CANCELLATION", ChungCuYeuCau = "Nguồn hủy " + cancellation.MaHuyMon,
                 LyDoHoan = input.LyDo, TrangThai = "REQUESTED", MaQuanLyYeuCau = admin, MaCaYeuCau = shift }); needed -= amount;

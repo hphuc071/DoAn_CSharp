@@ -1,4 +1,4 @@
-﻿using FourChang.Desktop.Admin.Employees;
+using FourChang.Desktop.Admin.Employees;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Database;
@@ -150,14 +150,14 @@ public sealed class MenuManagementPage : UserControl
         var term = search.Text.Trim();
         var rows = kind switch
         {
-            "dishes" => data.Mon.Select(x => new[] { x.MaMon.ToString(), x.TenMon, data.DanhMuc.FirstOrDefault(c => c.MaDanhMuc == x.MaDanhMuc)?.TenDanhMuc ?? "", x.DaCongBo ? "Hiển thị" : "Ẩn", x.DangBan ? "Bật bán" : "Tạm hết" }),
+            "dishes" => data.Mon.OrderBy(x => x.ThuTuHienThi).ThenBy(x => x.MaMon).Select(x => new[] { x.MaMon.ToString(), x.TenMon, data.DanhMuc.FirstOrDefault(c => c.MaDanhMuc == x.MaDanhMuc)?.TenDanhMuc ?? "", x.DaCongBo ? "Hiển thị" : "Ẩn", x.DangBan ? "Bật bán" : "Tạm hết" }),
             "variants" => data.CauHinh.Select(x => new[] { x.MaCauHinhMon.ToString(), data.Mon.FirstOrDefault(m => m.MaMon == x.MaMon)?.TenMon ?? "", x.KichCo, x.NhietDo == "HOT" ? "Nóng" : "Lạnh", x.GiaBan.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), x.DangBan ? "Bật" : "Tắt", x.LaMacDinh ? "Mặc định" : "" }),
             "toppings" => data.MonThem.Select(x => new[] { x.MaMonThem.ToString(), x.TenMonThem, x.GiaMoiPhan.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("vi-VN")), x.GioiHanMacDinhMoiLy.ToString(), x.DangSuDung ? "Sử dụng" : "Ngừng" }),
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         string[] columns = kind switch
         {
-            "dishes" => ["Mã", "Tên món", "Loại món", "Hiển thị", "Bán"],
+            "dishes" => ["STT", "Tên món", "Loại món", "Hiển thị", "Bán"],
             "variants" => ["Mã", "Món", "Size", "Nhiệt độ", "Giá (đ)", "Bán", "Mặc định"],
             "toppings" => ["Mã", "Topping", "Giá/phần (đ)", "Giới hạn/ly", "Trạng thái"],
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
@@ -167,6 +167,15 @@ public sealed class MenuManagementPage : UserControl
         grid.SuspendLayout();
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         DatabaseViews.SetGrid(grid, new(columns, matches));
+        if (kind == "dishes")
+        {
+            // STT chỉ để trình bày; Tag giữ khóa thật để sửa đúng món sau khi lọc/sắp xếp.
+            for (var index = 0; index < grid.Rows.Count; index++)
+            {
+                grid.Rows[index].Tag = Convert.ToInt64(matches[index][0]);
+                grid.Rows[index].Cells[0].Value = (index + 1).ToString();
+            }
+        }
         var unit = kind switch
         {
             "dishes" => "món",
@@ -207,7 +216,7 @@ public sealed class MenuManagementPage : UserControl
             MessageBox.Show(FindForm(), "Chọn một dòng trước.");
             return;
         }
-        action(Convert.ToInt64(grid.CurrentRow.Cells[0].Value));
+        action(kind == "dishes" ? (long)grid.CurrentRow.Tag! : Convert.ToInt64(grid.CurrentRow.Cells[0].Value));
     }
 
     /// <summary>Mở editor có snapshot/version hiện tại; lỗi tải không được tạo form sửa từ dữ liệu thiếu.</summary>

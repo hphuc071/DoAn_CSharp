@@ -19,8 +19,7 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
-            var shortCode = FourChang.Presentation.Shared.Contracts.Common.OrderCode.TryParse(term, out var channel, out var orderId);
-            var matchingOrders = db.DonHang.Where(x => shortCode && x.MaDonHang == orderId && x.KenhDatHang == channel ||
+            var matchingOrders = db.DonHang.Where(x =>
                 x.MaDonHienThi.Contains(term) || x.TenNguoiNhan != null && x.TenNguoiNhan.Contains(term)).Select(x => x.MaDonHang);
             q = q.Where(x => x.SoHoaDon.Contains(term) || x.MaDonHang.ToString() == term ||
                 x.TenNguoiMua != null && x.TenNguoiMua.Contains(term) || matchingOrders.Contains(x.MaDonHang));
@@ -34,7 +33,7 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
         var orders = await db.DonHang.AsNoTracking().Where(x => orderIds.Contains(x.MaDonHang)).ToDictionaryAsync(x => x.MaDonHang);
         var rows = list.Select(x => View(x) with
         {
-            MaDon = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(x.MaDonHang, orders[x.MaDonHang].KenhDatHang),
+            MaDon = orders[x.MaDonHang].MaDonHienThi,
             NguoiMua = !string.IsNullOrWhiteSpace(x.TenNguoiMua) ? x.TenNguoiMua : orders[x.MaDonHang].TenNguoiNhan ?? "Khách lẻ"
         }).ToList();
         return new(rows, total, page, 50, DateTime.UtcNow);
@@ -58,7 +57,7 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
         var audits = await db.NhatKyHeThong.AsNoTracking().Where(x => x.LoaiDoiTuong == "HoaDon" && x.MaDoiTuong == id.ToString()).OrderByDescending(x => x.PhatSinhLuc).ToListAsync();
         var view = View(invoice) with
         {
-            MaDon = FourChang.Presentation.Shared.Contracts.Common.OrderCode.Format(order.MaDonHang, order.KenhDatHang),
+            MaDon = order.MaDonHienThi,
             NguoiMua = !string.IsNullOrWhiteSpace(invoice.TenNguoiMua) ? invoice.TenNguoiMua : order.TenNguoiNhan ?? "Khách lẻ"
         };
         var result = new AdminInvoiceDetail(view, invoice.NoiDungHoaDonDaChotJson, await financials.Read(order), related.Select(View).ToList(),
@@ -100,7 +99,7 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
             if (reduction <= 0 || original.SoTien + adjusted - reduction < 0) throw new AdminRule(409, "Điều chỉnh vượt giá trị hóa đơn còn lại.");
             var now = DateTime.UtcNow;
             var invoice = new HoaDon { MaDonHang = original.MaDonHang, MaHoaDonGoc = id, MaHuyMon = cancelId, MaHoanTien = refundId,
-                LoaiHoaDon = "ADJUSTMENT", SoHoaDon = "DC-" + Guid.NewGuid().ToString("N"), TrangThai = "ISSUED", SoTien = -reduction,
+                LoaiHoaDon = "ADJUSTMENT", TrangThai = "ISSUED", SoTien = -reduction,
                 TenNguoiMua = original.TenNguoiMua, MaCaLamViec = original.MaCaLamViec, LyDo = input.LyDo, PhatHanhLuc = now,
                 MaQuanLyPhatHanh = long.Parse(context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value),
                 NoiDungHoaDonDaChotJson = JsonSerializer.Serialize(new { Version = 1, SourceType = cancelId is null ? "COMPLAINT" : "CANCELLATION", SourceId = cancelId ?? refundId,
