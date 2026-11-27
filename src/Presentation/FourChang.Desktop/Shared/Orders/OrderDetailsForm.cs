@@ -1,3 +1,7 @@
+// UC: UC-POS-03, UC-POS-04, UC-ADM-05
+// Chức năng: Hiển thị bốn phần cơ bản của một đơn: thông tin đơn, khách, món và thanh toán.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Theme;

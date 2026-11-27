@@ -1,3 +1,7 @@
+// UC: UC-WEB-06, UC-WEB-07
+// Chức năng: Theo dõi trạng thái phiên và quyền thao tác của luồng đặt món.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 // Kết thúc bản thao tác cục bộ sau khi máy chủ xác minh đã thu đủ tiền.
 // Không tạo đơn, không xác nhận thanh toán và không xóa giỏ khách đang chọn cho lần tiếp theo.
 (() => {

@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Che dữ liệu nhạy cảm trước khi trả nhật ký ra giao diện.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Text.Json.Nodes;
 
 namespace FourChang.Api.Features.Admin.Reports;

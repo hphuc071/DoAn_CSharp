@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Xem số liệu ca và gửi thao tác chốt hoặc bàn giao khi hợp lệ.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Globalization;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;

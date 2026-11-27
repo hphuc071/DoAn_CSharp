@@ -1,4 +1,8 @@
-﻿using System.Text.Json;
+// UC: UC-POS-02
+// Chức năng: Chọn size, nóng/lạnh, đường/đá, topping và số ly của dòng món.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using System.Text.Json;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

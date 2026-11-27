@@ -1,3 +1,7 @@
+// UC: UC-POS-01
+// Chức năng: Kiểm tra hồ sơ nhân viên và mở ca làm việc.
+// Cần nhớ: Một nhân viên không được chọn lại cùng tên ca trong một ngày; không bắt buộc giờ thực tế.
+
 using System.Data;
 using FourChang.Api.Security;
 using FourChang.Api.Shared.Audit;
@@ -42,19 +46,38 @@ public static class WorkEndpoints
             CaDaLamTrongNgay: await UsedShifts(db, employee.MaNhanVien, DateTime.UtcNow)));
     }
 
-    /// <summary>Mở ca độc lập, xác minh hồ sơ và mã chống trùng thao tác; mỗi tên ca chỉ được mở một lần/ngày/nhân viên, không phụ thuộc giờ hoặc máy.</summary>
+    /// <summary>
+    /// UC-POS-01 — Mở một ca theo hồ sơ nhân viên.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra thông tin nhân viên, tên ca và tiền đầu ca.
+    /// 2. Đối chiếu nhân viên đang làm việc và kiểm tra yêu cầu gửi lại.
+    /// 3. Kiểm tra nhân viên đã làm ca cùng tên trong ngày chưa.
+    /// 4. Tạo ca mới, ghi nhận thao tác và trả phiên ca cho ứng dụng nhân viên.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Nhân viên, tên ca, máy sử dụng, tiền đầu ca và mã thao tác.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    /// - db: Đối tượng dùng để đọc và ghi dữ liệu của hệ thống.
+    ///
+    /// Sau khi xử lý: Phiên ca làm việc hợp lệ hoặc lỗi; không mở lặp cùng tên ca trong ngày.
+    /// </summary>
     private static async Task<IResult> Open(OpenShift input, HttpContext context, CafeDbContext db)
     {
         try
         {
             // Client thiết bị đời cũ phải mở lại theo hồ sơ; không chấp nhận khóa máy như phiên nhân viên.
             if (context.Request.Headers.ContainsKey("X-POS-Key")) return Results.Unauthorized();
+
+            // Bước 1: Kiểm tra dữ liệu mở ca và mã máy của phiên làm việc.
             var machine = ShiftSessionCodec.Machine(input.MaMay);
             if (input.TenCa is not ("Sáng" or "Chiều" or "Tối") || input.MaNhanVien <= 0 || string.IsNullOrWhiteSpace(input.HoTen) || input.HoTen.Length > 120 ||
                 input.TienMatDauCa < 0 || input.TienMatDauCa > 999999999999999999m || decimal.Truncate(input.TienMatDauCa) != input.TienMatDauCa)
                 throw new AdminRule(400, "Hồ sơ, tên ca hoặc tiền đầu ca không hợp lệ.");
             await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             await AdminOperation.Lock(db);
+
+            // Bước 2: Đối chiếu mã và họ tên với hồ sơ nhân viên đang hoạt động.
             var employee = await db.NhanVien.SingleOrDefaultAsync(x => x.MaNhanVien == input.MaNhanVien && x.TrangThai == "ACTIVE");
             if (employee is null || !EmployeeIdentity.Matches(employee.HoTen, input.HoTen)) throw new AdminRule(400, "Mã/họ tên không khớp nhân viên đang làm.");
             // Mỗi lần bấm Mở ca là một thao tác riêng. Gửi lặp sau timeout chỉ trả lại ca đã tạo bởi đúng mã này.
@@ -85,9 +108,13 @@ public static class WorkEndpoints
             }
             var now = DateTime.UtcNow;
             // Kiểm sau receipt: gửi lại cùng mã vẫn trả ca cũ; mã mới không được lặp tên ca trong ngày.
+
+            // Bước 3: Chặn nhân viên chọn lại cùng ca Sáng/Chiều/Tối trong ngày.
             if ((await UsedShifts(db, employee.MaNhanVien, now)).Contains(input.TenCa))
                 throw new AdminRule(409, $"Nhân viên đã làm ca {input.TenCa} hôm nay. Vui lòng chọn ca khác; ngày mai có thể chọn lại.");
             var source = await HandoverLink.SourceForOpen(db, employee.MaNhanVien, machine);
+
+            // Bước 4: Tạo ca, lưu nhật ký và trả phiên làm việc cho ứng dụng nhân viên.
             var shift = new CaLamViec
             {
                 MaNhanVien = employee.MaNhanVien,
@@ -109,7 +136,21 @@ public static class WorkEndpoints
         }
         catch (AdminRule error) { return Results.Problem(statusCode: error.Status, detail: error.Message); }
     }
-    /// <summary>Ngày nghiệp vụ UTC+07, lấy cả ca đã đóng/khóa; không ràng buộc giờ Sáng/Chiều/Tối.</summary>
+    /// <summary>
+    /// UC-POS-01 — Lấy các tên ca nhân viên đã làm trong ngày nghiệp vụ.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Xác định đầu ngày và cuối ngày cần kiểm tra theo giờ nghiệp vụ.
+    /// 2. Tìm các ca nhân viên đã mở trong khoảng ngày đó.
+    /// 3. Trả các tên ca để phần mở ca chặn chọn trùng.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - db: Đối tượng dùng để đọc và ghi dữ liệu của hệ thống.
+    /// - employeeId: Khóa của nhân viên cần kiểm tra ca.
+    /// - now: Thời điểm đang thực hiện việc xử lý.
+    ///
+    /// Sau khi xử lý: Danh sách tên ca để chặn chọn trùng.
+    /// </summary>
     private static Task<List<string>> UsedShifts(CafeDbContext db, long employeeId, DateTime now)
     {
         var start = DateTime.SpecifyKind(now.AddHours(7).Date.AddHours(-7), DateTimeKind.Utc);

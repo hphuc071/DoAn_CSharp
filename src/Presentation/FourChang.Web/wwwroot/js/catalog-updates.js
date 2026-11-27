@@ -1,4 +1,8 @@
-﻿/* ADM-02/05: cập nhật menu từ server; không xóa giỏ, không ghi đè form khách đang nhập. */
+// UC: UC-WEB-04, UC-WEB-05, UC-WEB-06
+// Chức năng: Cập nhật dữ liệu thực đơn và thông báo khi thông tin món thay đổi.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
+/* ADM-02/05: cập nhật menu từ server; không xóa giỏ, không ghi đè form khách đang nhập. */
 (() => {
   "use strict";
   const grid = document.getElementById("product-grid");

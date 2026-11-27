@@ -1,3 +1,7 @@
+// UC: UC-WEB-01
+// Chức năng: Nhận thông tin đăng ký từ biểu mẫu và gọi API tạo tài khoản.
+// Cần nhớ: Hiển thị lỗi từ Backend để khách sửa; không tự ghi database.
+
 using System.ComponentModel.DataAnnotations;
 using FourChang.Presentation.Shared.ApiClients;
 using Microsoft.AspNetCore.Mvc;

@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Nhận yêu cầu báo giá và tạo đơn từ website; đồng thời nối các API đọc/hủy của UC-WEB-08.
+// Cần nhớ: Backend tính lại giá, kiểm tra nguyên liệu và lưu đơn cùng giữ chỗ trong một giao dịch.
+
 using System.Data;
 using System.Security.Claims;
 using FourChang.Domain.Entities.Payments;
@@ -17,7 +21,7 @@ public static class CustomerOrdersEndpoints
             ICustomerOrderReader reader, int? page, int? pageSize, string? status,
             DateTime? fromUtc, DateTime? toUtc, CancellationToken ct) =>
         {
-            // Explicit pagination selects the new snapshot contract; legacy callers keep their array.
+            // Có bộ lọc/phân trang thì trả dữ liệu phân trang; giữ dạng danh sách cho bên gọi cũ.
             if (page.HasValue || pageSize.HasValue || status is not null || fromUtc.HasValue || toUtc.HasValue)
                 return await CustomerOrderReadEndpoints.ListAsync(context, reader,
                     page, pageSize, status, fromUtc, toUtc, ct);
@@ -62,6 +66,22 @@ public static class CustomerOrdersEndpoints
         CustomerOrderCancellation.Map(app);
         OrderExpiryReview.Map(app);
     }
+    /// <summary>
+    /// UC-WEB-06 — Xem trước điều kiện nhận món trước khi tạo đơn.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Xác định khách đang yêu cầu xem trước.
+    /// 2. Kiểm tra hình thức nhận món và thông tin liên quan.
+    /// 3. Trả kết quả xem trước hoặc báo nội dung chưa hợp lệ.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - request: Yêu cầu xem trước và phiên khách hiện tại.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    /// - service: Bộ xử lý kiểm tra điều kiện nhận món, do hệ thống cung cấp.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Cần nhớ: Đây chỉ là bước xem trước, chưa tạo đơn hoặc ghi nhận thanh toán.
+    /// </summary>
     public static async Task<IResult> FulfillmentPreviewAsync(FulfillmentPreviewRequest request,
         HttpContext context, [Microsoft.AspNetCore.Mvc.FromServices] FulfillmentPreviewService service,
         CancellationToken ct)
@@ -72,12 +92,33 @@ public static class CustomerOrdersEndpoints
         catch (FulfillmentUnavailable ex) { return Results.Json(new { code = ex.Code }, statusCode: ex.Status); }
         catch (OrderQuoteValidationException) { return Results.Json(new { code = "CART_INVALID" }, statusCode: 400); }
     }
-    // A separate Backend capability: Web configuration cannot secure a direct API caller.
+    // Backend kiểm tra cờ bật tạo đơn riêng, kể cả khi người dùng gọi API trực tiếp.
+    /// <summary>
+    /// UC-WEB-06 — Tạo một đơn hàng từ yêu cầu đặt món trên website.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra khách đã đăng nhập và đã xác nhận tổng tiền.
+    /// 2. Kiểm tra lần đặt này đã được xử lý trước đó chưa để tránh tạo trùng.
+    /// 3. Tính lại giá, kiểm tra cấu hình món và lượng nguyên liệu cần giữ.
+    /// 4. Lưu đơn, các món, topping, nguyên liệu giữ chỗ và yêu cầu thanh toán.
+    /// 5. Trả mã đơn, tổng tiền và trạng thái cho website.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - req: Thông tin nhận món, các dòng món, mã thao tác và tổng tiền khách đã chấp nhận.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    /// - db: Đối tượng dùng để đọc và ghi dữ liệu của hệ thống.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    /// - configuration: Các thiết lập chạy của Backend, do hệ thống cung cấp.
+    ///
+    /// Cần nhớ: Tạo đơn chưa có nghĩa khách đã trả tiền. Các phần dữ liệu được lưu cùng nhau để tránh chỉ tạo được một phần của đơn.
+    /// </summary>
     public static async Task<IResult> CreateAsync(CreateCustomerOrderRequest req, HttpContext context,
         CafeDbContext db, CancellationToken ct, IConfiguration configuration)
     {
         if (!bool.TryParse(configuration["Orders:CustomerCreationEnabled"], out var enabled) || !enabled)
             return Results.Json(new { code = "CUSTOMER_ORDER_CREATION_DISABLED" }, statusCode: 503);
+
+        // Bước 1: Xác định khách đặt từ phiên đăng nhập, không lấy mã khách tùy ý từ biểu mẫu.
         var claim = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!long.TryParse(claim, out var customerId) || customerId <= 0)
             return Results.Unauthorized();
@@ -86,8 +127,8 @@ public static class CustomerOrdersEndpoints
         // Chỉ mở bàn từ danh sách và phí cố định trong mô phỏng Development đã được chấp thuận.
         if (req.HinhThucNhanMon != "TAKEAWAY" && !SimulatedFulfillment.Enabled(configuration))
             return Results.Json(new { code = "FULFILLMENT_CREATION_NOT_VALIDATED" }, statusCode: 503);
-        // Customer WEB always requires consent, including direct API calls and replays.
-        // This is independent of POS/Admin contracts and precedes any business SQL.
+        // Khách phải xác nhận tổng tiền, kể cả khi gọi API trực tiếp hoặc gửi lại yêu cầu.
+        // Kiểm tra trước khi xử lý dữ liệu đơn; không dùng quy tắc riêng của POS/Quản lý thay thế.
         if (!OrderIdempotency.TryReadAcceptedTotal(context, out var acceptedTotal))
             return Results.BadRequest(new { code = "CHECKOUT_ACCEPTED_TOTAL_INVALID",
                 message = "Cần một X-Checkout-Accepted-Total duy nhất, không âm và theo định dạng số bất biến." });
@@ -109,6 +150,8 @@ public static class CustomerOrdersEndpoints
             return Results.BadRequest(new { message = "Giỏ hàng đang trống." });
         // Hold menu/recipe read locks until commit, so the authoritative total and persisted
         // line/topping/BOM snapshots cannot come from different menu versions.
+
+        // Bước 2: Mở giao dịch; kiểm tra yêu cầu gửi lại trước khi tạo dữ liệu mới.
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
         var lockedReplay = await OrderIdempotency.LockAndReplayAsync(
             db, tx, customerId, idempotencyKey, requestFingerprint, acceptedTotal, ct);
@@ -120,6 +163,8 @@ public static class CustomerOrdersEndpoints
         OrderPriceSummary priceSummary;
         try
         {
+
+            // Bước 3: Backend tính lại giá từ dữ liệu món, topping và hình thức nhận.
             priceSummary = await OrderPricingService.CalculateOrderTotalAsync(
                 db, req.HinhThucNhanMon, req.KhoangCachKm, req.Items, ct, SimulatedFulfillment.Enabled(configuration));
         }
@@ -169,6 +214,8 @@ public static class CustomerOrdersEndpoints
         var stocks = await db.TonKho.ToDictionaryAsync(x => x.MaNguyenLieu, ct);
         // Keep full decimal precision until aggregating each ingredient over the WHOLE order.
         var perItemIngredientRequirements = new List<Dictionary<long, decimal>>();
+
+        // Bước 4: Kiểm tra cấu hình/công thức các dòng món để tính nguyên liệu cần dùng.
         foreach (var item in req.Items)
         {
             var variantRecipe = recipes.FirstOrDefault(r => r.MaCauHinhMon == item.MaCauHinhMon);
@@ -269,10 +316,14 @@ public static class CustomerOrdersEndpoints
             ThoiDiemTao = now,
             ThoiDiemCapNhat = now
         };
+
+        // Bước 5: Lưu đầu đơn để có khóa liên kết; mã hiển thị được cấp riêng.
         db.DonHang.Add(order);
         await db.SaveChangesAsync(ct);
         // Sequence SQL đã cấp mã hiển thị trước khi lưu biên nhận.
         // Mã hiển thị được cấp độc lập với identity khi lưu đơn.
+
+        // Bước 6: Lưu chi tiết món, topping và lượng nguyên liệu giữ chỗ của từng dòng.
         for (var idx = 0; idx < req.Items.Count; idx++)
         {
             var item = req.Items[idx];
@@ -341,6 +392,8 @@ public static class CustomerOrdersEndpoints
         }
         // Create an unpaid payment intent in the same transaction as the order.
         // QR generation and payment verification are NOT performed here.
+
+        // Bước 7: Tạo yêu cầu thanh toán; tại đây chưa coi khách đã trả tiền.
         db.ThanhToan.Add(new ThanhToan
         {
             MaThanhToanHienThi = $"PAY-{order.MaDonHang:D12}",
@@ -355,6 +408,8 @@ public static class CustomerOrdersEndpoints
             ThoiDiemCapNhat = now
         });
 
+
+        // Bước 8: Chuẩn bị kết quả, lưu nhật ký rồi xác nhận toàn bộ giao dịch.
         var receipt = new CustomerOrderReceipt(
             order.MaDonHang,
             order.MaDonHienThi,

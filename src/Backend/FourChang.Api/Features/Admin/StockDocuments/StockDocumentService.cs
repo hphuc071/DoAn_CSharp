@@ -1,3 +1,7 @@
+// UC: UC-ADM-04
+// Chức năng: Lưu nháp, xác nhận và xử lý lịch phiếu nhập/xuất kho.
+// Cần nhớ: Phiếu nháp chưa đổi kho; phiếu thành công không được sửa/hủy; phiếu tương lai chờ đến ngày.
+
 using System.Data;
 using FourChang.Api.Shared.Audit;
 using System.Security.Claims;
@@ -10,7 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.StockDocuments;
 
-/// <summary>UC-ADM-04: nháp không đổi tồn; ghi sổ/đảo toàn phiếu nguyên tử cùng sổ kho, audit và outbox.</summary>
+/// <summary>UC-ADM-04: lưu nháp và xác nhận phiếu nhập/xuất; phiếu thành công chỉ được xem.</summary>
 public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
 {
     /// <summary>Đọc danh sách có dòng và nguồn gốc; không trả entity EF để tránh ghi từ giao diện.</summary>
@@ -28,10 +32,27 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
                 null, x.l.GhiChu)).ToList(), p.NgayThucHien, p.LoiXuLy)).ToList();
     }
 
-    /// <summary>Tạo/sửa nháp nhập hoặc xuất với đơn vị g/ml; không cộng trừ bất cứ nguyên liệu nào.</summary>
+    /// <summary>
+    /// UC-ADM-04 — Lưu phiếu nhập/xuất ở trạng thái nháp.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra loại phiếu, ngày và thông tin quản lý đã nhập.
+    /// 2. Tạo phiếu mới hoặc kiểm tra phiếu được phép sửa.
+    /// 3. Kiểm tra rồi lưu từng nguyên liệu, số lượng và đơn giá.
+    /// 4. Lưu phiếu nháp để quản lý kiểm tra trước khi xác nhận.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa phiếu cần sửa; để trống nếu lập phiếu mới.
+    /// - input: Loại phiếu, ngày, nguồn, ghi chú và danh sách nguyên liệu.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Cần nhớ: Lưu nháp chưa làm tăng hoặc giảm số lượng trong kho. Muốn thay đổi kho, quản lý phải xác nhận phiếu.
+    /// </summary>
     public Task<IResult> Save(long? id, StockDocumentInput input, HttpContext context) =>
         AdminOperation.Execute(db, input.MaThaoTac, "STOCK_DRAFT", "PhieuKho", new { id, input }, context, async () =>
         {
+
+            // Bước 1: Kiểm tra loại phiếu, ngày, mục đích và danh sách nguyên liệu.
             var reason = string.IsNullOrWhiteSpace(input.LyDo) && input.LoaiPhieu == "RECEIPT" ? "Nhập nguyên liệu" : input.LyDo;
             AdminOperation.Reason(reason);
             var today = BusinessToday();
@@ -43,6 +64,8 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
                 throw Bad("Chọn mục đích: hỏng, hết hạn hoặc sử dụng nội bộ; không xuất tiêu hao đơn thủ công.");
             if ((input.Nguon?.Length ?? 0) > 200) throw Bad("Nguồn nhập tối đa 200 ký tự.");
             var now = DateTime.UtcNow;
+
+            // Bước 2: Tạo đầu phiếu mới hoặc kiểm tra phiếu được phép sửa.
             var header = id is null ? new PhieuKho { TrangThai = "DRAFT",
                 MaThaoTac = input.MaThaoTac, MaQuanLyLap = Actor(context), ThoiDiemTao = now } : await Find(id.Value);
             var before = id is null ? null : JsonSerializer.Serialize(header);
@@ -58,6 +81,8 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
             header.TrangThai = "DRAFT"; header.LoiXuLy = null; header.MaQuanLyDuyet = null;
             if (id is null) db.PhieuKho.Add(header);
             await db.SaveChangesAsync();
+
+            // Bước 3: Kiểm tra và lưu từng nguyên liệu cùng số lượng/giá; chưa cộng trừ tồn kho.
             foreach (var line in input.ThanhPhan)
             {
                 var n = await db.NguyenLieu.SingleOrDefaultAsync(x => x.MaNguyenLieu == line.MaNguyenLieu && x.DangSuDung)
@@ -76,16 +101,35 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
             return (header.MaPhieuKho, (object)new AdminSaveReceipt(header.MaPhieuKho, header.PhienBanDuLieu), before, reason);
         });
 
-    /// <summary>Xác nhận hôm nay/quá khứ ghi sổ ngay; tương lai chỉ khóa lịch, chưa cộng/trừ kho.</summary>
+    /// <summary>
+    /// UC-ADM-04 — Xác nhận phiếu nháp để ghi kho hoặc hẹn ngày xử lý.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm phiếu và kiểm tra bản dữ liệu, trạng thái cùng các dòng nguyên liệu.
+    /// 2. Nếu ngày thực hiện chưa đến thì ghi nhận lịch chờ xử lý.
+    /// 3. Nếu ngày đã đến thì thực hiện nhập hoặc xuất kho.
+    /// 4. Lưu trạng thái và trả kết quả xác nhận.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa phiếu kho cần xử lý.
+    /// - input: Mã phiếu, phiên bản và mã thao tác xác nhận.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Phiếu thành công hoặc đang xử lý theo ngày đã chọn.
+    /// </summary>
     public Task<IResult> Post(long id, StockDocumentAction input, HttpContext context) =>
         AdminOperation.Execute(db, input.MaThaoTac, "STOCK_POST", "PhieuKho", new { id, input }, context, async () =>
         {
+
+            // Bước 1: Đọc đúng phiếu và kiểm tra phiên bản, trạng thái trước khi xác nhận.
             var header = await Find(id); AdminOperation.Version(input.PhienBanDuLieu, header.PhienBanDuLieu); Editable(header);
             if (header.LoaiPhieu is not ("RECEIPT" or "ISSUE")) throw new AdminRule(409, "Phiếu kiểm kê/điều chỉnh cũ chỉ xem lịch sử.");
             if (!await db.ChiTietPhieuKho.AnyAsync(x => x.MaPhieuKho == id)) throw Bad("Phiếu chưa có nguyên liệu.");
             var reason = string.IsNullOrWhiteSpace(input.LyDo) ? header.LyDo ?? "Xác nhận phiếu kho" : input.LyDo;
             AdminOperation.Reason(reason); var before = JsonSerializer.Serialize(header);
             header.MaQuanLyDuyet = Actor(context); header.LoiXuLy = null;
+
+            // Bước 2: Ngày tương lai chỉ hẹn xử lý; ngày đã đến thì ghi sổ nhập/xuất ngay.
             if (header.NgayThucHien > BusinessToday())
             {
                 header.TrangThai = "SCHEDULED"; header.ThoiDiemCapNhat = DateTime.UtcNow;
@@ -95,7 +139,21 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
             return (id, (object)new AdminSaveReceipt(id, header.PhienBanDuLieu), before, reason);
         });
 
-    /// <summary>Hủy lịch/chờ kiểm tra bằng trạng thái có audit, không xóa phiếu và không sinh biến động kho.</summary>
+    /// <summary>
+    /// UC-ADM-04 — Hủy lịch của phiếu chưa ghi sổ thành công.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm phiếu và kiểm tra nó đang chờ lịch hoặc cần kiểm tra.
+    /// 2. Kiểm tra lý do hủy và bản dữ liệu.
+    /// 3. Hủy lịch xử lý rồi ghi nhận kết quả.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa phiếu kho cần xử lý.
+    /// - input: Phiếu đang xử lý/cần kiểm tra, phiên bản và lý do.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Cần nhớ: Không cho hủy phiếu đã nhập/xuất thành công; hủy lịch không tự tạo phiếu ngược.
+    /// </summary>
     public Task<IResult> Cancel(long id, StockDocumentAction input, HttpContext context) =>
         AdminOperation.Execute(db, input.MaThaoTac, "STOCK_SCHEDULE_CANCEL", "PhieuKho", new { id, input }, context, async () =>
         {
@@ -107,7 +165,20 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
             return (id, (object)new AdminSaveReceipt(id, header.PhienBanDuLieu), before, input.LyDo);
         });
 
-    /// <summary>Khóa và đọc lại lịch đến hạn trong transaction riêng. Mỗi phiếu ghi sổ đúng một lần, kể cả khởi động lại.</summary>
+    /// <summary>
+    /// UC-ADM-04 — Xử lý một phiếu đã xác nhận khi đến ngày.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Khóa và đọc lại phiếu đã xác nhận có lịch đến hạn.
+    /// 2. Thử thực hiện việc nhập hoặc xuất kho cho phiếu.
+    /// 3. Nếu thành công thì ghi sổ; nếu không đủ điều kiện thì lưu lỗi để quản lý kiểm tra.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa phiếu kho cần xử lý.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Sau khi xử lý: Tồn kho và trạng thái được cập nhật theo kết quả xử lý.
+    /// </summary>
     public async Task ApplyScheduled(long id, CancellationToken ct)
     {
         await using var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct);
@@ -133,7 +204,22 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
         await db.SaveChangesAsync(ct); await transaction.CommitAsync(ct);
     }
 
-    /// <summary>Kiểm toàn phiếu trước khi sửa bất cứ dòng/tồn nào. Dùng chung cho xác nhận ngay và xử lý đến hạn.</summary>
+    /// <summary>
+    /// UC-ADM-04 — Cộng hoặc trừ kho cho toàn bộ các dòng phiếu hợp lệ.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Đọc các dòng nguyên liệu trong phiếu.
+    /// 2. Kiểm tra điều kiện nhập/xuất, đặc biệt là tồn còn được phép xuất.
+    /// 3. Cộng hoặc trừ số lượng và ghi biến động kho.
+    /// 4. Đánh dấu phiếu thành công sau khi các dòng đã được xử lý hợp lệ.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - header: Thông tin đầu phiếu nhập hoặc xuất kho đang xử lý.
+    /// - operation: Mã nhận biết lần thao tác này, giúp kiểm tra yêu cầu bị gửi lại.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Cần nhớ: Mọi dòng cùng thuộc giao dịch của bên gọi. Nếu có lỗi thì không được để kho thay đổi một phần.
+    /// </summary>
     private async Task ApplyCore(PhieuKho header, Guid operation, CancellationToken ct)
     {
         if (header.LoaiPhieu is not ("RECEIPT" or "ISSUE") || header.MaQuanLyDuyet is null) throw new AdminRule(409, "Phiếu chưa đủ điều kiện ghi sổ.");
@@ -161,6 +247,8 @@ public sealed class StockDocumentService(CafeDbContext db, TimeProvider clock)
             await Move(header, line, stock, delta, operation, null);
         }
         await db.SaveChangesAsync(ct); // Lưu chi tiết trước khi khóa bất biến POSTED; vẫn cùng transaction.
+
+        // Chỉ sau khi các dòng đã ghi kho hợp lệ mới đánh dấu phiếu thành công và khóa sửa.
         header.TrangThai = "POSTED"; header.GhiSoLuc = DateTime.UtcNow; header.LoiXuLy = null;
         header.ThoiDiemCapNhat = DateTime.UtcNow; Emit(operation, header.MaPhieuKho);
     }

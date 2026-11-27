@@ -1,3 +1,7 @@
+// UC: UC-POS-01
+// Chức năng: Đọc kết quả ca và nhận số tiền nhân viên kiểm đếm khi kết thúc ca.
+// Cần nhớ: Số tiền kiểm đếm phải được đối chiếu với tiền mặt hệ thống, không với toàn bộ doanh thu chuyển khoản.
+
 using System.Security.Claims;
 using FourChang.Api.Security;
 using FourChang.Api.Shared.Operations;
@@ -9,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Staff.WorkSessions;
 
-/// <summary>Điểm nối POS-01/ADM-12: chữ ký phiên ca bảo vệ thao tác; nhân viên không có tài khoản cá nhân.</summary>
+/// <summary>Điểm nối POS-01/ADM-08: chữ ký phiên ca bảo vệ thao tác; nhân viên không có tài khoản cá nhân.</summary>
 public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessions)
 {
     /// <summary>Đọc riêng ca thuộc token, kể cả LOCKED; không cấp quyền Admin hoặc đọc ca tùy ý theo ID.</summary>
@@ -28,7 +32,21 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
         return audit?.KetQuaDaChotJson is { } json ? Results.Content(json, "application/json") : Results.NotFound();
     }
 
-    /// <summary>Lưu tiền thực đếm và LOCKED nguyên tử. Phiên phục hồi chỉ gửi một lần, không thể mở bán.</summary>
+    /// <summary>
+    /// UC-POS-01 — Nhận kết quả kiểm đếm khi nhân viên kết thúc ca.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra nhân viên đang thao tác trên đúng phiên ca.
+    /// 2. Nhận số tiền mặt nhân viên đã đếm.
+    /// 3. Kiểm tra tiền và các đơn/khoản còn xử lý.
+    /// 4. Lưu kết quả và cập nhật trạng thái ca khi đáp ứng điều kiện.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Tiền mặt thực đếm, mã thao tác và phiên ca.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả đối chiếu hoặc lỗi giải thích vì sao chưa kết thúc được.
+    /// </summary>
     public Task<IResult> Submit(SubmitReconciliation input, HttpContext context) => Execute(context, input.MaThaoTac,
         "SHIFT_RECONCILIATION_SENT", input, async grant =>
     {
@@ -109,7 +127,7 @@ public sealed class ShiftStaffService(CafeDbContext db, WorkSessionService sessi
     }
 }
 
-/// <summary>Đăng ký luồng POS bổ trợ ADM-12; token chỉ đối chiếu không được dùng làm Staff toàn quyền.</summary>
+/// <summary>Đăng ký luồng POS bổ trợ ADM-08; token chỉ đối chiếu không được dùng làm Staff toàn quyền.</summary>
 public static class ReconciliationEndpoints
 {
     /// <summary>Không nhận ID ca từ client cho các thao tác hiện tại; ca được suy ra từ token ký.</summary>

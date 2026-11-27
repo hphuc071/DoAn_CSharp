@@ -1,3 +1,7 @@
+// UC: UC-WEB-07
+// Chức năng: Điều khiển tương tác của phần thanh toán mô phỏng trong đồ án.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 // Chỉ đọc trạng thái đã lưu; trang này không POST hoặc tự coi việc mở/quét QR là thu tiền.
 (() => {
   "use strict";

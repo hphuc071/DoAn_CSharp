@@ -1,3 +1,7 @@
+// UC: UC-WEB-08
+// Chức năng: Hiển thị chi tiết, trạng thái và các thao tác hợp lệ trên đơn của khách.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using Microsoft.AspNetCore.Mvc;
 using FourChang.Web.Security;

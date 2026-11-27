@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Chọn bộ lọc, xem báo cáo và yêu cầu xuất dữ liệu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Data;
 using System.Globalization;
 using FourChang.Desktop.Shell;

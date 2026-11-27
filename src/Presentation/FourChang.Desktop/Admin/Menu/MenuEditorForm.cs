@@ -1,4 +1,8 @@
-﻿using FourChang.Desktop.Admin.Employees;
+// UC: UC-ADM-02
+// Chức năng: Nhập thông tin món, hình ảnh, cấu hình hoặc topping để gửi Backend.
+// Cần nhớ: Không tự đổi tồn kho chỉ vì thêm một món hoặc topping mới.
+
+using FourChang.Desktop.Admin.Employees;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

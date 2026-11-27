@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Tìm và mở chi tiết ca cần quản lý đối chiếu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

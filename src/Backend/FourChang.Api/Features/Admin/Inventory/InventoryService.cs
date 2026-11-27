@@ -1,3 +1,7 @@
+// UC: UC-ADM-03
+// Chức năng: Đọc số tồn, lượng đang giữ và lịch sử nhập/xuất, tiêu hao của nguyên liệu.
+// Cần nhớ: Xem tồn không tự cộng/trừ kho; giữ chỗ và tiêu hao là hai việc khác nhau.
+
 using System.Data;
 using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
@@ -9,7 +13,20 @@ namespace FourChang.Api.Features.Admin.Inventory;
 /// <summary>ADM-05 chỉ đọc: tách số dư, giữ chỗ, an toàn và lịch sử; không có API sửa tồn.</summary>
 public sealed class InventoryService(CafeDbContext db)
 {
-    /// <summary>Đọc số dư nhất quán theo mốc; thiếu bản ghi tồn được báo chưa xác định, không giả là 0.</summary>
+    /// <summary>
+    /// UC-ADM-03 — Xem danh sách tồn kho theo bộ lọc.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Đọc các nguyên liệu phù hợp từ khóa và trạng thái.
+    /// 2. Lấy số tồn thực tế, lượng đang giữ và các thông tin liên quan.
+    /// 3. Tính số liệu cần hiển thị rồi trả bảng tồn kho.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - search: Từ khóa người dùng muốn tìm; có thể để trống.
+    /// - status: Trạng thái cần lọc; có thể để trống để xem nhiều trạng thái.
+    ///
+    /// Cần nhớ: Hàm chỉ xem tồn kho, không tự cộng/trừ nguyên liệu.
+    /// </summary>
     public async Task<StockSnapshot> Read(string? search, string? status)
     {
         await using var tx = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(IsolationLevel.Serializable) : null;
@@ -42,7 +59,19 @@ public sealed class InventoryService(CafeDbContext db)
         return result;
     }
 
-    /// <summary>Truy vết biến động đến đơn/ca hoặc phiếu nguồn và BOM liên quan; không sửa lịch sử.</summary>
+    /// <summary>
+    /// UC-ADM-03 — Truy vết nguồn thay đổi số lượng của một nguyên liệu.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm nguyên liệu cần xem lịch sử.
+    /// 2. Đọc biến động kho và nguồn từ phiếu hoặc đơn hàng liên quan.
+    /// 3. Trả thông tin để giải thích vì sao số lượng kho thay đổi.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa nguyên liệu cần xem hoặc cập nhật; không phải STT trên màn hình.
+    ///
+    /// Sau khi xử lý: Chi tiết để giải thích vì sao số tồn thay đổi.
+    /// </summary>
     public async Task<StockDetail> Details(long id)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);

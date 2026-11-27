@@ -1,3 +1,7 @@
+// UC: UC-ADM-02
+// Chức năng: Lưu công thức và lượng nguyên liệu theo cấu hình món hoặc phần topping.
+// Cần nhớ: Đơn cũ giữ lượng nguyên liệu đã chốt, không tính lại bằng công thức vừa sửa.
+
 using FourChang.Domain.Shared;
 using System.Text.Json;
 using System.Security.Claims;
@@ -35,7 +39,20 @@ public sealed class RecipeService(CafeDbContext db)
     public Task<IResult> Save(long? id, RecipeInput input, HttpContext context) =>
         Change(input.MaThaoTac, "SAVE", new { id, input }, context, () => SaveCore(id, input, context));
 
-    /// <summary>Lưu mọi size/nhiệt độ của một món trong cùng giao dịch; lỗi một ô hoàn tác cả bảng.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Lưu bảng nguyên liệu của công thức món theo các cấu hình.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm các cấu hình size/nhiệt độ của món cần lưu công thức.
+    /// 2. Đọc lượng nguyên liệu đã nhập cho các cấu hình.
+    /// 3. Gọi phần lưu công thức cho từng cấu hình trong cùng một thao tác.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Món và các định lượng đã nhập trên giao diện.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Các công thức của món được lưu hoặc toàn thao tác bị từ chối.
+    /// </summary>
     public Task<IResult> SaveDish(RecipeDishInput input, HttpContext context) => Change(input.MaThaoTac, "SAVE_DISH", input, context, async () =>
     {
         if (input.CauHinh is null || input.CauHinh.Count is < 1 or > 100 ||
@@ -59,9 +76,26 @@ public sealed class RecipeService(CafeDbContext db)
         return (first.Id, first.Result!, JsonSerializer.Serialize(before), null);
     });
 
-    /// <summary>Nghiệp vụ ghi một cấu hình, dùng lại trong lệnh đơn và lệnh bảng nhiều size.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Lưu nguyên liệu và định lượng của một công thức.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra công thức áp dụng cho cấu hình món hoặc topping nào.
+    /// 2. Nếu sửa thì kiểm tra công thức hiện tại và bản dữ liệu mới nhất.
+    /// 3. Kiểm tra mức đường mặc định, nguyên liệu, đơn vị và lượng dùng.
+    /// 4. Lưu công thức và xử lý bản công thức đang áp dụng theo điều kiện trong hàm.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa công thức cần sửa; để trống nếu thêm công thức mới.
+    /// - input: Cấu hình món hoặc topping, tên công thức, mức đường và danh sách nguyên liệu.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Cần nhớ: Đơn đã đặt giữ lượng nguyên liệu đã chốt, không lấy công thức vừa sửa để tính lại đơn cũ.
+    /// </summary>
     internal async Task<(long Id, object Result, string? Before, string? Reason)> SaveCore(long? id, RecipeInput input, HttpContext context)
     {
+
+        // Bước 1: Công thức phải áp dụng cho đúng một cấu hình món hoặc một topping.
         if ((input.MaCauHinhMon is null) == (input.MaMonThem is null))
             throw new AdminRule(400, "Chọn đúng một cấu hình món hoặc topping.");
         if (input.MaCauHinhMon is { } variant && !await db.CauHinhMon.AnyAsync(x => x.MaCauHinhMon == variant) ||
@@ -84,6 +118,8 @@ public sealed class RecipeService(CafeDbContext db)
         // Kiểm toàn bộ trước khi thay hiệu lực; lỗi không để món đang bán mất công thức cũ.
         if (input.PhanTramDuongMacDinh is not (0 or 25 or 50 or 75 or 100))
             throw new AdminRule(400, "Mức đường mặc định chỉ có 0%,25%,50%,75%,100%.");
+
+        // Bước 2: Kiểm tra từng nguyên liệu và lượng dùng trước khi thay công thức đang áp dụng.
         var lines = await Convert(input.ThanhPhan);
         if (lines.Count == 0) throw new AdminRule(400, "Công thức phải có ít nhất một nguyên liệu.");
         var name = MenuValidation.Text(input.TenCongThuc, 150, "Tên công thức");

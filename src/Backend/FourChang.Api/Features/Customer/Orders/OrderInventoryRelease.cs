@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Giải phóng phần nguyên liệu đã giữ nhưng chưa dùng khi đủ điều kiện.
+// Cần nhớ: Không tự hoàn lại nguyên liệu đã đưa vào pha chế.
+
 using FourChang.Domain.Entities.Orders;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Infrastructure.Database.Context;

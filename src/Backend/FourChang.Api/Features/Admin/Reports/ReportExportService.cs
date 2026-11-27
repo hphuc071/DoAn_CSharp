@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Tiếp nhận yêu cầu xuất báo cáo từ bộ dữ liệu đã chốt.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;

@@ -1,3 +1,7 @@
+// UC: UC-POS-03, UC-POS-04, UC-ADM-05
+// Chức năng: Dùng chung danh sách, bộ lọc, chi tiết và thao tác đơn cho nhân viên/quản lý.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

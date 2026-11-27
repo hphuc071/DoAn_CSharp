@@ -1,3 +1,7 @@
+// UC: UC-ADM-03
+// Chức năng: Nhận yêu cầu xem tồn kho và truy vết nguyên liệu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 namespace FourChang.Api.Features.Admin.Inventory;
 
 /// <summary>ADM-05: API tồn kho và truy vết có quyền Admin, không mở lệnh chỉnh số dư.</summary>

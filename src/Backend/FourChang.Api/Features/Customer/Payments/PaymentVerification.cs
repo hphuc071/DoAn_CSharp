@@ -1,3 +1,7 @@
+// UC: UC-WEB-07
+// Chức năng: Kiểm tra số tiền, tài khoản và nội dung chuyển khoản từ bằng chứng thanh toán.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Domain.Entities.Payments;
 
 namespace FourChang.Api.Features.Customer.Payments;

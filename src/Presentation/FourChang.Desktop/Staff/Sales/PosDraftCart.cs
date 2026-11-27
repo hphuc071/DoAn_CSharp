@@ -1,3 +1,7 @@
+// UC: UC-POS-02
+// Chức năng: Giữ các dòng món đang chọn trước khi thanh toán.
+// Cần nhớ: Đây là giỏ tạm; chưa phải dữ liệu đơn đã lưu trong database.
+
 using FourChang.Presentation.Shared.Contracts.Customer;
 using FourChang.Presentation.Shared.Contracts.Staff;
 namespace FourChang.Desktop.Staff.Sales;

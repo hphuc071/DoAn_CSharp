@@ -1,3 +1,7 @@
+// UC: UC-WEB-05
+// Chức năng: Các thao tác dùng chung với giỏ món trước khi đặt.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 (() => {
   "use strict";
   const C = window.FourChangCart, editor = document.getElementById("product-editor");

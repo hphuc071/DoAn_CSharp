@@ -1,3 +1,7 @@
+// UC: UC-ADM-05
+// Chức năng: Mở danh sách đơn cho quản lý theo dõi.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 namespace FourChang.Desktop.Admin.Orders;
 
 /// <summary>Màn hình Quản lý dùng workspace chung và giữ đủ hành động quản trị hiện có.</summary>

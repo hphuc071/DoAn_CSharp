@@ -1,3 +1,7 @@
+// UC: UC-WEB-06, UC-WEB-07
+// Chức năng: Gửi yêu cầu tạo đơn và xử lý phản hồi chuyển sang bước thanh toán.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 /* One durable checkout operation per origin, serialized across tabs with Web Locks.
  * Only order details/key are stored; authentication stays in the HttpOnly cookie.
  * An uncertain response never authorizes a new GUID or a changed payload.

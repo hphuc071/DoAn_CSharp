@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Hiển thị và thao tác sổ địa chỉ của khách từ màn hình quản lý.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Admin.Employees;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;

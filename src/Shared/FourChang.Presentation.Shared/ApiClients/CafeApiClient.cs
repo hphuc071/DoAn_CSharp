@@ -1,3 +1,7 @@
+// UC: Dùng chung các UC Web, POS và quản lý
+// Chức năng: Gửi yêu cầu HTTP từ giao diện đến Backend và đọc kết quả trả về.
+// Cần nhớ: Đây là cầu nối gọi API; không kết nối trực tiếp SQL Server.
+
 using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Presentation.Shared.Contracts.Common;
 using FourChang.Presentation.Shared.Contracts.Customer;

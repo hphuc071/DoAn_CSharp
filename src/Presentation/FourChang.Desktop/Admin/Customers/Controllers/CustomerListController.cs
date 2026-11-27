@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Điều phối tải, lọc và thao tác danh sách khách hàng.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Admin;
 namespace FourChang.Desktop.Admin.Customers.Controllers;

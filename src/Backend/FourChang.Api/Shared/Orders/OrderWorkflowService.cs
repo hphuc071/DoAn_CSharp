@@ -1,3 +1,7 @@
+// UC: UC-POS-03, UC-ADM-05
+// Chức năng: Xử lý tiếp nhận, bắt đầu pha, pha xong, giao và hoàn tất đơn.
+// Cần nhớ: Bắt đầu pha mới ghi nhận tiêu hao; pha xong không trừ nguyên liệu lần thứ hai.
+
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;
 using FourChang.Domain.Entities.Orders;
@@ -10,7 +14,22 @@ namespace FourChang.Api.Shared.Orders;
 /// <summary>Lệnh đơn chung cho Admin và POS: không lùi trạng thái, không vượt tiền/kho hoặc tự hoàn nguyên liệu đã pha.</summary>
 public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money)
 {
-    /// <summary>Thực thi một lệnh có version, idempotency và audit; Staff chỉ được hành động trong ca OPEN.</summary>
+    /// <summary>
+    /// UC-POS-03, UC-ADM-05 — Thực hiện một bước trong quá trình xử lý đơn.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra người thao tác, ca làm việc và bản dữ liệu của đơn.
+    /// 2. Kiểm tra đơn có đang chờ giải quyết yêu cầu hủy không.
+    /// 3. Thực hiện đúng hành động được yêu cầu: tiếp nhận, pha, giao hoặc hoàn tất.
+    /// 4. Lưu trạng thái mới và thông tin cập nhật đơn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa của đơn hàng cần xử lý.
+    /// - input: Mã đơn, hành động, số ly nếu pha chế, phiên bản đơn và người thực hiện.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Trạng thái mới của đơn hoặc lỗi; không ép chuyển sai bước.
+    /// </summary>
     public Task<IResult> Execute(long id, OrderActionInput input, HttpContext context)
     {
         // Kiểm trước receipt/idempotency: không phát lại một lệnh Admin đã bị loại khỏi phạm vi UC-ADM-05.
@@ -18,6 +37,8 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             return Task.FromResult<IResult>(Results.Problem(statusCode: 403, detail: "Quản lý chỉ theo dõi đơn và duyệt yêu cầu hủy. Tiếp nhận/pha chế/bàn giao thuộc Nhân viên."));
         return AdminOperation.Execute(db, input.MaThaoTac, "ORDER_" + input.HanhDong, "DonHang", new { id, input }, context, async () =>
         {
+
+            // Bước 1: Khóa đơn để hai thao tác đồng thời không cùng quyết định trên dữ liệu cũ.
             await LockOrder(id);
             var order = await db.DonHang.SingleOrDefaultAsync(x => x.MaDonHang == id) ?? throw new AdminRule(404, "Không tìm thấy đơn.");
             AdminOperation.Version(input.PhienBanDuLieu, order.PhienBanDuLieu);
@@ -38,6 +59,8 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             if (lines.Count == 0) throw new AdminRule(409, "Đơn chưa có dòng món để xử lý.");
             var financial = await money.Read(order);
             var now = DateTime.UtcNow;
+
+            // Bước 2: Kiểm tra điều kiện riêng của hành động tiếp nhận, pha chế, giao hoặc hoàn tất.
             switch (input.HanhDong)
             {
                 case "EXPIRE":
@@ -102,6 +125,8 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             order.ThoiDiemCapNhat = now;
             db.SuKienDongBo.Add(new() { MaSuKien = Guid.NewGuid(), MaThaoTac = input.MaThaoTac, LoaiSuKien = "ORDER_CHANGED",
                 NoiDungJson = JsonSerializer.Serialize(new { MaDonHang = id }), PhatSinhLuc = now });
+
+            // Bước 3: Lưu trạng thái và sự kiện; giao dịch chung sẽ lưu kết quả chống gửi lặp.
             await db.SaveChangesAsync();
             return (id, (object)new OrderActionReceipt(id, order.TrangThai, order.PhienBanDuLieu), before, reason);
         }, allowStaff: true);
@@ -167,7 +192,23 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
         }
     }
 
-    /// <summary>Trừ kho ở START từ lượng đang giữ đã chốt, không tính lại BOM menu và không trừ ở COMPLETE.</summary>
+    /// <summary>
+    /// UC-POS-03 — Ghi nhận nguyên liệu dùng để pha món.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Lấy phần nguyên liệu đã giữ cho dòng món.
+    /// 2. Tính lượng cần dùng cho số ly bắt đầu pha.
+    /// 3. Kiểm tra tồn thực tế và lượng đang giữ có đủ không.
+    /// 4. Trừ lượng đã dùng khỏi tồn thực tế, đồng thời giảm lượng đang giữ.
+    /// 5. Cập nhật lượng đã tiêu hao và ghi lịch sử biến động kho.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - line: Dòng món đang được chọn để bắt đầu pha.
+    /// - quantity: Số ly sẽ bắt đầu pha trong lần thao tác này.
+    /// - operation: Mã nhận biết lần thao tác này, giúp kiểm tra yêu cầu bị gửi lại.
+    ///
+    /// Cần nhớ: Không đủ nguyên liệu thì báo lỗi để bước xử lý không được hoàn tất. Bước “Pha xong” không gọi lại việc trừ nguyên liệu.
+    /// </summary>
     private async Task Consume(ChiTietDonHang line, int quantity, Guid operation)
     {
         var holds = await db.NguyenLieuChiTietDonHang.Where(x => x.MaChiTietDonHang == line.MaChiTietDonHang).ToListAsync();
@@ -179,6 +220,8 @@ public sealed class OrderWorkflowService(CafeDbContext db, OrderFinancials money
             var use = quantity == remainingCups ? remaining : decimal.Ceiling(remaining * quantity / remainingCups * 10000m) / 10000m;
             var stock = await db.TonKho.SingleAsync(x => x.MaNguyenLieu == h.MaNguyenLieu);
             Require(use >= 0 && stock.TonThucTe >= use && stock.TongGiuCho >= use, "Kho/giữ chỗ không đủ, chưa thể pha.");
+
+            // Đủ nguyên liệu mới trừ tồn thực tế và giảm lượng đang giữ tương ứng số ly bắt đầu pha.
             stock.TonThucTe -= use; stock.TongGiuCho -= use; stock.ThoiDiemCapNhat = DateTime.UtcNow;
             h.SoLuongDaTieuHao += use; h.TrangThai = h.SoLuongDaTieuHao + h.SoLuongDaGiaiPhong == h.SoLuongGiuCho ? "CONSUMED" : "PARTIAL";
             h.ThoiDiemCapNhat = DateTime.UtcNow;

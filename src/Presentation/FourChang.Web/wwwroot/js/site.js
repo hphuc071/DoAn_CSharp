@@ -1,3 +1,7 @@
+// UC: UC-WEB-04, UC-WEB-05
+// Chức năng: Xử lý các tương tác chung khi khách xem và chọn món trên website.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 /* Presentation events and a read-only legacy-cart notice. No storage mutation or business writes. */
 (() => {
   const $ = (s, root = document) => root.querySelector(s);

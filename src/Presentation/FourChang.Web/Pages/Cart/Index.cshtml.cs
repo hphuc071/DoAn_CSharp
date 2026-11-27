@@ -1,3 +1,7 @@
+// UC: UC-WEB-05
+// Chức năng: Chuẩn bị trang giỏ hàng để khách kiểm tra món trước khi đặt.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 
 using System.Net.Http.Json;
 using FourChang.Presentation.Shared.ApiClients;

@@ -1,3 +1,7 @@
+// UC: UC-WEB-07
+// Chức năng: Hiển thị và kiểm tra thanh toán cho đơn khách đang sở hữu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Web.Pages.Orders;
 using FourChang.Web.Services;

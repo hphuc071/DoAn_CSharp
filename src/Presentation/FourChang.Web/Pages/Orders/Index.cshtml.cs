@@ -1,3 +1,7 @@
+// UC: UC-WEB-08
+// Chức năng: Hiển thị danh sách đơn hàng của khách đang đăng nhập.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.AspNetCore.Mvc;

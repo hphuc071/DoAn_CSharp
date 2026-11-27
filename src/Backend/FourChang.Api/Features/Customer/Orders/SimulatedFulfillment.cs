@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Kiểm tra thông tin tại bàn, mang đi và giao hàng trong cấu hình chạy đồ án.
+// Cần nhớ: Chỉ mở các hình thức được cấu hình; không coi dữ liệu nhập từ giao diện là đã hợp lệ.
+
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.EntityFrameworkCore;

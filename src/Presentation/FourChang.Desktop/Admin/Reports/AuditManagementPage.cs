@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Tra cứu nhật ký thao tác, không sửa dữ liệu lịch sử.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Orders;

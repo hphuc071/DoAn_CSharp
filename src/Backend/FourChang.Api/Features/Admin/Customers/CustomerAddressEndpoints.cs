@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Khai báo API quản lý sổ địa chỉ khách hàng.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.Contracts.Admin;
 using FourChang.Presentation.Shared.Contracts.Customer;
 

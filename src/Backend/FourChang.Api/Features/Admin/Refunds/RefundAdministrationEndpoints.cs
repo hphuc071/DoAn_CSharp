@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Khai báo API quản lý và theo dõi hồ sơ hoàn tiền.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;

@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Nhận biết khách gửi lại cùng một yêu cầu đặt món.
+// Cần nhớ: Cùng mã thao tác và cùng nội dung thì trả kết quả cũ; không tạo thêm đơn.
+
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;

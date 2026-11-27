@@ -1,4 +1,8 @@
-﻿using FourChang.Domain.Shared;
+// UC: UC-ADM-02
+// Chức năng: Tổng hợp thực đơn, giá và khả năng bán dùng chung cho Web/POS.
+// Cần nhớ: Hai giao diện dùng chung nguồn dữ liệu, không khai báo bảng giá riêng.
+
+using FourChang.Domain.Shared;
 using FourChang.Domain.Entities.Menu;
 using FourChang.Domain.Entities.Inventory;
 using FourChang.Infrastructure.Database.Context;

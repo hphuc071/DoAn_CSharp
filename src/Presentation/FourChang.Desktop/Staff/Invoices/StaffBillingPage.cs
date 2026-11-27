@@ -1,3 +1,7 @@
+// UC: UC-POS-05
+// Chức năng: Chia giao diện hóa đơn và hoàn tiền tại quầy.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 
 namespace FourChang.Desktop.Staff.Invoices;

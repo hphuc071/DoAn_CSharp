@@ -1,3 +1,7 @@
+// UC: UC-WEB-08
+// Chức năng: Gửi yêu cầu hủy và cập nhật trạng thái yêu cầu trên trang đơn cá nhân.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 // UC-WEB-08: Nút hủy chỉ hiển thị khi server trả trạng thái chờ xác nhận.
 // Quyền hủy vẫn phải được kiểm tra lại bởi Backend, không tin dữ liệu trình duyệt.
 (() => {

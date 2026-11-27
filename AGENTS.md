@@ -307,3 +307,11 @@ Cập nhật: 14/11/2026. Đây là ghi nhớ và hướng dẫn cho agent; code
 ## STT danh sách món — 24/11/2026
 - Chỉ tab Món: sắp theo ThuTuHienThi rồi MaMon; cột STT1..N thay khóa thô. DataGridViewRow.Tag giữ MaMon thật để sửa đúng sau lọc. Không đổi database hoặc mã các tab khác.
 - Smoke UI dữ liệu thử có MaMon60002: STT1–7/sửa đúng khóa/lọc đúng đạt, đã xem ảnh. Admin build thư mục artifacts/menu-stt-app đạt0warning/error; bản bin chuẩn đang bị app Quản lý PID38000 giữ DLL. Người dùng cần đóng Quản lý rồi chạy Chay-QuanLy.cmd để build/nạp DLL mới. Không tự đóng app người dùng.
+
+## Chú thích tiếng Việt và mã UC — 26/11/2026
+- Chỉ chú thích:140file C# chức năng chính +14file JavaScript, ghi UC/nhiệm vụ/điểm cần nhớ;57hàm có đầu vào/xử lý/kết quả,39bước nghiệp vụ. Mã ADM trong chú thích theo bộ8UC hiện hành của tests/QuanLy; không sửa giá trị route/ScreenCatalog hay nghiệp vụ.
+- Dùng Roslyn đối chiếu toàn bộ token C# với bản trước chỉnh sửa, tất cả khớp; JS chỉ thêm đầu file, thân giữ nguyên. Build solution ở artifacts/comment-build đạt0warning/error; git diff --check sạch. Không chạy lại toàn bộ test, không sửa database hoặc khởi động lại ứng dụng.
+
+## Viết lại chú thích hàm dễ hiểu — 27/11/2026
+- Theo mẫu người dùng chốt:57hàm trong24file có UC + mục đích, các bước thực tế, giải thích từng tham số và điều cần nhớ. Bao gồm đặt đơn, bán tại quầy, trừ nguyên liệu, hủy/hoàn tiền, phiếu kho, công thức và ca. Chỉ thay chú thích trên hàm, giữ ghi chú đầu file/các bước trong thân hàm đã có.
+- Roslyn đối chiếu trước/sau: toàn bộ token thực thi và chỉ thị biên dịch giữ nguyên. Build solution artifacts/comment-build đạt0warning/error; diff --check sạch. Không đổi tên hàm, logic, database; không chạy lại toàn bộ test hoặc khởi động ứng dụng.

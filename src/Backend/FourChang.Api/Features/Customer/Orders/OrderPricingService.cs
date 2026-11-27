@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Tính tiền món, topping và phí nhận món từ cấu hình khách chọn.
+// Cần nhớ: Không lấy tổng tiền do giao diện gửi lên làm giá chính thức.
+
 using FourChang.Domain.Shared;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;

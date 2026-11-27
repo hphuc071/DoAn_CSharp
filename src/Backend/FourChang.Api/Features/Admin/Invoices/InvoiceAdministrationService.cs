@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Tra cứu hóa đơn đã phát hành và nội dung đã chốt.
+// Cần nhớ: Xem hóa đơn không tạo khoản thu; luồng điều chỉnh lịch sử tạo chứng từ riêng.
+
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;
 using FourChang.Api.Shared.Orders;
@@ -8,10 +12,26 @@ using Microsoft.EntityFrameworkCore;
 
 namespace FourChang.Api.Features.Admin.Invoices;
 
-/// <summary>UC-ADM-08 chỉ đọc bản gốc đã phát hành; điều chỉnh tạo chứng từ mới và không thực hiện thu/chi.</summary>
+/// <summary>UC-ADM-06 chỉ đọc bản gốc đã phát hành; điều chỉnh tạo chứng từ mới và không thực hiện thu/chi.</summary>
 public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancials financials)
 {
-    /// <summary>Tra cứu phân trang theo số, đơn, khách hoặc ca; ngày lọc theo thời điểm phát hành.</summary>
+    /// <summary>
+    /// UC-ADM-06 — Tìm và phân trang hóa đơn.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra điều kiện tìm hóa đơn.
+    /// 2. Lọc theo từ khóa, ngày hoặc ca trước khi chia trang.
+    /// 3. Đọc thông tin khách và mã đơn để trả danh sách hiển thị.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - search: Từ khóa người dùng muốn tìm; có thể để trống.
+    /// - from: Mốc bắt đầu của khoảng ngày cần tìm.
+    /// - to: Mốc kết thúc của khoảng ngày cần tìm, được dùng theo điều kiện lọc trong hàm.
+    /// - shift: Khóa ca làm việc đang yêu cầu xem.
+    /// - page: Số trang danh sách cần xem.
+    ///
+    /// Sau khi xử lý: Danh sách hóa đơn khớp bộ lọc.
+    /// </summary>
     public async Task<AdminPage<AdminInvoiceView>> Read(string? search, DateTime? from, DateTime? to, long? shift, int page = 1)
     {
         if (page < 1 || from > to) throw new AdminRule(400, "Bộ lọc hóa đơn không hợp lệ.");
@@ -46,7 +66,19 @@ public sealed class InvoiceAdministrationService(CafeDbContext db, OrderFinancia
         return new(View(invoice), invoice.NoiDungHoaDonDaChotJson);
     }
 
-    /// <summary>Giữ nguyên JSON snapshot; tiền thu/hoàn hiển thị riêng, không dựng hóa đơn từ giá menu hiện hành.</summary>
+    /// <summary>
+    /// UC-ADM-06 — Đọc thông tin hóa đơn và nội dung đã phát hành.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm hóa đơn cần xem và đơn hàng liên quan.
+    /// 2. Đọc nội dung hóa đơn đã phát hành cùng thông tin tài chính, lịch sử xử lý.
+    /// 3. Trả dữ liệu cho cửa sổ chi tiết hóa đơn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa hóa đơn cần xem.
+    ///
+    /// Cần nhớ: Xem hóa đơn không tạo khoản thu và không thay giá đã lưu bằng giá thực đơn hiện tại.
+    /// </summary>
     public async Task<AdminInvoiceDetail> Details(long id)
     {
         await using var tx = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);

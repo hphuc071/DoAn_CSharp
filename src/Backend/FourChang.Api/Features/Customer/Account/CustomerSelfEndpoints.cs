@@ -1,3 +1,7 @@
+// UC: UC-WEB-03
+// Chức năng: Khai báo các địa chỉ API cho trang thông tin cá nhân.
+// Cần nhớ: Chuyển yêu cầu sang dịch vụ xử lý; không để khách chọn tùy ý tài khoản của người khác.
+
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;
 namespace FourChang.Api.Features.Customer.Account;

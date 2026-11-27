@@ -1,3 +1,7 @@
+// UC: UC-WEB-02
+// Chức năng: Gửi thông tin đăng nhập và thiết lập phiên sử dụng website.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.ComponentModel.DataAnnotations;
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Customer;

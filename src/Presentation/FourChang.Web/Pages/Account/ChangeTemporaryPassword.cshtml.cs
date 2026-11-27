@@ -1,3 +1,7 @@
+// UC: UC-WEB-02
+// Chức năng: Hướng dẫn khách đổi mật khẩu tạm trước khi sử dụng đầy đủ chức năng.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.ComponentModel.DataAnnotations;
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Web.Security;

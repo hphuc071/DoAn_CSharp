@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Cung cấp thông tin để xem xét các đơn chờ thanh toán đã đến hạn.
+// Cần nhớ: Đây là kiểm tra/đối chiếu; không được suy diễn đã xác minh ngân hàng.
+
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
 

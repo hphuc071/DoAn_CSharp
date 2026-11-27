@@ -1,3 +1,7 @@
+// UC: UC-WEB-01, UC-WEB-02, UC-WEB-03
+// Chức năng: Xử lý tương tác biểu mẫu tài khoản và hiển thị phản hồi cho khách.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 // Chỉ giữ nháp ngay trên form; không lưu thông tin cá nhân hay mật khẩu vào localStorage.
 // Cảnh báo rời trang giúp khách không vô tình bỏ thay đổi chưa gửi (UC-WEB-02/03).
 let accountDirty=false;

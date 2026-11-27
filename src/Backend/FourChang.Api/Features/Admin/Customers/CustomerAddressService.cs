@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Quản lý địa chỉ khách hàng từ phía quản lý.
+// Cần nhớ: Địa chỉ hồ sơ không thay thế địa chỉ giao đã chốt của đơn cũ.
+
 using System.Data;
 using System.Security.Claims;
 using System.Security.Cryptography;

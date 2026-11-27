@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-POS-05
+// Chức năng: Tạo QR và xác nhận thanh toán trong chế độ mô phỏng của đồ án.
+// Cần nhớ: Chỉ sử dụng khi cấu hình cho phép; đây không phải xác minh tiền thật từ ngân hàng.
+
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

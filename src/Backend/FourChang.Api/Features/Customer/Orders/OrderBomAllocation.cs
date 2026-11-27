@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Tính lượng nguyên liệu cần giữ cho từng dòng món và số ly.
+// Cần nhớ: Đường, đá được tính theo mức chọn; làm tròn theo độ chính xác của lượng kho.
+
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -1,4 +1,8 @@
-﻿// Shared Menu/Cart editor. Only GET catalog data; saving changes the local draft.
+// UC: UC-WEB-05
+// Chức năng: Chỉnh size, nhiệt độ, đường/đá, topping và số ly của dòng món.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
+// Shared Menu/Cart editor. Only GET catalog data; saving changes the local draft.
 (() => {
   "use strict";
   const C = window.FourChangCart;

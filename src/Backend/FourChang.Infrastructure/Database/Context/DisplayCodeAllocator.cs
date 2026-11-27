@@ -1,3 +1,7 @@
+// UC: Dùng chung toàn hệ thống
+// Chức năng: Cấp mã hiển thị dễ đọc như WEB-1, POS-1, HD-1.
+// Cần nhớ: Số hiển thị độc lập khóa database; khi hủy giao dịch có thể có khoảng trống trong dãy số.
+
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -14,6 +18,20 @@ internal static class DisplayCodeAllocator
 {
     internal static readonly string[] Prefixes = ["WEB", "POS", "HD", "DC", "PN", "PX", "PK", "CA", "HT"];
 
+    /// <summary>
+    /// Dùng chung toàn hệ thống — Cấp mã hiển thị ngắn trước khi lưu bản ghi.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm các bản ghi cần được cấp mã hiển thị.
+    /// 2. Chọn tiền tố đúng loại, ví dụ WEB, POS, HD, PN hoặc PX.
+    /// 3. Lấy số tiếp theo do SQL Server cấp và ghép thành mã ngắn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - db: Đối tượng dùng để đọc và ghi dữ liệu của hệ thống.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Cần nhớ: Chỉ thay mã hiển thị, không đổi khóa liên kết trong database. Hủy một thao tác có thể làm dãy số bị trống một số.
+    /// </summary>
     internal static async Task AssignAsync(CafeDbContext db, CancellationToken ct)
     {
         var entries = db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added || e.State == EntityState.Modified && e.Entity is PhieuKho).ToArray();

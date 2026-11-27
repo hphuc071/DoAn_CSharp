@@ -1,3 +1,7 @@
+// UC: UC-POS-02, UC-POS-05
+// Chức năng: Nhận thao tác bán hàng và kiểm tra quyền ca làm việc trước khi gọi dịch vụ.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Security.Claims;
 using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;

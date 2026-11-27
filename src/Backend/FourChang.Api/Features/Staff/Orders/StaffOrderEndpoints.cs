@@ -1,3 +1,7 @@
+// UC: UC-POS-03, UC-POS-04, UC-POS-05
+// Chức năng: Khai báo API để nhân viên tiếp nhận đơn, pha chế, chuyển yêu cầu hủy và hoàn tiền tại quầy.
+// Cần nhớ: Nhân viên thực hiện theo quyền và ca hiện tại; việc duyệt hủy thuộc quản lý.
+
 using FourChang.Api.Features.Admin.Orders;
 using FourChang.Api.Shared.Orders;
 using FourChang.Infrastructure.Database.Context;

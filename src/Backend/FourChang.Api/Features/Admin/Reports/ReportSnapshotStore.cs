@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Lưu và đọc bộ dữ liệu báo cáo tại một mốc thời gian.
+// Cần nhớ: Xuất lại cùng bộ dữ liệu không tự lấy thêm các đơn vừa phát sinh.
+
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Configuration;

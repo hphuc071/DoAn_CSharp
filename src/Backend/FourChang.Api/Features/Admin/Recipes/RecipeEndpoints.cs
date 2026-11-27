@@ -1,4 +1,8 @@
-﻿using FourChang.Api.Shared.Operations;
+// UC: UC-ADM-02
+// Chức năng: Khai báo API xem và lưu công thức pha chế.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;
 

@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Kiểm tra quyền xem và xuất các nhóm dữ liệu báo cáo.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 
 namespace FourChang.Api.Features.Admin.Reports;

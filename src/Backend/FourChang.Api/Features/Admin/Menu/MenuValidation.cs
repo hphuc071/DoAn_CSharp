@@ -1,4 +1,8 @@
-﻿using FourChang.Api.Shared.Operations;
+// UC: UC-ADM-02
+// Chức năng: Kiểm tra dữ liệu thực đơn và hình ảnh trước khi lưu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using FourChang.Api.Shared.Operations;
 namespace FourChang.Api.Features.Admin.Menu;
 
 /// <summary>Quy tắc trường ADM-02: chặn dữ liệu sai trước khi SQL ghi; không chuẩn hóa giá ở UI.</summary>

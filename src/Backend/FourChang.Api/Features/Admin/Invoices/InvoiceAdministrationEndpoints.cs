@@ -1,10 +1,14 @@
+// UC: UC-ADM-06
+// Chức năng: Khai báo API danh sách, chi tiết và xuất hóa đơn.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Api.Features.Admin.Invoices;
 
-/// <summary>UC-ADM-08 không có route sửa/xóa bản gốc, mọi lệnh đều yêu cầu Admin.</summary>
+/// <summary>UC-ADM-06 không có route sửa/xóa bản gốc, mọi lệnh đều yêu cầu Admin.</summary>
 public static class InvoiceAdministrationEndpoints
 {
     /// <summary>Đăng ký tra cứu, chi tiết, điều chỉnh và nhật ký in/xuất độc lập với thanh toán.</summary>

@@ -1,3 +1,7 @@
+// UC: UC-WEB-07
+// Chức năng: Tiếp nhận và chuẩn hóa thông báo giao dịch từ bộ tích hợp thanh toán.
+// Cần nhớ: Thông báo chưa qua kiểm tra không được coi là bằng chứng khách đã trả tiền.
+
 using FourChang.Domain.Entities.Payments;
 
 namespace FourChang.Api.Features.Customer.Payments;

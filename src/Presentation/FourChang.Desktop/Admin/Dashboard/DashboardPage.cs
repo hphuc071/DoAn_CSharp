@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Hiển thị số liệu tổng quan và lối đi đến các màn hình quản lý.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Globalization;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;

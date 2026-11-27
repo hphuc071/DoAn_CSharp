@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Nối giỏ tạm với các bước đặt món và xử lý phần giỏ đã gửi.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 /*
  * UC-WEB-05 -> UC-WEB-06: read-only synchronization of the local cart draft.
  * This renderer never submits orders; checkout-order.js owns order creation.

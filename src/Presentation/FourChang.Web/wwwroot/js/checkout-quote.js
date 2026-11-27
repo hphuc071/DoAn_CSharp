@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Gửi thông tin món để lấy báo giá mới trước khi khách xác nhận.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 /* UC-WEB-06: quote only. checkout-order.js owns order creation and recovery. */
 (() => {
   "use strict";

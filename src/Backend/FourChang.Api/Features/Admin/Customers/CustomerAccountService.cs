@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Quản lý hồ sơ khách, trạng thái tài khoản và lịch sử liên quan.
+// Cần nhớ: Kiểm tra điều kiện trước thao tác; không xóa tùy ý khách đã có dữ liệu liên quan.
+
 using FourChang.Api.Shared.Audit;
 using FourChang.Api.Shared.Customers;
 using System.Data;
@@ -17,7 +21,21 @@ namespace FourChang.Api.Features.Admin.Customers;
 // UC-ADM-01: toàn bộ quy tắc ghi tài khoản khách nằm tại đây; endpoint chỉ định tuyến.
 public sealed class CustomerAccountService(CafeDbContext db)
 {
-    /// <summary>Luồng chính 1: lọc ở SQL và chỉ lấy một trang, tránh tải toàn bộ dữ liệu cá nhân.</summary>
+    /// <summary>
+    /// UC-ADM-01 — Tìm và phân trang danh sách khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra từ khóa và thông tin trang cần xem.
+    /// 2. Tìm các khách hàng phù hợp.
+    /// 3. Trả danh sách của trang đó cùng tổng số khách tìm thấy.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - search: Từ khóa người dùng muốn tìm; có thể để trống.
+    /// - page: Số trang danh sách cần xem.
+    /// - pageSize: Số dòng tối đa cần hiển thị trong một trang.
+    ///
+    /// Sau khi xử lý: Danh sách khách và thông tin phân trang.
+    /// </summary>
     public async Task<IResult> Search(string? search, int page, int pageSize)
     {
         if (page < 1 || pageSize is < 1 or > 100 || search?.Length > 254 || (long)(page - 1) * pageSize > int.MaxValue)
@@ -37,7 +55,19 @@ public sealed class CustomerAccountService(CafeDbContext db)
         return Results.Ok(new CustomerPage(users.Select(CustomerRules.View).ToList(), page, pageSize, total));
     }
 
-    /// <summary>Đọc hồ sơ cùng giao dịch gần đây; không còn kiểm tra khả năng xóa hoặc lộ tên bảng kỹ thuật.</summary>
+    /// <summary>
+    /// UC-ADM-01 — Xem hồ sơ và lịch sử liên quan của một khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm khách hàng theo khóa được yêu cầu.
+    /// 2. Đọc hồ sơ và lịch sử đơn, thanh toán, hóa đơn, hoàn tiền liên quan.
+    /// 3. Trả thông tin cho cửa sổ chi tiết khách hàng.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa khách hàng cần xem hoặc cập nhật.
+    ///
+    /// Sau khi xử lý: Thông tin chi tiết phục vụ quản lý.
+    /// </summary>
     public async Task<IResult> Details(long id)
     {
         var user = await db.TaiKhoanKhachHang.AsNoTracking().SingleOrDefaultAsync(x => x.MaKhachHang == id);
@@ -63,7 +93,21 @@ public sealed class CustomerAccountService(CafeDbContext db)
         return audit?.KetQuaDaChotJson is { } json ? Results.Ok(JsonSerializer.Deserialize<CustomerMutation>(json)) : Results.NotFound();
     }
 
-    /// <summary>Sửa hồ sơ hiện hữu với định danh duy nhất; tạo khách chỉ thuộc đăng ký Web.</summary>
+    /// <summary>
+    /// UC-ADM-01 — Lưu thông tin hồ sơ khách do quản lý chỉnh sửa.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra hồ sơ khách và thông tin quản lý muốn sửa.
+    /// 2. Kiểm tra dữ liệu trên màn hình có bị cũ không.
+    /// 3. Lưu thay đổi hợp lệ và ghi nhận người đã thực hiện.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa khách hàng cần xem hoặc cập nhật.
+    /// - input: Mã khách, nội dung mới, phiên bản và phiên quản lý.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả cập nhật hoặc lỗi, không tự tạo đơn cho khách.
+    /// </summary>
     public async Task<IResult> Save(long id, CustomerSaveInput input, HttpContext context)
     {
         var problem = CustomerRules.Validate(input, false);
@@ -86,7 +130,22 @@ public sealed class CustomerAccountService(CafeDbContext db)
             });
     }
 
-    /// <summary>Khóa/mở hoặc cấp mật khẩu tạm; tự ghi lý do nghiệp vụ, giữ thu hồi phiên và lịch sử.</summary>
+    /// <summary>
+    /// UC-ADM-01 — Thực hiện thao tác quản lý trạng thái tài khoản khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Xác định thao tác quản lý muốn thực hiện với khách.
+    /// 2. Kiểm tra quyền và điều kiện riêng của thao tác đó.
+    /// 3. Thực hiện thay đổi được phép và ghi lại kết quả.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa khách hàng cần xem hoặc cập nhật.
+    /// - action: Tên hành động đang được yêu cầu.
+    /// - input: Khách, hành động, mã thao tác và phiên bản hồ sơ.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả thao tác có ghi nhận nhật ký.
+    /// </summary>
     public async Task<IResult> Act(long id, string action, CustomerActionInput input, HttpContext context)
     {
         if (action is not ("STATUS" or "RESET_PASSWORD")) return Error(400, "Thao tác khách hàng không còn được hỗ trợ.");

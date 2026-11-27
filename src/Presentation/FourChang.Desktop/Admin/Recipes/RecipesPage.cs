@@ -1,4 +1,8 @@
-﻿using FourChang.Desktop.Shared.Controls;
+// UC: UC-ADM-02
+// Chức năng: Hiển thị và mở phần chỉnh nguyên liệu của công thức món.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shared.Theme;

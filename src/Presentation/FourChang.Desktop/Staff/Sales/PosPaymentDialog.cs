@@ -1,3 +1,7 @@
+// UC: UC-POS-05
+// Chức năng: Theo dõi và hiển thị thanh toán cho đơn tại quầy.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Diagnostics;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Session;

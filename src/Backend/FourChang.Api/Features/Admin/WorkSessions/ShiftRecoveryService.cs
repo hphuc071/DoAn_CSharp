@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Cấp và kiểm tra quyền phục hồi phiên ca khi có sự cố.
+// Cần nhớ: Không dùng việc mất phiên để tự bỏ qua kiểm tra đối chiếu ca.
+
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;

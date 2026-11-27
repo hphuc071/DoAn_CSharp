@@ -1,3 +1,7 @@
+// UC: UC-POS-02, UC-POS-05
+// Chức năng: Tạo đơn tại quầy, chốt giá, giữ nguyên liệu và xử lý thanh toán theo phương thức chọn.
+// Cần nhớ: Một lần thanh toán gửi lại không được tạo thêm đơn hoặc hóa đơn.
+
 using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Features.Customer.Orders;
@@ -15,7 +19,21 @@ namespace FourChang.Api.Features.Staff.Sales;
 /// <summary>Thu ngân POS thật: nhiều dòng cấu hình, chốt giá/BOM và giữ kho trong cùng giao dịch với thu tiền/audit.</summary>
 public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, FourChang.Api.Features.Admin.Menu.CatalogReadService catalog)
 {
-    /// <summary>Trả trạng thái đã lưu, chỉ cho ca sở hữu đọc; không tạo lại đơn hoặc hóa đơn.</summary>
+    /// <summary>
+    /// UC-POS-02, UC-POS-05 — Xem lại kết quả bán hàng.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm đơn thuộc đúng ca đang yêu cầu xem.
+    /// 2. Đọc thông tin thanh toán của đơn.
+    /// 3. Đọc mã hóa đơn nếu đơn đã có hóa đơn.
+    /// 4. Trả kết quả bán hàng cho giao diện hiển thị.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa của đơn hàng cần xử lý.
+    /// - shift: Khóa ca làm việc đang yêu cầu xem.
+    ///
+    /// Cần nhớ: Hàm chỉ xem dữ liệu, không tạo đơn hoặc thu tiền thêm. Không có đơn thuộc ca này thì báo lỗi.
+    /// </summary>
     public async Task<PosCheckoutReceipt> Read(long id, long shift)
     {
         var order = await db.DonHang.AsNoTracking().SingleOrDefaultAsync(x => x.MaDonHang == id && x.MaCaLamViec == shift)
@@ -26,10 +44,27 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             0, payment.TrangThai, invoice);
     }
 
-    /// <summary>Chống lặp bằng audit; kiểm tra lại ca, menu, giá, lựa chọn, tồn tổng trước mọi ghi. Không tin giá UI.</summary>
+    /// <summary>
+    /// UC-POS-02, UC-POS-05 — Thanh toán giỏ món tại quầy.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra ca nhân viên có được phép bán hàng không.
+    /// 2. Tính lại giá và kiểm tra các món, topping, nguyên liệu.
+    /// 3. Tạo đơn tại quầy cùng các dòng món và lượng nguyên liệu giữ chỗ.
+    /// 4. Ghi nhận phương thức thanh toán và tạo hóa đơn khi đủ điều kiện.
+    /// 5. Trả kết quả để ứng dụng thông báo cho nhân viên.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Giỏ món, hình thức nhận, phương thức thanh toán và tổng tiền đã chấp nhận.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Biên nhận của đơn vừa xử lý hoặc kết quả cũ nếu cùng thao tác được gửi lại.
+    /// </summary>
     public Task<IResult> Checkout(PosCheckoutInput input, HttpContext context) => AdminOperation.Execute(db,
         input.MaThaoTac, "POS_CHECKOUT", "DonHang", input, context, async () =>
     {
+
+        // Bước 1: Kiểm tra phiên ca đang được phép bán hàng.
         var grant = await ShiftSessionCodec.Resolve(context, db);
         if (grant is null || grant.ReconciliationOnly || !await db.CaLamViec.AnyAsync(x => x.MaCaLamViec == grant.Shift && x.TrangThai == "OPEN"))
             throw new AdminRule(403, "Cần phiên nhân viên và ca đang mở.");
@@ -40,6 +75,8 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             ?? throw new AdminRule(400, "Chọn bàn đang hoạt động.");
         else if (input.MaBan is not null) throw new AdminRule(400, "Đơn mang đi không gắn bàn.");
         OrderPriceSummary price;
+
+        // Bước 2: Tính lại giá và so với tổng tiền nhân viên đã chấp nhận.
         try { price = await OrderPricingService.CalculateOrderTotalAsync(db, "TAKEAWAY", null, input.Items, CancellationToken.None); }
         catch (OrderQuoteValidationException ex) { throw new AdminRule(400, ex.Message); }
         if (price.TongCong != input.TongTienDaChapNhan) throw new AdminRule(409, "Giá đã thay đổi. Kiểm tra lại món và xác nhận tổng mới.");
@@ -151,9 +188,13 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             KenhDatHang = "POS", HinhThucNhanMon = input.HinhThuc, MaBan = table?.MaBan, MaBanDaChot = table?.MaBanHienThi,
             TrangThai = input.PhuongThuc == "CASH" ? "ACCEPTED" : "PENDING_PAYMENT", HetHanLuc = expiresAt,
             TiepNhanLuc = input.PhuongThuc == "CASH" ? now : null, ThoiDiemTao = now, ThoiDiemCapNhat = now };
+
+        // Bước 3: Lưu đầu đơn tại quầy; các kiểm tra cấu hình/nguyên liệu ở phía trên phải hợp lệ.
         db.DonHang.Add(order); await db.SaveChangesAsync();
         // Sequence SQL dùng chung cho các máy POS, độc lập với khóa identity.
         // Mã hiển thị được cấp độc lập với identity khi lưu đơn.
+
+        // Bước 4: Lưu các món trong giỏ và phần nguyên liệu cần giữ.
         for (var idx = 0; idx < req.Items.Count; idx++)
         {
             var item = req.Items[idx];
@@ -221,6 +262,8 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
             }
         }
 
+
+        // Bước 5: Ghi nhận thanh toán theo phương thức chọn; chuyển khoản phải theo luồng xác nhận tương ứng.
         var payment = new ThanhToan { MaThanhToanHienThi = "PAY-POS-" + order.MaDonHang, MaDonHang = order.MaDonHang, MaCaLamViec = grant.Shift,
             PhuongThuc = input.PhuongThuc, SoTienYeuCau = price.TongCong, SoTienDaXacMinh = input.PhuongThuc == "CASH" ? price.TongCong : 0,
             TrangThai = input.PhuongThuc == "CASH" ? "VERIFIED" : "PENDING",
@@ -238,7 +281,22 @@ public sealed class PosCheckoutService(CafeDbContext db, IConfiguration config, 
 /// <summary>Hóa đơn chốt từ dòng món đã lưu, không dùng giá thực đơn thay đổi sau thanh toán.</summary>
 public static class CheckoutInvoice
 {
-    /// <summary>Phát hành một hóa đơn gốc khi đã thu đủ; caller sở hữu transaction và audit.</summary>
+    /// <summary>
+    /// UC-POS-05, UC-WEB-07 — Tạo hóa đơn gốc nếu đơn chưa có hóa đơn gốc.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra đơn đã có hóa đơn gốc chưa.
+    /// 2. Nếu chưa có, đọc các món và topping đã lưu trong đơn.
+    /// 3. Lưu hóa đơn cùng nội dung và giá tại thời điểm phát hành.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - db: Đối tượng dùng để đọc và ghi dữ liệu của hệ thống.
+    /// - order: Thông tin đơn hàng đã được đọc từ database.
+    /// - payment: Thông tin thanh toán liên quan đến đơn.
+    /// - now: Thời điểm đang thực hiện việc xử lý.
+    ///
+    /// Cần nhớ: Nếu đơn đã có hóa đơn gốc thì dừng, không phát hành thêm hóa đơn gốc.
+    /// </summary>
     public static async Task Issue(CafeDbContext db, DonHang order, ThanhToan payment, DateTime now)
     {
         if (await db.HoaDon.AnyAsync(x => x.MaDonHang == order.MaDonHang && x.LoaiHoaDon == "ORIGINAL")) return;

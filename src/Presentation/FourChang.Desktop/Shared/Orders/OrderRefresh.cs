@@ -1,3 +1,7 @@
+// UC: UC-POS-03, UC-POS-04, UC-ADM-05
+// Chức năng: Tải lại dữ liệu đơn và cập nhật màn hình trong trang dùng chung.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Text.Json;
 using FourChang.Presentation.Shared.Contracts.Admin;
 

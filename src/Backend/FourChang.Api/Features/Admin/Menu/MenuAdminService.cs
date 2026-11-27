@@ -1,3 +1,7 @@
+// UC: UC-ADM-02
+// Chức năng: Quản lý món, cấu hình size/nhiệt độ, topping và lấy mẫu từ món có sẵn.
+// Cần nhớ: Kiểm tra điều kiện trước khi công bố/bật bán; không sửa giá đã chốt trong đơn cũ.
+
 using FourChang.Domain.Shared;
 using System.Security.Claims;
 using System.Text.Json;
@@ -52,7 +56,22 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
     /// <summary>Route tương thích báo rõ loại món cố định, không ghi vào bảng danh mục đã bỏ.</summary>
     public Task<IResult> Category(long? id, MenuCategoryInput input, HttpContext context) => Task.FromResult<IResult>(Results.Problem(statusCode:409,detail:"Loại món là danh sách cố định; không còn quản lý bảng danh mục."));
 
-    /// <summary>Món mới lưu nháp trước; chỉ công bố sau khi cấu hình/BOM/mặc định hợp lệ, tồn thiếu vẫn tạm hết.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Thêm hoặc sửa thông tin một món.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra tên, loại món, hình ảnh và thông tin được nhập.
+    /// 2. Nếu chọn món mẫu thì lấy cấu hình/công thức theo quy tắc sao chép.
+    /// 3. Kiểm tra điều kiện hiển thị và bán món.
+    /// 4. Lưu món và trả kết quả cho quản lý.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa món/cấu hình/topping cần sửa; để trống nếu thêm mới.
+    /// - input: Thông tin món, ảnh, trạng thái và món mẫu nếu được chọn.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả lưu món hoặc lỗi để quản lý điều chỉnh.
+    /// </summary>
     public Task<IResult> Dish(long? id, MenuDishInput input, HttpContext context) => Change(input.MaThaoTac, "DISH", id, input, context, async () =>
     {
         var item = id is null ? new Mon() : await db.Mon.SingleOrDefaultAsync(x => x.MaMon == id) ?? throw Missing();
@@ -97,7 +116,22 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         return (item.MaMon, item.PhienBanDuLieu, before);
     });
 
-    /// <summary>Lưu size, nhiệt độ, giá; đường/đá và topping dùng chính sách chung, không sửa snapshot đã bán.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Lưu giá và cấu hình size/nóng-lạnh của món.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra món cần cấu hình có tồn tại không.
+    /// 2. Kiểm tra size, nóng/lạnh, giá và cấu hình trùng.
+    /// 3. Xử lý lựa chọn mặc định theo điều kiện trong hàm.
+    /// 4. Lưu cấu hình để website và ứng dụng tại quầy dùng chung.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa món/cấu hình/topping cần sửa; để trống nếu thêm mới.
+    /// - input: Mã cấu hình nếu sửa và cấu hình mới.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Cấu hình được lưu để Web/POS dùng chung.
+    /// </summary>
     public Task<IResult> Variant(long? id, MenuVariantInput input, HttpContext context) => Change(input.MaThaoTac, "VARIANT", id, input, context, async () =>
     {
         var item = id is null ? new CauHinhMon() : await db.CauHinhMon.SingleOrDefaultAsync(x => x.MaCauHinhMon == id) ?? throw Missing();
@@ -150,7 +184,20 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         return (item.MaCauHinhMon, item.PhienBanDuLieu, before);
     });
 
-    /// <summary>Nhập nhiều size cùng lúc; bảo toàn cấu hình cũ, mặc định duy nhất, rollback cả bảng nếu một ô lỗi.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Lưu nhiều lựa chọn size/nhiệt độ của một món.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Nhận các lựa chọn size và nhiệt độ của một món.
+    /// 2. Kiểm tra các cấu hình được chọn và giá tương ứng.
+    /// 3. Lưu các cấu hình hợp lệ trong cùng một thao tác.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Món cần cấu hình và danh sách lựa chọn.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả để giao diện chuyển sang chỉnh công thức khi cần.
+    /// </summary>
     public Task<IResult> VariantBatch(MenuVariantBatchInput input, HttpContext context) => Change(input.MaThaoTac, "VARIANT_BATCH", input.MaMon, input, context, async () =>
     {
         var dish = await db.Mon.SingleOrDefaultAsync(m => m.MaMon == input.MaMon) ?? throw Bad("Món không tồn tại.");
@@ -186,7 +233,21 @@ public sealed class MenuAdminService(CafeDbContext db, CatalogReadService catalo
         return (dish.MaMon, dish.PhienBanDuLieu, before);
     });
 
-    /// <summary>Topping có giá mỗi phần và giới hạn riêng; kích hoạt phải có BOM, thiếu tồn chỉ khóa khả dụng.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Lưu topping và thông tin sử dụng của topping.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra tên topping, giá mỗi phần và giới hạn mỗi ly.
+    /// 2. Kiểm tra thông tin nguyên liệu liên quan theo yêu cầu nhập.
+    /// 3. Lưu topping để dùng ở màn hình chọn món.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa món/cấu hình/topping cần sửa; để trống nếu thêm mới.
+    /// - input: Tên topping, giá/phần, giới hạn và các thông tin liên quan.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Topping được lưu để dùng trong phần chọn món.
+    /// </summary>
     public Task<IResult> Topping(long? id, MenuToppingInput input, HttpContext context) => Change(input.MaThaoTac, "TOPPING", id, input, context, async () =>
     {
         var item = id is null ? new MonThem() : await db.MonThem.SingleOrDefaultAsync(x => x.MaMonThem == id) ?? throw Missing();

@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Đọc danh sách và chi tiết đơn của khách, gồm món, thanh toán, hủy và hoàn tiền.
+// Cần nhớ: Mỗi lần đọc phải kiểm tra chủ đơn; không thay đổi dữ liệu khi xem.
+
 using System.Data;
 using FourChang.Domain.Entities.Orders;
 using FourChang.Infrastructure.Database.Context;
@@ -9,6 +13,21 @@ namespace FourChang.Api.Features.Customer.Orders;
 public interface ICustomerOrderReader
 {
     Task<CustomerOrderPage> ListAsync(long customerId, CustomerOrderFilter filter, CancellationToken ct);
+    /// <summary>
+    /// UC-WEB-08 — Đọc đầy đủ một đơn thuộc tài khoản khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm đơn thuộc đúng tài khoản khách đang xem.
+    /// 2. Đọc món, topping, thanh toán, yêu cầu hủy và khoản hoàn liên quan.
+    /// 3. Trả thông tin đầy đủ cho trang chi tiết đơn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - customerId: Khóa của khách hàng đang yêu cầu xem đơn.
+    /// - orderId: Khóa của đơn hàng cần xem.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Cần nhớ: Khách không được xem đơn của tài khoản khác. Xem chi tiết không tự sửa trạng thái đơn.
+    /// </summary>
     Task<CustomerOrderDetail?> DetailAsync(long customerId, long orderId, CancellationToken ct);
 }
 
@@ -43,6 +62,21 @@ public sealed class CustomerOrderReader(CafeDbContext db, IConfiguration? config
         return new(rows.Select(x => Summary(x) with { CanReceiveCounterRefund = counterOrders.Contains(x.MaDonHang) }).ToArray(), filter.Page, filter.PageSize, count, DateTime.UtcNow);
     }
 
+    /// <summary>
+    /// UC-WEB-08 — Đọc đầy đủ một đơn thuộc tài khoản khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm đơn thuộc đúng tài khoản khách đang xem.
+    /// 2. Đọc món, topping, thanh toán, yêu cầu hủy và khoản hoàn liên quan.
+    /// 3. Trả thông tin đầy đủ cho trang chi tiết đơn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - customerId: Khóa của khách hàng đang yêu cầu xem đơn.
+    /// - orderId: Khóa của đơn hàng cần xem.
+    /// - ct: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Cần nhớ: Khách không được xem đơn của tài khoản khác. Xem chi tiết không tự sửa trạng thái đơn.
+    /// </summary>
     public async Task<CustomerOrderDetail?> DetailAsync(long customerId, long orderId, CancellationToken ct)
     {
         if (customerId <= 0 || orderId <= 0) return null;

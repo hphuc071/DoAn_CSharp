@@ -1,3 +1,7 @@
+// UC: UC-POS-01
+// Chức năng: Nhập thông tin phục hồi ca khi phiên làm việc bị mất.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

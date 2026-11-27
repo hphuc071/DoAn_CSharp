@@ -1,3 +1,7 @@
+// UC: UC-ADM-05
+// Chức năng: Khai báo API theo dõi đơn và các thao tác quản lý được phép.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 using FourChang.Api.Shared.Orders;
 using FourChang.Infrastructure.Database.Context;

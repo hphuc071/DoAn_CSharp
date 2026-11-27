@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Kiểm tra các điều kiện an toàn khi nối luồng đặt món với các thành phần khác.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;

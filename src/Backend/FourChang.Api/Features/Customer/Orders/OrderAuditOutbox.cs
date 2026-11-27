@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Lưu dấu vết tạo đơn và sự kiện cần xử lý cùng giao dịch của đơn.
+// Cần nhớ: Chỉ xử lý tiếp sự kiện sau khi dữ liệu đã được lưu thành công.
+
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using FourChang.Domain.Entities.Audit;

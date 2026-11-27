@@ -1,3 +1,7 @@
+// UC: UC-ADM-05
+// Chức năng: Mở danh sách yêu cầu hủy để quản lý duyệt hoặc từ chối.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 namespace FourChang.Desktop.Admin.Orders;
 
 /// <summary>Trang con của quản lý đơn, không thêm UC hay thay đổi quyền duyệt/hoàn.</summary>

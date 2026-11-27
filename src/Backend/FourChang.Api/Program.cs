@@ -1,3 +1,7 @@
+// UC: Dùng chung các UC Web, POS và quản lý
+// Chức năng: Khởi động Backend, đăng ký dịch vụ, kết nối database, xác thực và các nhóm API.
+// Cần nhớ: Đây là nơi nối các thành phần; xử lý từng nghiệp vụ nằm trong các dịch vụ được đăng ký.
+
 using FourChang.Api.Features.Admin.Reports;
 using FourChang.Api.Features.Admin.Invoices;
 using FourChang.Api.Features.Admin.Refunds;

@@ -1,3 +1,7 @@
+// UC: UC-ADM-04
+// Chức năng: Tìm phiếu đã xác nhận có lịch đến hạn để ghi sổ.
+// Cần nhớ: Chưa đủ tồn khi xuất thì báo cần kiểm tra, không trừ kho âm.
+
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
 

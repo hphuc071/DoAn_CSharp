@@ -1,3 +1,7 @@
+// UC: UC-WEB-01 đến UC-WEB-08
+// Chức năng: Khởi động website Razor Pages và cấu hình các phần gọi Backend.
+// Cần nhớ: Website tiếp nhận thao tác; các quyết định giá, đơn và kho vẫn do Backend kiểm tra.
+
 using FourChang.Web.Services;
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Customer;

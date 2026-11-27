@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Xác định hướng xử lý trạng thái đơn theo dữ liệu hiện tại.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Domain.Entities.Orders;
 using System.Security.Cryptography;
 using System.Text.Json;

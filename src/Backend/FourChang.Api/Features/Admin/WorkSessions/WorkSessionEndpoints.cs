@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Khai báo API quản lý và đối chiếu ca.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 using FourChang.Api.Shared.WorkSessions;
 using FourChang.Infrastructure.Database.Context;

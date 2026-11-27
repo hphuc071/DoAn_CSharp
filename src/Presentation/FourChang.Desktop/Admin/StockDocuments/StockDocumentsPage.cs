@@ -1,3 +1,7 @@
+// UC: UC-ADM-04
+// Chức năng: Tìm, xem chi tiết, xác nhận và quản lý các phiếu nhập/xuất.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Globalization;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;

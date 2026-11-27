@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Kiểm tra và xử lý đơn chờ thanh toán đến hạn theo cấu hình.
+// Cần nhớ: Không chỉ nhìn thời gian rồi mặc định khách chưa chuyển tiền.
+
 using FourChang.Domain.Entities.Orders;
 using System.Data;
 using System.Security.Cryptography;

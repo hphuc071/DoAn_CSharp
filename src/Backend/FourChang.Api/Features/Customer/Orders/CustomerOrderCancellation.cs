@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Ghi nhận khách gửi yêu cầu hủy đơn.
+// Cần nhớ: Gửi yêu cầu chưa có nghĩa là đơn đã được hủy hoặc tiền đã được trả.
+
 using System.Data;
 using System.Security.Claims;
 using System.Text.Json;

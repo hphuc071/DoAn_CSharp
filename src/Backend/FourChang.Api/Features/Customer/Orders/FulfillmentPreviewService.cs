@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Kiểm tra hình thức nhận món và trả thông tin xem trước khi đặt.
+// Cần nhớ: Đây là bước xem trước; chưa tạo đơn hoặc ghi nhận thanh toán.
+
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.RegularExpressions;

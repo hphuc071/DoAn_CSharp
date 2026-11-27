@@ -1,3 +1,7 @@
+// UC: UC-POS-03, UC-ADM-05
+// Chức năng: Tính nghĩa vụ thanh toán, tiền đã thu, đã hoàn và số còn phải xử lý.
+// Cần nhớ: Các con số được tính từ dữ liệu đơn và giao dịch, không lấy từ nhãn trên giao diện.
+
 using FourChang.Domain.Entities.Orders;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;

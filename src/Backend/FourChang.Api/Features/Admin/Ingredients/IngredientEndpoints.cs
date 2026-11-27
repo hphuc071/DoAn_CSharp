@@ -1,4 +1,8 @@
-﻿using FourChang.Api.Shared.Operations;
+// UC: UC-ADM-03
+// Chức năng: Khai báo API danh sách, lưu và xem ảnh hưởng của nguyên liệu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;
 

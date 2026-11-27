@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-POS-05
+// Chức năng: Khai báo các API phục vụ trang thanh toán mô phỏng.
+// Cần nhớ: Quyền truy cập và chế độ chạy vẫn phải được kiểm tra tại Backend.
+
 using FourChang.Api.Shared.Operations;
 namespace FourChang.Api.Features.Payments.Simulation;
 public static class PaymentSimulationEndpoints

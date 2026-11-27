@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Đọc và chuẩn hóa dữ liệu đơn đã trả về để hiển thị nhất quán.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 // Full document reloads only: no asynchronous event merge, bearer token, financial POST or storage.
 (() => {
   "use strict";

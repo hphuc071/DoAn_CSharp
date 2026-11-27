@@ -1,3 +1,7 @@
+// UC: UC-ADM-02
+// Chức năng: Hiển thị món, cấu hình và topping; mở cửa sổ thêm/sửa tương ứng.
+// Cần nhớ: STT là số thứ tự trên màn hình; thao tác sửa vẫn dùng khóa thật của dòng được chọn.
+
 using FourChang.Desktop.Admin.Employees;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
@@ -121,7 +125,16 @@ public sealed class MenuManagementPage : UserControl
         return pane;
     }
 
-    /// <summary>Chỉ thay snapshot sau khi tải thành công; lỗi giữ dữ liệu cũ và không khẳng định đó là dữ liệu mới.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Tải thực đơn mới nhất cho giao diện quản lý.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Chặn việc tải dữ liệu chồng nhau.
+    /// 2. Gọi Backend lấy thực đơn mới nhất.
+    /// 3. Nếu thành công thì cập nhật các danh sách; nếu lỗi thì giữ dữ liệu cũ và thông báo.
+    ///
+    /// Sau khi xử lý: Danh sách mới hoặc thông báo lỗi mà không tự tạo dữ liệu giả.
+    /// </summary>
     private async Task LoadData()
     {
         if (busy)
@@ -143,7 +156,20 @@ public sealed class MenuManagementPage : UserControl
         finally { busy = false; foreach (var pane in panes.Values) if (!pane.IsDisposed) pane.Busy = false; }
     }
 
-    /// <summary>Lọc snapshot mới nhất theo từ khóa hiện tại; xóa từ khóa trả lại đầy đủ số dòng.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Hiển thị danh sách theo tab và từ khóa đang nhập.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Đọc tab và từ khóa đang tìm.
+    /// 2. Lọc và sắp xếp các dòng cần hiển thị.
+    /// 3. Tạo bảng, đánh STT cho tab món và giữ khóa thật của từng dòng.
+    /// 4. Cập nhật số dòng và cách trình bày bảng.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - kind: Tên tab đang thao tác: món, cấu hình hoặc topping.
+    ///
+    /// Sau khi xử lý: Bảng hiển thị đúng dữ liệu, số lượng và thứ tự.
+    /// </summary>
     private void Render(string kind)
     {
         var (grid, search, count) = lists[kind];
@@ -207,7 +233,20 @@ public sealed class MenuManagementPage : UserControl
         panes[kind].ArrangeGrid();
     }
 
-    /// <summary>Luôn dùng khóa dòng đang chọn, không suy mã từ tên món hoặc vị trí hiển thị.</summary>
+    /// <summary>
+    /// UC-ADM-02 — Lấy đúng đối tượng người dùng đang chọn để thao tác.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra người dùng đã chọn một dòng chưa.
+    /// 2. Lấy khóa thật của dòng đó; tab món lấy từ Tag, không lấy STT.
+    /// 3. Gọi thao tác tiếp theo bằng khóa vừa tìm được.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - kind: Tên tab đang thao tác: món, cấu hình hoặc topping.
+    /// - action: Việc sẽ thực hiện sau khi đã lấy được đúng khóa của dòng.
+    ///
+    /// Cần nhớ: Món hiển thị STT 7 vẫn có thể có khóa database là 60002. Phải dùng khóa thật để tránh sửa nhầm món.
+    /// </summary>
     private void Selected(string kind, Action<long> action)
     {
         var grid = lists[kind].Grid;

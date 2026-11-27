@@ -1,3 +1,7 @@
+// UC: UC-POS-05
+// Chức năng: Tìm và xem hóa đơn từ phía nhân viên.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Invoices;

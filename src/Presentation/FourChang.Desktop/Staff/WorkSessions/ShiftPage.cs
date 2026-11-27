@@ -1,3 +1,7 @@
+// UC: UC-POS-01
+// Chức năng: Hiển thị tổng hợp ca và nhận tiền mặt nhân viên kiểm đếm.
+// Cần nhớ: Tổng tiền đơn hoàn thành và tiền mặt cần kiểm đếm là hai chỉ số khác nhau.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Security;

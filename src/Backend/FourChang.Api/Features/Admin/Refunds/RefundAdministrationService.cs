@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Theo dõi hồ sơ hoàn, số tiền được duyệt và các lần chi trả.
+// Cần nhớ: Duyệt hoặc có hồ sơ hoàn không đồng nghĩa khách đã nhận tiền.
+
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
@@ -14,7 +18,22 @@ namespace FourChang.Api.Features.Admin.Refunds;
 /// <summary>UC-ADM-06: theo dõi hoàn tại quầy; giữ dịch vụ hồ sơ ngân hàng cũ để đọc lịch sử tương thích.</summary>
 public sealed class RefundAdministrationService(CafeDbContext db, OrderFinancials financials, IDataProtectionProvider protection)
 {
-    /// <summary>Đọc danh sách và từng lần chi; chỉ trả tài khoản đã che, không trả bí mật mã hóa.</summary>
+    /// <summary>
+    /// UC-ADM-06 — Theo dõi các khoản hoàn theo bộ lọc.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Lọc các hồ sơ hoàn theo thông tin tìm kiếm.
+    /// 2. Đọc các lần đã trả tiền cho khách.
+    /// 3. Tổng hợp số tiền cần hoàn, đã trả và còn phải trả.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - search: Từ khóa người dùng muốn tìm; có thể để trống.
+    /// - from: Mốc bắt đầu của khoảng ngày cần tìm.
+    /// - to: Mốc kết thúc của khoảng ngày cần tìm, được dùng theo điều kiện lọc trong hàm.
+    /// - status: Trạng thái cần lọc; có thể để trống để xem nhiều trạng thái.
+    ///
+    /// Sau khi xử lý: Danh sách khoản hoàn; không tự thực hiện chi tiền.
+    /// </summary>
     public async Task<IReadOnlyList<RefundView>> Read(string? search = null, DateTime? from = null, DateTime? to = null, string? status = null)
     {
         if (from > to || status is not (null or "WAITING" or "PAID" or "PARTIAL" or "CHECK"))

@@ -1,3 +1,7 @@
+// UC: UC-POS-05
+// Chức năng: Chọn hồ sơ hoàn đã duyệt và ghi nhận lần trả tiền mặt cho khách.
+// Cần nhớ: Chỉ ghi nhận đã hoàn khi việc chi trả được xác nhận thành công.
+
 namespace FourChang.Desktop.Staff.Invoices;
 
 /// <summary>Thu ngân chi tiền mặt ở màn hình riêng, không trộn nút chi tiền với thao tác gửi yêu cầu hủy.</summary>

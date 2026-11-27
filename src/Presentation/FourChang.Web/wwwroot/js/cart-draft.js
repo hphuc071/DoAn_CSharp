@@ -1,3 +1,7 @@
+// UC: UC-WEB-05
+// Chức năng: Quản lý giỏ tạm để giữ các lựa chọn trước khi tạo đơn.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 // Local draft only. Never touches a pending Checkout operation or calls a write API.
 (() => {
   "use strict";

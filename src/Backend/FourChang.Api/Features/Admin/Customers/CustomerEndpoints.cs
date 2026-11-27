@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Nhận yêu cầu quản lý khách hàng và chuyển sang lớp xử lý.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Api.Features.Admin.Customers;

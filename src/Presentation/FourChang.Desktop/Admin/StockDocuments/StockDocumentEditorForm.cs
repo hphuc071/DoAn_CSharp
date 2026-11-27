@@ -1,3 +1,7 @@
+// UC: UC-ADM-04
+// Chức năng: Nhập ngày, nguồn, nguyên liệu, số lượng và giá của phiếu.
+// Cần nhớ: Lưu nháp chưa cộng/trừ kho; việc xác nhận phải được Backend chấp nhận.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

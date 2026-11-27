@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Tổng hợp đơn hoàn thành, món bán chạy, tiền đã hoàn và nhật ký.
+// Cần nhớ: Chỉ cộng đơn đủ trạng thái theo bộ lọc; giữ khoản thu, khoản hoàn và tiền mặt đúng ý nghĩa.
+
 using System.Data;
 using System.Globalization;
 using System.Security.Claims;
@@ -11,7 +15,20 @@ namespace FourChang.Api.Features.Admin.Reports;
 /// <summary>UC-ADM-07: báo cáo tinh gọn theo đơn hoàn thành và tiền đã hoàn; nhật ký chỉ đọc.</summary>
 public sealed class ReportAdministrationService(CafeDbContext db, ReportPermissions permissions, ReportSnapshotStore store)
 {
-    /// <summary>UC-ADM-07: chỉ tổng hợp đơn hoàn thành và tiền hoàn thực trả trong kỳ; chụp cùng transaction để xuất đúng dữ liệu đã xem.</summary>
+    /// <summary>
+    /// UC-ADM-07 — Tổng hợp báo cáo bán hàng tại một mốc dữ liệu.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra người dùng và bộ lọc báo cáo.
+    /// 2. Lấy các đơn đã hoàn thành, các món đã bán và các lần hoàn tiền thành công.
+    /// 3. Tính các chỉ số và tạo bộ dữ liệu báo cáo tại thời điểm đọc.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - filter: Các điều kiện người dùng chọn để lọc dữ liệu.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Cần nhớ: Chỉ cộng các đơn đáp ứng trạng thái hoàn thành theo bộ lọc; không gộp đơn chưa hoàn thành vào doanh thu này.
+    /// </summary>
     public async Task<ReportSnapshot> Read(ReportFilter filter, HttpContext context)
     {
         permissions.Demand("ReportsRead");
@@ -77,7 +94,20 @@ public sealed class ReportAdministrationService(CafeDbContext db, ReportPermissi
         await store.Save(snapshot, long.Parse(context.User.FindFirstValue(ClaimTypes.NameIdentifier)!));
         return snapshot;
     }
-    /// <summary>Tra audit độc lập quyền báo cáo, phân trang và che dữ liệu bí mật; không có sửa/xóa.</summary>
+    /// <summary>
+    /// UC-ADM-07 — Tra cứu nhật ký hệ thống theo bộ lọc.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra điều kiện xem nhật ký.
+    /// 2. Tìm các thao tác phù hợp bộ lọc và trang cần xem.
+    /// 3. Trả phần thông tin nhật ký được phép hiển thị.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - filter: Các điều kiện người dùng chọn để lọc dữ liệu.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Nhật ký chỉ đọc, không sửa hoặc xóa lịch sử.
+    /// </summary>
     public async Task<AdminPage<AdminTraceRow>> Audit(AuditFilter filter, HttpContext? context = null)
     {
         permissions.Demand("AuditRead");

@@ -1,4 +1,8 @@
-﻿using System.Globalization;
+// UC: UC-WEB-04, UC-WEB-05
+// Chức năng: Trả thực đơn, bộ lọc và các lựa chọn của từng món cho khách.
+// Cần nhớ: Giá và khả năng đặt món lấy từ dữ liệu chung với ứng dụng tại quầy.
+
+using System.Globalization;
 using System.Text;
 using FourChang.Api.Features.Admin.Menu;
 using FourChang.Infrastructure.Database.Context;

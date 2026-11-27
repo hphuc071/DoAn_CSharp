@@ -1,8 +1,12 @@
+// UC: UC-ADM-07
+// Chức năng: Khai báo API đọc báo cáo và nhật ký.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Api.Features.Admin.Reports;
 
-/// <summary>UC-ADM-10: quyền Admin và quyền báo cáo/audit/xuất được kiểm tra ở phía máy chủ.</summary>
+/// <summary>UC-ADM-07: quyền Admin và quyền báo cáo/audit/xuất được kiểm tra ở phía máy chủ.</summary>
 public static class ReportAdministrationEndpoints
 {
     /// <summary>Đăng ký báo cáo, audit, snapshot và job xuất; không có API sửa/xóa audit.</summary>

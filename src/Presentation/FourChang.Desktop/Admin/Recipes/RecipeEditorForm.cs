@@ -1,4 +1,8 @@
-﻿using FourChang.Desktop.Admin.Ingredients;
+// UC: UC-ADM-02
+// Chức năng: Chọn nguyên liệu, nhập lượng theo đơn vị và gửi công thức về Backend.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using FourChang.Desktop.Admin.Ingredients;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

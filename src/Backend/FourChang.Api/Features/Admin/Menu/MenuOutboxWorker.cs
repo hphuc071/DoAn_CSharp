@@ -1,3 +1,7 @@
+// UC: UC-ADM-02
+// Chức năng: Xử lý sự kiện thực đơn sau khi thay đổi đã được lưu.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;
 namespace FourChang.Api.Features.Admin.Menu;

@@ -1,3 +1,7 @@
+// UC: UC-WEB-03
+// Chức năng: Hiển thị và gửi thay đổi hồ sơ, địa chỉ, mật khẩu của khách.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using FourChang.Web.Security;

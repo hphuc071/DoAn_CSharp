@@ -1,3 +1,7 @@
+// UC: UC-WEB-07
+// Chức năng: Đối chiếu bằng chứng giao dịch với yêu cầu thanh toán của đơn.
+// Cần nhớ: Chỉ xác nhận khi đáp ứng điều kiện; cùng một giao dịch không được ghi nhận thu hai lần.
+
 using System.Data;
 using System.Security.Cryptography;
 using System.Text.Json;

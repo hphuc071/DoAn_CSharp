@@ -1,3 +1,7 @@
+// UC: UC-WEB-03
+// Chức năng: Đọc và cập nhật hồ sơ, sổ địa chỉ, mật khẩu của chính khách đang đăng nhập.
+// Cần nhớ: Chỉ cho thay đổi dữ liệu thuộc khách hiện tại; kiểm tra phiên bản trước khi lưu.
+
 using FourChang.Api.Shared.Audit;
 using FourChang.Api.Shared.Customers;
 using System.Data;
@@ -30,9 +34,34 @@ public sealed class CustomerSelfService(CafeDbContext db)
             .Select(x => new CustomerAddress(x.MaDiaChi, x.NhanDiaChi, x.TenNguoiNhan, x.DienThoaiNguoiNhan, x.DiaChiChiTiet, null, null, x.GhiChuGiaoHang, x.LaDiaChiMacDinh, x.PhienBanDuLieu)).ToListAsync();
         return new(u.MaKhachHang, u.TenDangNhapChuanHoa, u.HoTen, u.EmailChuanHoa, u.SoDienThoaiChuanHoa, u.PhienBanDuLieu, addresses);
     }
-    /// <summary>Trả hồ sơ của Customer hiện tại qua DTO an toàn.</summary>
+    /// <summary>
+    /// UC-WEB-03 — Đọc hồ sơ của chính khách đang đăng nhập.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Xác định khách đang đăng nhập.
+    /// 2. Đọc thông tin hồ sơ và các địa chỉ của khách.
+    /// 3. Trả dữ liệu cho trang thông tin cá nhân.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Thông tin dùng để hiển thị trang cá nhân.
+    /// </summary>
     public async Task<IResult> Get(HttpContext context) => Results.Ok(await Profile(Owner(context)));
-    /// <summary>Lưu thông tin cá nhân với validation định danh/điện thoại chung, kiểm tra trùng và version.</summary>
+    /// <summary>
+    /// UC-WEB-03 — Cập nhật thông tin cá nhân.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra thông tin khách muốn thay đổi.
+    /// 2. Kiểm tra dữ liệu trên màn hình còn đúng với bản mới nhất không.
+    /// 3. Lưu hồ sơ và trả kết quả cập nhật.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Nội dung hồ sơ mới và phiên bản dữ liệu.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Hồ sơ sau cập nhật hoặc lỗi kiểm tra.
+    /// </summary>
     public Task<IResult> Save(SaveSelfProfile input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_PROFILE_UPDATED", input, input.PhienBanDuLieu, context, async u =>
     {
         var invalid = CustomerRules.Validate(new(input.MaThaoTac, u.TenDangNhapChuanHoa, input.HoTen, input.Email, input.SoDienThoai, null), false);
@@ -41,7 +70,21 @@ public sealed class CustomerSelfService(CafeDbContext db)
         if (await db.TaiKhoanKhachHang.AnyAsync(x => x.MaKhachHang != u.MaKhachHang && (email != null && x.EmailChuanHoa == email || phone != null && x.SoDienThoaiChuanHoa == phone))) throw new Rule(409, "Email hoặc số điện thoại đã được sử dụng.");
         u.HoTen = input.HoTen.Trim(); u.EmailChuanHoa = email; u.SoDienThoaiChuanHoa = phone;
     });
-    /// <summary>Thêm hoặc sửa địa chỉ thuộc khách hiện tại; kiểm tra số người nhận và địa chỉ mặc định.</summary>
+    /// <summary>
+    /// UC-WEB-03 — Thêm hoặc sửa địa chỉ trong sổ địa chỉ của khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Xác định đây là địa chỉ thêm mới hay địa chỉ cần sửa.
+    /// 2. Kiểm tra địa chỉ thuộc đúng khách và thông tin nhận hàng hợp lệ.
+    /// 3. Lưu địa chỉ, xử lý lựa chọn mặc định theo điều kiện trong hàm.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa địa chỉ cần sửa; để trống nếu thêm địa chỉ mới.
+    /// - input: Mã địa chỉ nếu sửa, thông tin người nhận và địa chỉ.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả lưu địa chỉ của đúng khách.
+    /// </summary>
     public Task<IResult> Address(long? id, SaveSelfAddress input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_ADDRESS_SAVED", new { id, input }, input.PhienBanHoSo, context, async u =>
     {
         if (string.IsNullOrWhiteSpace(input.TenNguoiNhan) || input.TenNguoiNhan.Trim().Length > 120 || input.DienThoaiNguoiNhan is null || !Regex.IsMatch(input.DienThoaiNguoiNhan.Trim(), @"^[0-9]{10}$") || string.IsNullOrWhiteSpace(input.DiaChiChiTiet) || input.DiaChiChiTiet.Trim().Length > 500 || input.NhanDiaChi?.Length > 50 || input.GhiChuGiaoHang?.Length > 500 || input.ViDo is < -90 or > 90 || input.KinhDo is < -180 or > 180 || (input.ViDo is null) != (input.KinhDo is null)) throw new Rule(400, "Tên người nhận, số điện thoại, địa chỉ hoặc tọa độ không hợp lệ.");
@@ -72,7 +115,20 @@ public sealed class CustomerSelfService(CafeDbContext db)
             if (replacement is not null) replacement.LaDiaChiMacDinh = true;
         }
     });
-    /// <summary>Đổi mật khẩu sau khi xác minh mật khẩu hiện tại; băm mật khẩu mới và thu hồi phiên theo chính sách.</summary>
+    /// <summary>
+    /// UC-WEB-03 — Đổi mật khẩu bằng thông tin xác nhận của khách.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra mật khẩu hiện tại và mật khẩu mới.
+    /// 2. Kiểm tra điều kiện đổi mật khẩu của tài khoản.
+    /// 3. Lưu mật khẩu mới dưới dạng đã băm, không lưu chữ khách vừa nhập.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - input: Mật khẩu hiện tại, mật khẩu mới và phiên bản hồ sơ.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả đổi mật khẩu, không trả mật khẩu rõ.
+    /// </summary>
     public Task<IResult> Password(ChangeSelfPassword input, HttpContext context) => Execute(input.MaThaoTac, "CUSTOMER_PASSWORD_CHANGED", input, input.PhienBanDuLieu, context, async u =>
     {
         if (input.MatKhauHienTai is null || !CustomerRules.ValidPassword(input.MatKhauMoi) || input.MatKhauMoi != input.XacNhanMatKhau) throw new Rule(400, "Mật khẩu mới phải có 5–128 ký tự và xác nhận khớp.");

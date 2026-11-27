@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Nhập và gửi thông tin hồ sơ nhân viên.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Text.RegularExpressions;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;

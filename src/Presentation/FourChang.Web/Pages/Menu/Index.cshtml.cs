@@ -1,3 +1,7 @@
+// UC: UC-WEB-04, UC-WEB-05
+// Chức năng: Tải thực đơn và dữ liệu cần cho trang chọn món.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Customer;
 using Microsoft.AspNetCore.Mvc.RazorPages;

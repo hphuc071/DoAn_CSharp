@@ -1,3 +1,7 @@
+// UC: UC-ADM-02
+// Chức năng: Xử lý các mốc áp dụng công thức theo dữ liệu và cấu hình hiện có.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Data;
 using FourChang.Api.Shared.Audit;
 using FourChang.Api.Shared.Operations;

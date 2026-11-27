@@ -1,3 +1,7 @@
+// UC: UC-WEB-08, UC-POS-04, UC-POS-05, UC-ADM-05, UC-ADM-06
+// Chức năng: Nối luồng khách yêu cầu hủy, nhân viên chuyển, quản lý duyệt và hoàn tiền tại quầy.
+// Cần nhớ: Chỉ duyệt mới hủy; chỉ lần chi thành công mới được tính là đã trả tiền.
+
 using FourChang.Api.Features.Staff.WorkSessions;
 using FourChang.Api.Security;
 using System.Security.Claims;
@@ -44,7 +48,22 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
         return new(last.MaNhomHuy, last.TrangThai == "ACCEPTED" ? "APPROVED" : "REJECTED", reason);
     }
 
-    /// <summary>Lệnh có version và mã chống trùng; chuyển không hủy, từ chối không sửa kho hoặc phát sinh hoàn.</summary>
+    /// <summary>
+    /// UC-WEB-08, UC-POS-04, UC-POS-05, UC-ADM-05, UC-ADM-06 — Chuyển hoặc quyết định yêu cầu hủy theo vai trò.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra người thao tác có quyền thực hiện hành động này không.
+    /// 2. Đọc lại đơn và yêu cầu hủy đang được xử lý.
+    /// 3. Chuyển yêu cầu, duyệt hoặc từ chối theo hành động hợp lệ.
+    /// 4. Lưu kết quả và thông tin để các bên theo dõi.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa của đơn hàng cần xử lý.
+    /// - input: Đơn, nhóm yêu cầu hủy, hành động và phiên người dùng.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Kết quả xử lý yêu cầu; gửi yêu cầu chưa đồng nghĩa đã hủy.
+    /// </summary>
     public Task<IResult> Execute(long id, CancellationCommand input, HttpContext context) =>
         AdminOperation.Execute(db, input.MaThaoTac, "CANCELLATION_" + input.HanhDong, "DonHang", new { id, input }, context, async () =>
         {
@@ -101,9 +120,26 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
             return (id, (object)new CancellationInfo(input.MaNhomHuy, state, input.LyDo), before, input.LyDo);
         }, allowStaff: true);
 
-    /// <summary>Hủy toàn bộ nhóm đã xác minh trong cùng transaction: giữ giá chốt, giải phóng giữ chỗ, duyệt tiền mặt còn được hoàn.</summary>
+    /// <summary>
+    /// UC-ADM-05 — Áp dụng quyết định quản lý đồng ý hủy đơn.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Đọc các dòng món và kiểm tra chúng còn được phép hủy không.
+    /// 2. Cập nhật phần món bị hủy và giải phóng nguyên liệu chưa dùng.
+    /// 3. Kiểm tra các khoản đã thu để tạo hồ sơ hoàn tiền khi cần.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - order: Thông tin đơn hàng đã được đọc từ database.
+    /// - requests: Các dòng món đang được yêu cầu hủy.
+    /// - admin: Khóa của quản lý thực hiện duyệt.
+    /// - now: Thời điểm đang thực hiện việc xử lý.
+    ///
+    /// Cần nhớ: Duyệt hủy mới tạo điều kiện hoàn tiền; khách vẫn cần nhận tiền tại quầy theo luồng được phép.
+    /// </summary>
     private async Task Approve(DonHang order, List<HuyMon> requests, long admin, DateTime now)
     {
+
+        // Bước 1: Đọc lại các dòng món và kiểm tra điều kiện hủy trước khi áp dụng quyết định.
         var lines = await db.ChiTietDonHang.Where(x => x.MaDonHang == order.MaDonHang).OrderBy(x => x.MaChiTietDonHang).ToListAsync();
         if (lines.Count != requests.Count || lines.Any(x => x.SoLuongBatDauPha != 0 || x.SoLuongDaHuy != 0 || x.SoLuongPhaXong != 0 ||
             !requests.Any(r => r.MaChiTietDonHang == x.MaChiTietDonHang && r.SoLuongHuy == x.SoLuongDat)))
@@ -124,6 +160,8 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
             line.SoLuongDaHuy = line.SoLuongDat; line.ThoiDiemCapNhat = now;
         }
         var customer = await db.TaiKhoanKhachHang.SingleAsync(x => x.MaKhachHang == order.MaKhachHang);
+
+        // Bước 2: Với khoản đã thu, tạo hồ sơ hoàn phù hợp; chưa ghi nhận đã trả tiền.
         foreach (var payment in await db.ThanhToan.Where(x => x.MaDonHang == order.MaDonHang && x.SoTienDaXacMinh > 0).ToListAsync())
         {
             db.HoSoHoanTien.Add(new() { MaDonHang = order.MaDonHang,
@@ -151,7 +189,21 @@ public sealed class CancellationWorkflow(CafeDbContext db, OrderWorkflowService 
         return result;
     }
 
-    /// <summary>Nhân viên xác nhận đã giao tiền thật cho khách; ghi lần chi gắn đúng ca và audit nguyên tử, không tự tạo hạn mức.</summary>
+    /// <summary>
+    /// UC-POS-05, UC-ADM-06 — Ghi nhận nhân viên trả tiền cho khách tại quầy.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra ca nhân viên và hồ sơ hoàn đã được duyệt.
+    /// 2. Kiểm tra số tiền còn được phép trả cho khách.
+    /// 3. Ghi nhận lần trả tiền thành công và cập nhật hồ sơ hoàn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - refundId: Khóa hồ sơ hoàn tiền đã được duyệt.
+    /// - input: Hồ sơ hoàn đã duyệt, số tiền và thông tin xác nhận.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Cần nhớ: Chỉ lần chi thành công mới được tính là đã trả tiền cho khách; không trả vượt số còn được hoàn.
+    /// </summary>
     public Task<IResult> PayAtCounter(long refundId, CounterRefundCommand input, HttpContext context) =>
         AdminOperation.Execute(db, input.MaThaoTac, "COUNTER_REFUND", "HoSoHoanTien", new { refundId, input }, context, async () =>
         {

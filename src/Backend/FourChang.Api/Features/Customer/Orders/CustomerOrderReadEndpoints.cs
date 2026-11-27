@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Tiếp nhận yêu cầu xem danh sách và chi tiết đơn cá nhân.
+// Cần nhớ: Khách chỉ được đọc đơn thuộc tài khoản của mình.
+
 using System.Security.Claims;
 using FourChang.Presentation.Shared.Contracts.Customer;
 

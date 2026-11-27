@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Theo dõi khoản cần hoàn và kết quả khách nhận tiền tại quầy.
+// Cần nhớ: Trạng thái được duyệt không được trình bày thành đã chi tiền.
+
 using System.Globalization;
 using System.Text.Json;
 using FourChang.Desktop.Shared.Controls;

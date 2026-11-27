@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Tra cứu, đối chiếu, chốt và bàn giao ca làm việc.
+// Cần nhớ: Đơn hoàn thành tính theo ca hoàn tất; tiền thu/hoàn vẫn gắn với ca đã thực hiện giao dịch.
+
 using FourChang.Api.Shared.Operations;
 using System.Text.Json;
 using System.Security.Cryptography;
@@ -62,7 +66,20 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         return Results.Ok(result);
     }
 
-    /// <summary>Tổng hợp tiền của chính ca, đơn/khoản chưa rõ từ chuỗi bàn giao, audit và biên bản liên quan.</summary>
+    /// <summary>
+    /// UC-ADM-08 — Tính tiền và tổng hợp các đơn của ca.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm các giao dịch thu và hoàn liên quan đến ca.
+    /// 2. Tính tiền mặt phải có từ tiền đầu ca, tiền mặt đã thu và đã trả.
+    /// 3. Tìm các đơn ca đã hoàn thành và những việc còn xử lý.
+    /// 4. Trả thông tin để nhân viên hoặc quản lý đối chiếu ca.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - shift: Thông tin ca đang cần tổng hợp số liệu.
+    ///
+    /// Cần nhớ: Tổng tiền đơn hoàn thành khác tiền mặt trong két; tiền chuyển khoản không cộng vào số tiền mặt cần đếm.
+    /// </summary>
     public async Task<WorkSessionDetails> Detail(CaLamViec shift)
     {
         var ids = await HandoverLink.Ancestors(db, shift.MaCaLamViec);
@@ -111,12 +128,29 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
             await HasRecentResumeRequest(shift.MaCaLamViec), await LastLifecycle(shift.MaCaLamViec), finished.Count, completedTotal, completedOrders);
     }
 
-    /// <summary>Chốt từ số thực đếm POS đã gửi; kiểm tra lại nguồn tiền ngay trong giao dịch, không chốt lần hai.</summary>
+    /// <summary>
+    /// UC-ADM-08 — Quản lý chốt ca đã có kết quả kiểm đếm hợp lệ.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Đọc lại ca và số liệu đối chiếu mới nhất.
+    /// 2. Kiểm tra số tiền nhân viên đã đếm có khớp không.
+    /// 3. Kiểm tra kết quả đối chiếu và các đơn/khoản còn dở.
+    /// 4. Chốt ca khi đáp ứng đầy đủ điều kiện.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa ca làm việc cần xử lý.
+    /// - input: Ca, phiên bản và mã đối chiếu từ giao diện.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Ca được chốt hoặc lý do chưa thể chốt.
+    /// </summary>
     public Task<IResult> Close(long id, CloseWorkSessionInput input, HttpContext context) => AdminOperation.Execute(db,
         input.MaThaoTac, "SHIFT_ADMIN_CLOSED", "CaLamViec", new { id, input }, context, async () =>
     {
         var shift = await Editable(id, input.PhienBanDuLieu);
         var detail = await Detail(shift);
+
+        // Bước 1: Đối chiếu số tiền kiểm đếm với tiền mặt hệ thống của đúng ca.
         ValidateCount(shift, detail.TienMatDuKienHienTai);
         if (!detail.DangChoDoiChieu) throw new AdminRule(409, "Cần nhân viên Gửi đối chiếu tại POS; ca phải đang khóa chờ đối chiếu.");
         if (string.IsNullOrEmpty(input.MaDoiChieu) || input.MaDoiChieu != detail.MaDoiChieu)
@@ -124,12 +158,28 @@ public sealed class WorkSessionService(CafeDbContext db, FourChang.Api.Shared.Or
         if (detail.DonDangXuLy.Count > 0 || detail.KhoanChuaRo.Count > 0)
             throw new AdminRule(409, "Ca còn đơn dở hoặc khoản chưa rõ. Xử lý tại đúng nghiệp vụ hoặc bàn giao có liên kết trước khi chốt.");
         var before = JsonSerializer.Serialize(detail.Ca);
+
+        // Bước 2: Chỉ chốt sau khi mã đối chiếu, các đơn và các khoản chưa rõ đã được kiểm tra.
         Finish(shift, "CLOSED", detail.TienMatDuKienHienTai, context);
         await db.SaveChangesAsync();
         return (id, (object)await View(shift), before, null);
     });
 
-    /// <summary>Bàn giao có biên bản giữ nguyên chủ ca/giao dịch nguồn; ca nhận chỉ được tạo khi nhân viên mở POS.</summary>
+    /// <summary>
+    /// UC-ADM-08 — Ghi bàn giao từ ca hiện tại sang hồ sơ ca nhận.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra ca nguồn và thông tin bàn giao.
+    /// 2. Kiểm tra các điều kiện và nội dung được phép chuyển tiếp.
+    /// 3. Lưu liên kết bàn giao để ca sau nhận đúng công việc còn lại.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa ca làm việc cần xử lý.
+    /// - input: Ca nguồn và thông tin bàn giao.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Sau khi xử lý: Thông tin bàn giao để ca sau tiếp tục đúng các đơn được chuyển.
+    /// </summary>
     public Task<IResult> Handover(long id, HandoverWorkSessionInput input, HttpContext context) => AdminOperation.Execute(db,
         input.MaThaoTac, "SHIFT_HANDED_OVER", "CaLamViec", new { id, input }, context, async () =>
     {

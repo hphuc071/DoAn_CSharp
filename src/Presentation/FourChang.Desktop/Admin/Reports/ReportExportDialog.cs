@@ -1,3 +1,7 @@
+// UC: UC-ADM-07
+// Chức năng: Hiển thị tiến độ và kết quả xuất báo cáo.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Session;
 using FourChang.Desktop.Shared.Theme;

@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Chuẩn bị thông tin nhận món, báo giá và chuyển yêu cầu đặt món đến Backend.
+// Cần nhớ: Kiểm tra tại giao diện hỗ trợ khách nhập; Backend vẫn kiểm lại dữ liệu.
+
 using System.Net.Http.Json;
 using System.Text.Json;
 using FourChang.Presentation.Shared.ApiClients;

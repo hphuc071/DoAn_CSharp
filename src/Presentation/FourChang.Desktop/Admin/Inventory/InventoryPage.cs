@@ -1,3 +1,7 @@
+// UC: UC-ADM-03
+// Chức năng: Hiển thị số tồn và nguồn biến động của nguyên liệu.
+// Cần nhớ: Đây là màn hình tra cứu; số kho thay đổi qua nghiệp vụ nhập/xuất hoặc pha chế.
+
 using System.Globalization;
 using FourChang.Desktop.Shared.Theme;
 using FourChang.Desktop.Shared.Controls;

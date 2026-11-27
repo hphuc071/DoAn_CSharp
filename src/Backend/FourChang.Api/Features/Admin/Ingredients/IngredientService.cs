@@ -1,3 +1,7 @@
+// UC: UC-ADM-03
+// Chức năng: Quản lý nguyên liệu, đơn vị g/ml và kiểm tra ảnh hưởng khi ngừng sử dụng.
+// Cần nhớ: Thêm nguyên liệu không phải nhập kho; số lượng kho được xử lý qua phiếu.
+
 using FourChang.Domain.Shared;
 using System.Text.Json;
 using System.Security.Cryptography;
@@ -28,7 +32,21 @@ public sealed class IngredientService(CafeDbContext db)
         return new(result, units);
     }
 
-    /// <summary>Lưu nguyên liệu cùng transaction/audit/outbox; không nhận số tồn từ client.</summary>
+    /// <summary>
+    /// UC-ADM-03 — Thêm hoặc sửa thông tin nguyên liệu.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Kiểm tra tên nguyên liệu, đơn vị và các thông tin được nhập.
+    /// 2. Khi ngừng sử dụng, kiểm tra công thức nào bị ảnh hưởng và thông tin xác nhận.
+    /// 3. Lưu thông tin nguyên liệu cùng kết quả thao tác.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa nguyên liệu cần xem hoặc cập nhật; không phải STT trên màn hình.
+    /// - input: Tên, đơn vị, ngưỡng cảnh báo, trạng thái và xác nhận ảnh hưởng khi cần.
+    /// - context: Thông tin phiên và quyền của người đang thao tác.
+    ///
+    /// Cần nhớ: Thêm nguyên liệu không tự tăng số lượng trong kho. Số lượng được cộng khi phiếu nhập được xử lý thành công.
+    /// </summary>
     public Task<IResult> Save(long? id, IngredientInput input, HttpContext context) => Change(input.MaThaoTac, "SAVE", new { id, input }, context, async () =>
     {
         var item = id is null ? new NguyenLieu() : await db.NguyenLieu.SingleOrDefaultAsync(x => x.MaNguyenLieu == id)
@@ -66,7 +84,19 @@ public sealed class IngredientService(CafeDbContext db)
     public Task<IResult> Delete(long id, AdminDeleteInput input, HttpContext context) => Task.FromResult<IResult>(
         Results.Problem(statusCode: 409, detail: "Không xóa nguyên liệu. Chọn Ngừng sử dụng để giữ tồn kho và lịch sử."));
 
-    /// <summary>Chụp công thức đang áp dụng/lên lịch và phiên bản để xác nhận ảnh hưởng trước khi ngừng.</summary>
+    /// <summary>
+    /// UC-ADM-03 — Xem việc ngừng nguyên liệu có ảnh hưởng đến đâu.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm nguyên liệu đang được yêu cầu kiểm tra.
+    /// 2. Tìm các công thức và cấu hình có sử dụng nguyên liệu đó.
+    /// 3. Trả thông tin ảnh hưởng cho quản lý xem trước khi quyết định.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa nguyên liệu cần xem hoặc cập nhật; không phải STT trên màn hình.
+    ///
+    /// Sau khi xử lý: Thông tin cho quản lý cân nhắc trước khi xác nhận.
+    /// </summary>
     public async Task<IngredientImpact> Impact(long id)
     {
         var ingredient = await db.NguyenLieu.AsNoTracking().SingleOrDefaultAsync(n => n.MaNguyenLieu == id)

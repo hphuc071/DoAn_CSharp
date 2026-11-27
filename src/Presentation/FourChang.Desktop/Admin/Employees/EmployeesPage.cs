@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Hiển thị danh sách và trạng thái làm việc của nhân viên.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Admin.WorkSessions;
 using FourChang.Desktop.Shared.Controls;
 using FourChang.Desktop.Shared.Controls.Admin;

@@ -1,4 +1,8 @@
-﻿using System.Text.Json;
+// UC: UC-ADM-03
+// Chức năng: Tìm nguyên liệu, xem trạng thái và mở cửa sổ chỉnh thông tin.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
+using System.Text.Json;
 using System.Globalization;
 using FourChang.Desktop.Shared.Controls.Admin;
 using FourChang.Desktop.Shared.Session;

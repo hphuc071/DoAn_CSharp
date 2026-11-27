@@ -1,3 +1,7 @@
+// UC: UC-POS-01, UC-ADM-08
+// Chức năng: Tính tiền mặt cần đối chiếu của một ca.
+// Cần nhớ: Tiền mặt cuối ca = đầu ca + tiền mặt đã thu - tiền mặt đã hoàn; chuyển khoản không nằm trong két.
+
 using FourChang.Api.Shared.WorkSessions;
 using System.Data;
 using System.Security.Cryptography;

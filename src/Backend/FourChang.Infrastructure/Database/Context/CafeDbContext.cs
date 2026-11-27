@@ -1,3 +1,7 @@
+// UC: Dùng chung toàn hệ thống
+// Chức năng: Khai báo các bảng EF Core và thực hiện lưu dữ liệu.
+// Cần nhớ: Trước khi lưu, gắn thời điểm và cấp mã hiển thị cho bản ghi mới; không thay khóa liên kết.
+
 using FourChang.Domain.Entities.Accounts;
 using FourChang.Domain.Entities.Audit;
 using FourChang.Domain.Entities.Employees;
@@ -46,7 +50,20 @@ public sealed class CafeDbContext(DbContextOptions<CafeDbContext> options) : DbC
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(CafeDbContext).Assembly);
         foreach (var prefix in DisplayCodeAllocator.Prefixes) modelBuilder.HasSequence<long>("DisplayCode_" + prefix, "dbo").StartsAt(1).IncrementsBy(1);
     }
-    /// <summary>Gắn thời điểm tạo/cập nhật phía máy chủ trước khi lưu; không tin thời điểm do client gửi.</summary>
+    /// <summary>
+    /// Dùng chung toàn hệ thống — Chuẩn bị thông tin chung rồi ghi thay đổi xuống database.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm các đối tượng đang được thêm hoặc sửa.
+    /// 2. Gắn thời điểm tạo/cập nhật theo thời gian máy chủ.
+    /// 3. Gọi phần cấp mã hiển thị nếu cần.
+    /// 4. Yêu cầu EF Core ghi những thay đổi xuống database.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - cancellationToken: Tín hiệu yêu cầu dừng tác vụ nếu không cần xử lý tiếp.
+    ///
+    /// Sau khi xử lý: Số bản ghi bị tác động; lỗi được trả về cho bên gọi xử lý giao dịch.
+    /// </summary>
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;

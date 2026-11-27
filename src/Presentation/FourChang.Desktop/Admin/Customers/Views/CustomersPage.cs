@@ -1,3 +1,7 @@
+// UC: UC-ADM-01
+// Chức năng: Hiển thị danh sách khách và mở thao tác quản lý hồ sơ.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Desktop.Admin.Customers.Controllers;
 using System.Drawing.Drawing2D;
 using FourChang.Desktop.Shared.Controls;

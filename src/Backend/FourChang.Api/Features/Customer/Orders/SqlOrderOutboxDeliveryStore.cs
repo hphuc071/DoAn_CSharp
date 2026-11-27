@@ -1,3 +1,7 @@
+// UC: UC-WEB-06
+// Chức năng: Nhận và ghi trạng thái xử lý các sự kiện đơn hàng đã lưu.
+// Cần nhớ: Có khóa và mốc thử lại để các lần chạy không nhận cùng sự kiện một cách tùy ý.
+
 using System.Data;
 using FourChang.Infrastructure.Database.Context;
 using Microsoft.EntityFrameworkCore;

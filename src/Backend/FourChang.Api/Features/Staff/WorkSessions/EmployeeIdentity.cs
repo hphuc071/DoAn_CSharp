@@ -1,3 +1,7 @@
+// UC: UC-POS-01
+// Chức năng: Chuẩn hóa và xác định hồ sơ nhân viên dùng khi mở ca.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Text;
 using System.Text.RegularExpressions;
 namespace FourChang.Api.Features.Staff.WorkSessions;

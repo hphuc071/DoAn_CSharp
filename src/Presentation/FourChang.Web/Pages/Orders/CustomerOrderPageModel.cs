@@ -1,3 +1,7 @@
+// UC: UC-WEB-08
+// Chức năng: Dùng chung phần kiểm tra phiên và gọi API cho các trang đơn cá nhân.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Net;
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Presentation.Shared.Contracts.Customer;

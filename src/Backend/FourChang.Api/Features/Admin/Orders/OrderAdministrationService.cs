@@ -1,3 +1,7 @@
+// UC: UC-ADM-05
+// Chức năng: Tra cứu đơn, chi tiết món, thanh toán và kết quả yêu cầu hủy.
+// Cần nhớ: Quản lý theo dõi và duyệt hủy; các bước pha chế thường lệ thuộc nhân viên.
+
 using System.Data;
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;
@@ -78,7 +82,19 @@ public sealed class OrderAdministrationService(CafeDbContext db, OrderFinancials
         await tx.CommitAsync(); return result;
     }
 
-    /// <summary>Liên kết đơn–dòng–giữ chỗ–tiêu hao–tiền–audit, không dựng lại giá hoặc BOM từ menu hiện tại.</summary>
+    /// <summary>
+    /// UC-ADM-05 — Xem một đơn với thông tin nhận món và thanh toán.
+    ///
+    /// Hàm này được dùng để:
+    /// 1. Tìm đơn hàng cần xem.
+    /// 2. Đọc các món, thông tin nhận hàng, thanh toán và yêu cầu hủy liên quan.
+    /// 3. Trả dữ liệu cho giao diện chi tiết đơn.
+    ///
+    /// Thông tin cần truyền vào:
+    /// - id: Khóa của đơn hàng cần xử lý.
+    ///
+    /// Sau khi xử lý: Chi tiết dùng cho giao diện; không tự đổi trạng thái đơn.
+    /// </summary>
     public async Task<AdminOrderDetail> Details(long id)
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable);

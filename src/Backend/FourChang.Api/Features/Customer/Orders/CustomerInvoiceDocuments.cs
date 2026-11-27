@@ -1,3 +1,7 @@
+// UC: UC-WEB-07, UC-WEB-08
+// Chức năng: Trả tài liệu hóa đơn đã có cho đúng chủ đơn.
+// Cần nhớ: Không tự phát hành hóa đơn mới khi khách bấm xem hoặc tải.
+
 using System.Text;
 
 namespace FourChang.Api.Features.Customer.Orders;

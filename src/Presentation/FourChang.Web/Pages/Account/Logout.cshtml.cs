@@ -1,3 +1,7 @@
+// UC: UC-WEB-02
+// Chức năng: Thực hiện đăng xuất và dọn trạng thái phiên website.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Presentation.Shared.ApiClients;
 using FourChang.Web.Security;
 using Microsoft.AspNetCore.Mvc;

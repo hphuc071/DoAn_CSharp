@@ -1,3 +1,7 @@
+// UC: UC-WEB-02, UC-WEB-03
+// Chức năng: Nhận yêu cầu đổi mật khẩu tạm của khách hàng.
+// Cần nhớ: Phiên đổi mật khẩu có phạm vi riêng, chưa dùng thay cho phiên mua hàng đầy đủ.
+
 using System.Security.Claims;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Customer;

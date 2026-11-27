@@ -1,3 +1,7 @@
+// UC: UC-WEB-07
+// Chức năng: Phân loại kết quả thanh toán để quyết định bước xử lý tiếp theo.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Domain.Entities.Payments;
 using FourChang.Presentation.Shared.Contracts.Customer;
 

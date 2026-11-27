@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Xử lý các khoản tiền đến cần đối chiếu và khoản hoàn liên quan.
+// Cần nhớ: Không tự coi tiền chưa đủ bằng chứng là khoản thu hợp lệ.
+
 using System.Security.Claims;
 using System.Text.Json;
 using FourChang.Api.Shared.Operations;

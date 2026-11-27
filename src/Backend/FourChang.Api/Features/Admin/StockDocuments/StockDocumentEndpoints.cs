@@ -1,10 +1,14 @@
+// UC: UC-ADM-04
+// Chức năng: Khai báo API lập, sửa nháp, xác nhận và theo dõi phiếu kho.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 using FourChang.Infrastructure.Database.Context;
 using FourChang.Presentation.Shared.Contracts.Admin;
 
 namespace FourChang.Api.Features.Admin.StockDocuments;
 
-/// <summary>Điểm vào UC-ADM-06; quyền Admin được kiểm tra trước mọi truy vấn/lệnh kho.</summary>
+/// <summary>Điểm vào UC-ADM-04; quyền Admin được kiểm tra trước mọi truy vấn/lệnh kho.</summary>
 public static class StockDocumentEndpoints
 {
     /// <summary>Đăng ký danh sách, nháp, ghi sổ, đảo và tra kết quả sau timeout; không có API sửa phiếu đã ghi sổ.</summary>

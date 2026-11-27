@@ -1,3 +1,7 @@
+// UC: UC-ADM-08
+// Chức năng: Quản lý hồ sơ và trạng thái làm việc của nhân viên.
+// Cần nhớ: Hồ sơ nhân viên dùng để mở ca, không phải tài khoản đăng nhập cá nhân.
+
 using FourChang.Api.Shared.Operations;
 using System.Text.Json;
 using System.Text.RegularExpressions;

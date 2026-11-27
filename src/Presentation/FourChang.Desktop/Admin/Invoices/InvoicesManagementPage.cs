@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Tìm, xem, in và tải hóa đơn đã phát hành.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using System.Drawing.Printing;
 using System.Globalization;
 using FourChang.Desktop.Admin.Orders;

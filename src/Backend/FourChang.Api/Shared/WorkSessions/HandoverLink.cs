@@ -1,3 +1,7 @@
+// UC: UC-POS-01, UC-ADM-08
+// Chức năng: Liên kết ca trước/ca sau và xác định đơn được bàn giao hoặc hoàn tất ở ca nào.
+// Cần nhớ: Đọc hàm từ bước kiểm tra dữ liệu đến bước trả kết quả; các quyết định nghiệp vụ do Backend kiểm tra.
+
 using FourChang.Api.Shared.Operations;
 using System.Text.Json;
 using FourChang.Infrastructure.Database.Context;

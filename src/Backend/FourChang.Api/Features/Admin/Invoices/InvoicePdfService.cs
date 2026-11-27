@@ -1,3 +1,7 @@
+// UC: UC-ADM-06
+// Chức năng: Xuất PDF từ thông tin hóa đơn và nội dung đã lưu.
+// Cần nhớ: Không lấy giá thực đơn hiện tại để thay nội dung hóa đơn cũ.
+
 using System.Text.Json;
 using FourChang.Api.Shared.Documents;
 using FourChang.Api.Shared.Operations;

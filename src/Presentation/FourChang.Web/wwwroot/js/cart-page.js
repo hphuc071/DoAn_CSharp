@@ -1,3 +1,7 @@
+// UC: UC-WEB-05
+// Chức năng: Hiển thị các dòng giỏ và tổng hợp dữ liệu trên trang giỏ hàng.
+// Cần nhớ: JavaScript hỗ trợ thao tác; Backend vẫn kiểm tra dữ liệu và quyền trước khi lưu.
+
 (() => {
   "use strict";
   const C = window.FourChangCart, lines = document.getElementById("cart-lines");
